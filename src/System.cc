@@ -21,16 +21,152 @@
 
 
 #include "System.h"
-#include "Converter.h"
-#include "Usleep.h"
+
 #include <thread>
 #include <pangolin/pangolin.h>
 #include <iomanip>
 
+#include "Tracking.h"
+#include "FrameDrawer.h"
+#include "MapDrawer.h"
+#include "Map.h"
+#include "LocalMapping.h"
+#include "LoopClosing.h"
+#include "KeyFrameDatabase.h"
+#include "ORBVocabulary.h"
+#include "Viewer.h"
+#include "Converter.h"
+#include "Usleep.h"
+
 namespace ORB_SLAM2
 {
 
-System::System(const string &strVocFile, const string &strSettingsFile, const eSensor sensor,
+using namespace std;
+
+class SystemImpl : public System
+{
+
+public:
+
+	// Initialize the SLAM system. It launches the Local Mapping, Loop Closing and Viewer threads.
+	SystemImpl(const string &strVocFile, const string &strSettingsFile, const eSensor sensor, const bool bUseViewer = true);
+
+	// Proccess the given stereo frame. Images must be synchronized and rectified.
+	// Input images: RGB (CV_8UC3) or grayscale (CV_8U). RGB is converted to grayscale.
+	// Returns the camera pose (empty if tracking fails).
+	cv::Mat TrackStereo(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timestamp);
+
+	// Process the given rgbd frame. Depthmap must be registered to the RGB frame.
+	// Input image: RGB (CV_8UC3) or grayscale (CV_8U). RGB is converted to grayscale.
+	// Input depthmap: Float (CV_32F).
+	// Returns the camera pose (empty if tracking fails).
+	cv::Mat TrackRGBD(const cv::Mat &im, const cv::Mat &depthmap, const double &timestamp);
+
+	// Proccess the given monocular frame
+	// Input images: RGB (CV_8UC3) or grayscale (CV_8U). RGB is converted to grayscale.
+	// Returns the camera pose (empty if tracking fails).
+	cv::Mat TrackMonocular(const cv::Mat &im, const double &timestamp);
+
+	// This stops local mapping thread (map building) and performs only camera tracking.
+	void ActivateLocalizationMode();
+	// This resumes local mapping thread and performs SLAM again.
+	void DeactivateLocalizationMode();
+
+	// Returns true if there have been a big map change (loop closure, global BA)
+	// since last call to this function
+	bool MapChanged();
+
+	// Reset the system (clear map)
+	void Reset();
+
+	// All threads will be requested to finish.
+	// It waits until all threads have finished.
+	// This function must be called before saving the trajectory.
+	void Shutdown();
+
+	// Save camera trajectory in the TUM RGB-D dataset format.
+	// Only for stereo and RGB-D. This method does not work for monocular.
+	// Call first Shutdown()
+	// See format details at: http://vision.in.tum.de/data/datasets/rgbd-dataset
+	void SaveTrajectoryTUM(const string &filename);
+
+	// Save keyframe poses in the TUM RGB-D dataset format.
+	// This method works for all sensor input.
+	// Call first Shutdown()
+	// See format details at: http://vision.in.tum.de/data/datasets/rgbd-dataset
+	void SaveKeyFrameTrajectoryTUM(const string &filename);
+
+	// Save camera trajectory in the KITTI dataset format.
+	// Only for stereo and RGB-D. This method does not work for monocular.
+	// Call first Shutdown()
+	// See format details at: http://www.cvlibs.net/datasets/kitti/eval_odometry.php
+	void SaveTrajectoryKITTI(const string &filename);
+
+	// TODO: Save/Load functions
+	// SaveMap(const string &filename);
+	// LoadMap(const string &filename);
+
+	// Information from most recent processed frame
+	// You can call this right after TrackMonocular (or stereo or RGBD)
+	int GetTrackingState();
+	std::vector<MapPoint*> GetTrackedMapPoints();
+	std::vector<cv::KeyPoint> GetTrackedKeyPointsUn();
+
+private:
+
+	// Input sensor
+	eSensor mSensor;
+
+	// ORB vocabulary used for place recognition and feature matching.
+	ORBVocabulary* mpVocabulary;
+
+	// KeyFrame database for place recognition (relocalization and loop detection).
+	KeyFrameDatabase* mpKeyFrameDatabase;
+
+	// Map structure that stores the pointers to all KeyFrames and MapPoints.
+	Map* mpMap;
+
+	// Tracker. It receives a frame and computes the associated camera pose.
+	// It also decides when to insert a new keyframe, create some new MapPoints and
+	// performs relocalization if tracking fails.
+	Tracking* mpTracker;
+
+	// Local Mapper. It manages the local map and performs local bundle adjustment.
+	LocalMapping* mpLocalMapper;
+
+	// Loop Closer. It searches loops with every new keyframe. If there is a loop it performs
+	// a pose graph optimization and full bundle adjustment (in a new thread) afterwards.
+	LoopClosing* mpLoopCloser;
+
+	// The viewer draws the map and the current camera pose. It uses Pangolin.
+	Viewer* mpViewer;
+
+	FrameDrawer* mpFrameDrawer;
+	MapDrawer* mpMapDrawer;
+
+	// System threads: Local Mapping, Loop Closing, Viewer.
+	// The Tracking thread "lives" in the main execution thread that creates the System object.
+	std::thread* mptLocalMapping;
+	std::thread* mptLoopClosing;
+	std::thread* mptViewer;
+
+	// Reset flag
+	std::mutex mMutexReset;
+	bool mbReset;
+
+	// Change mode flags
+	std::mutex mMutexMode;
+	bool mbActivateLocalizationMode;
+	bool mbDeactivateLocalizationMode;
+
+	// Tracking state
+	int mTrackingState;
+	std::vector<MapPoint*> mTrackedMapPoints;
+	std::vector<cv::KeyPoint> mTrackedKeyPointsUn;
+	std::mutex mMutexState;
+};
+
+SystemImpl::SystemImpl(const string &strVocFile, const string &strSettingsFile, const eSensor sensor,
                const bool bUseViewer):mSensor(sensor), mpViewer(static_cast<Viewer*>(NULL)), mbReset(false),mbActivateLocalizationMode(false),
         mbDeactivateLocalizationMode(false)
 {
@@ -114,7 +250,7 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
     mpLoopCloser->SetLocalMapper(mpLocalMapper);
 }
 
-cv::Mat System::TrackStereo(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timestamp)
+cv::Mat SystemImpl::TrackStereo(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timestamp)
 {
     if(mSensor!=STEREO)
     {
@@ -165,7 +301,7 @@ cv::Mat System::TrackStereo(const cv::Mat &imLeft, const cv::Mat &imRight, const
     return Tcw;
 }
 
-cv::Mat System::TrackRGBD(const cv::Mat &im, const cv::Mat &depthmap, const double &timestamp)
+cv::Mat SystemImpl::TrackRGBD(const cv::Mat &im, const cv::Mat &depthmap, const double &timestamp)
 {
     if(mSensor!=RGBD)
     {
@@ -216,7 +352,7 @@ cv::Mat System::TrackRGBD(const cv::Mat &im, const cv::Mat &depthmap, const doub
     return Tcw;
 }
 
-cv::Mat System::TrackMonocular(const cv::Mat &im, const double &timestamp)
+cv::Mat SystemImpl::TrackMonocular(const cv::Mat &im, const double &timestamp)
 {
     if(mSensor!=MONOCULAR)
     {
@@ -268,19 +404,19 @@ cv::Mat System::TrackMonocular(const cv::Mat &im, const double &timestamp)
     return Tcw;
 }
 
-void System::ActivateLocalizationMode()
+void SystemImpl::ActivateLocalizationMode()
 {
     unique_lock<mutex> lock(mMutexMode);
     mbActivateLocalizationMode = true;
 }
 
-void System::DeactivateLocalizationMode()
+void SystemImpl::DeactivateLocalizationMode()
 {
     unique_lock<mutex> lock(mMutexMode);
     mbDeactivateLocalizationMode = true;
 }
 
-bool System::MapChanged()
+bool SystemImpl::MapChanged()
 {
     static int n=0;
     int curn = mpMap->GetLastBigChangeIdx();
@@ -293,13 +429,13 @@ bool System::MapChanged()
         return false;
 }
 
-void System::Reset()
+void SystemImpl::Reset()
 {
     unique_lock<mutex> lock(mMutexReset);
     mbReset = true;
 }
 
-void System::Shutdown()
+void SystemImpl::Shutdown()
 {
     mpLocalMapper->RequestFinish();
     mpLoopCloser->RequestFinish();
@@ -320,7 +456,7 @@ void System::Shutdown()
         pangolin::BindToContext("ORB-SLAM2: Map Viewer");
 }
 
-void System::SaveTrajectoryTUM(const string &filename)
+void SystemImpl::SaveTrajectoryTUM(const string &filename)
 {
     cout << endl << "Saving camera trajectory to " << filename << " ..." << endl;
     if(mSensor==MONOCULAR)
@@ -381,7 +517,7 @@ void System::SaveTrajectoryTUM(const string &filename)
 }
 
 
-void System::SaveKeyFrameTrajectoryTUM(const string &filename)
+void SystemImpl::SaveKeyFrameTrajectoryTUM(const string &filename)
 {
     cout << endl << "Saving keyframe trajectory to " << filename << " ..." << endl;
 
@@ -417,7 +553,7 @@ void System::SaveKeyFrameTrajectoryTUM(const string &filename)
     cout << endl << "trajectory saved!" << endl;
 }
 
-void System::SaveTrajectoryKITTI(const string &filename)
+void SystemImpl::SaveTrajectoryKITTI(const string &filename)
 {
     cout << endl << "Saving camera trajectory to " << filename << " ..." << endl;
     if(mSensor==MONOCULAR)
@@ -472,22 +608,27 @@ void System::SaveTrajectoryKITTI(const string &filename)
     cout << endl << "trajectory saved!" << endl;
 }
 
-int System::GetTrackingState()
+int SystemImpl::GetTrackingState()
 {
     unique_lock<mutex> lock(mMutexState);
     return mTrackingState;
 }
 
-vector<MapPoint*> System::GetTrackedMapPoints()
+vector<MapPoint*> SystemImpl::GetTrackedMapPoints()
 {
     unique_lock<mutex> lock(mMutexState);
     return mTrackedMapPoints;
 }
 
-vector<cv::KeyPoint> System::GetTrackedKeyPointsUn()
+vector<cv::KeyPoint> SystemImpl::GetTrackedKeyPointsUn()
 {
     unique_lock<mutex> lock(mMutexState);
     return mTrackedKeyPointsUn;
+}
+
+System::Pointer System::Create(const string &strVocFile, const string &strSettingsFile, const eSensor sensor, const bool bUseViewer)
+{
+	return std::make_unique<SystemImpl>(strVocFile, strSettingsFile, sensor, bUseViewer);
 }
 
 } //namespace ORB_SLAM

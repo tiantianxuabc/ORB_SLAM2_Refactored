@@ -24,8 +24,9 @@
 #include<fstream>
 #include<iomanip>
 #include<chrono>
+#include<thread>
 
-#include<opencv2/core/core.hpp>
+#include<opencv2/opencv.hpp>
 
 #include<System.h>
 
@@ -103,7 +104,7 @@ int main(int argc, char **argv)
     const int nImages = vstrImageLeft.size();
 
     // Create SLAM system. It initializes all system threads and gets ready to process frames.
-    ORB_SLAM2::System SLAM(argv[1],argv[2],ORB_SLAM2::System::STEREO,true);
+    auto SLAM = ORB_SLAM2::System::Create(argv[1],argv[2],ORB_SLAM2::System::STEREO,true);
 
     // Vector for tracking time statistics
     vector<float> vTimesTrack;
@@ -144,7 +145,7 @@ int main(int argc, char **argv)
 		std::chrono::steady_clock::time_point t1 = std::chrono::steady_clock::now();
 
         // Pass the images to the SLAM system
-        SLAM.TrackStereo(imLeftRect,imRightRect,tframe);
+        SLAM->TrackStereo(imLeftRect,imRightRect,tframe);
 
 		std::chrono::steady_clock::time_point t2 = std::chrono::steady_clock::now();
 
@@ -164,7 +165,7 @@ int main(int argc, char **argv)
     }
 
     // Stop all threads
-    SLAM.Shutdown();
+    SLAM->Shutdown();
 
     // Tracking time statistics
     sort(vTimesTrack.begin(),vTimesTrack.end());
@@ -178,7 +179,7 @@ int main(int argc, char **argv)
     cout << "mean tracking time: " << totaltime/nImages << endl;
 
     // Save camera trajectory
-    SLAM.SaveTrajectoryTUM("CameraTrajectory.txt");
+    SLAM->SaveTrajectoryTUM("CameraTrajectory.txt");
 
     return 0;
 }
