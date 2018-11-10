@@ -15,7 +15,8 @@ set(SRCS_DBOW2
   DBoW2/BowVector.cpp
   DBoW2/FORB.cpp      
   DBoW2/FeatureVector.cpp
-  DBoW2/ScoringObject.cpp)
+  DBoW2/ScoringObject.cpp
+  DBoW2/TemplatedVocabulary.cpp)
 
 set(HDRS_DUTILS
   DUtils/Random.h

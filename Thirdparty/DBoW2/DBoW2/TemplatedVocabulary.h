@@ -30,6 +30,7 @@
 #include "FeatureVector.h"
 #include "BowVector.h"
 #include "ScoringObject.h"
+#include "FORB.h"
 
 #include "../DUtils/Random.h"
 
@@ -1659,6 +1660,11 @@ std::ostream& operator<<(std::ostream &os,
 
   return os;
 }
+
+template<>
+bool TemplatedVocabulary<FORB::TDescriptor, FORB>::loadFromTextFile(const std::string &filename);
+
+extern template class TemplatedVocabulary<FORB::TDescriptor, FORB>;
 
 } // namespace DBoW2
 
