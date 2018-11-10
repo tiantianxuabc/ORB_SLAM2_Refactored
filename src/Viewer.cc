@@ -167,6 +167,8 @@ void Viewer::Run()
             break;
     }
 
+	pangolin::DestroyWindow("ORB-SLAM2: Map Viewer");
+
     SetFinish();
 }
 

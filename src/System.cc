@@ -23,7 +23,6 @@
 #include "System.h"
 
 #include <thread>
-#include <pangolin/pangolin.h>
 #include <iomanip>
 
 #include "Tracking.h"
@@ -451,9 +450,6 @@ void SystemImpl::Shutdown()
     {
         usleep(5000);
     }
-
-    if(mpViewer)
-        pangolin::BindToContext("ORB-SLAM2: Map Viewer");
 }
 
 void SystemImpl::SaveTrajectoryTUM(const string &filename)
