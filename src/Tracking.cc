@@ -54,6 +54,15 @@ TrackPoint::TrackPoint(const Frame& frame, bool lost)
 	Tcr = frame.mTcw * frame.mpReferenceKF->GetPoseInverse();
 }
 
+struct LastFrameInfo
+{
+	KeyFrame* keyFrame;
+	Frame frame;
+	int keyFrameId;
+	int relocFrameId;
+	LastFrameInfo() : keyFrame(nullptr), keyFrameId(0), relocFrameId(0) {}
+};
+
 static void ConvertToGray(const cv::Mat& src, cv::Mat& dst, bool RGB = false)
 {
 	static const int codes[] = { cv::COLOR_RGB2GRAY, cv::COLOR_BGR2GRAY, cv::COLOR_RGBA2GRAY, cv::COLOR_BGRA2GRAY };
@@ -80,7 +89,7 @@ public:
 		Map *pMap, KeyFrameDatabase* pKFDB, const string &strSettingPath, const int sensor) :
 		mState(STATE_NO_IMAGES), mSensor(sensor), mbLocalizationMode(false), mbVO(false), mpORBVocabulary(pVoc),
 		mpKeyFrameDB(pKFDB), mpInitializer(static_cast<Initializer*>(NULL)), mpSystem(pSys), mpViewer(NULL),
-		mpFrameDrawer(pFrameDrawer), mpMapDrawer(pMapDrawer), mpMap(pMap), mnLastRelocFrameId(0)
+		mpFrameDrawer(pFrameDrawer), mpMapDrawer(pMapDrawer), mpMap(pMap)
 	{
 		// Load camera parameters from settings file
 
@@ -434,15 +443,15 @@ protected:
 			if (mState == STATE_OK)
 			{
 				// Local Mapping might have changed some MapPoints tracked in last frame
-				for (int i = 0; i < mLastFrame.N; i++)
+				for (int i = 0; i < mLast.frame.N; i++)
 				{
-					MapPoint* pMP = mLastFrame.mvpMapPoints[i];
+					MapPoint* pMP = mLast.frame.mvpMapPoints[i];
 					MapPoint* pRep = pMP ? pMP->GetReplaced() : nullptr;
 					if (pRep)
-						mLastFrame.mvpMapPoints[i] = pRep;
+						mLast.frame.mvpMapPoints[i] = pRep;
 				}
 
-				const bool withMotionModel = !mVelocity.empty() && mCurrentFrame.mnId >= mnLastRelocFrameId + 2;
+				const bool withMotionModel = !mVelocity.empty() && mCurrentFrame.mnId >= mLast.relocFrameId + 2;
 				if (withMotionModel)
 				{
 					success = TrackWithMotionModel();
@@ -555,11 +564,11 @@ protected:
 		if (success)
 		{
 			// Update motion model
-			if (!mLastFrame.mTcw.empty())
+			if (!mLast.frame.mTcw.empty())
 			{
 				cv::Mat LastTwc = cv::Mat::eye(4, 4, CV_32F);
-				mLastFrame.GetRotationInverse().copyTo(LastTwc.rowRange(0, 3).colRange(0, 3));
-				mLastFrame.GetCameraCenter().copyTo(LastTwc.rowRange(0, 3).col(3));
+				mLast.frame.GetRotationInverse().copyTo(LastTwc.rowRange(0, 3).colRange(0, 3));
+				mLast.frame.GetCameraCenter().copyTo(LastTwc.rowRange(0, 3).col(3));
 				mVelocity = mCurrentFrame.mTcw*LastTwc;
 			}
 			else
@@ -616,7 +625,7 @@ protected:
 		if (!mCurrentFrame.mpReferenceKF)
 			mCurrentFrame.mpReferenceKF = mpReferenceKF;
 
-		mLastFrame = Frame(mCurrentFrame);
+		mLast.frame = Frame(mCurrentFrame);
 
 		// Store frame pose information to retrieve the complete camera trajectory afterwards.
 		CV_Assert(mCurrentFrame.mpReferenceKF == mpReferenceKF);
@@ -669,9 +678,9 @@ protected:
 
 			mpLocalMapper->InsertKeyFrame(pKFini);
 
-			mLastFrame = Frame(mCurrentFrame);
-			mnLastKeyFrameId = mCurrentFrame.mnId;
-			mpLastKeyFrame = pKFini;
+			mLast.frame = Frame(mCurrentFrame);
+			mLast.keyFrameId = mCurrentFrame.mnId;
+			mLast.keyFrame = pKFini;
 
 			mvpLocalKeyFrames.push_back(pKFini);
 			mvpLocalMapPoints = mpMap->GetAllMapPoints();
@@ -698,7 +707,7 @@ protected:
 			if (mCurrentFrame.mvKeys.size() > 100)
 			{
 				mInitialFrame = Frame(mCurrentFrame);
-				mLastFrame = Frame(mCurrentFrame);
+				mLast.frame = Frame(mCurrentFrame);
 				mvbPrevMatched.resize(mCurrentFrame.mvKeysUn.size());
 				for (size_t i = 0; i < mCurrentFrame.mvKeysUn.size(); i++)
 					mvbPrevMatched[i] = mCurrentFrame.mvKeysUn[i].pt;
@@ -845,8 +854,8 @@ protected:
 		mpLocalMapper->InsertKeyFrame(pKFcur);
 
 		mCurrentFrame.SetPose(pKFcur->GetPose());
-		mnLastKeyFrameId = mCurrentFrame.mnId;
-		mpLastKeyFrame = pKFcur;
+		mLast.keyFrameId = mCurrentFrame.mnId;
+		mLast.keyFrame = pKFcur;
 
 		mvpLocalKeyFrames.push_back(pKFcur);
 		mvpLocalKeyFrames.push_back(pKFini);
@@ -854,7 +863,7 @@ protected:
 		mpReferenceKF = pKFcur;
 		mCurrentFrame.mpReferenceKF = pKFcur;
 
-		mLastFrame = Frame(mCurrentFrame);
+		mLast.frame = Frame(mCurrentFrame);
 
 		mpMap->SetReferenceMapPoints(mvpLocalMapPoints);
 
@@ -881,7 +890,7 @@ protected:
 			return false;
 
 		mCurrentFrame.mvpMapPoints = vpMapPointMatches;
-		mCurrentFrame.SetPose(mLastFrame.mTcw);
+		mCurrentFrame.SetPose(mLast.frame.mTcw);
 
 		Optimizer::PoseOptimization(&mCurrentFrame);
 
@@ -912,21 +921,21 @@ protected:
 	void UpdateLastFrame()
 	{
 		// Update pose according to reference keyframe
-		KeyFrame* pRef = mLastFrame.mpReferenceKF;
+		KeyFrame* pRef = mLast.frame.mpReferenceKF;
 		cv::Mat Tlr = trajectory_.back().Tcr;
 
-		mLastFrame.SetPose(Tlr*pRef->GetPose());
+		mLast.frame.SetPose(Tlr*pRef->GetPose());
 
-		if (mnLastKeyFrameId == mLastFrame.mnId || mSensor == System::MONOCULAR || !mbLocalizationMode)
+		if (mLast.keyFrameId == mLast.frame.mnId || mSensor == System::MONOCULAR || !mbLocalizationMode)
 			return;
 
 		// Create "visual odometry" MapPoints
 		// We sort points according to their measured depth by the stereo/RGB-D sensor
 		vector<pair<float, int> > vDepthIdx;
-		vDepthIdx.reserve(mLastFrame.N);
-		for (int i = 0; i < mLastFrame.N; i++)
+		vDepthIdx.reserve(mLast.frame.N);
+		for (int i = 0; i < mLast.frame.N; i++)
 		{
-			float z = mLastFrame.mvDepth[i];
+			float z = mLast.frame.mvDepth[i];
 			if (z > 0)
 			{
 				vDepthIdx.push_back(make_pair(z, i));
@@ -947,7 +956,7 @@ protected:
 
 			bool bCreateNew = false;
 
-			MapPoint* pMP = mLastFrame.mvpMapPoints[i];
+			MapPoint* pMP = mLast.frame.mvpMapPoints[i];
 			if (!pMP)
 				bCreateNew = true;
 			else if (pMP->Observations() < 1)
@@ -957,10 +966,10 @@ protected:
 
 			if (bCreateNew)
 			{
-				cv::Mat x3D = mLastFrame.UnprojectStereo(i);
-				MapPoint* pNewMP = new MapPoint(x3D, mpMap, &mLastFrame, i);
+				cv::Mat x3D = mLast.frame.UnprojectStereo(i);
+				MapPoint* pNewMP = new MapPoint(x3D, mpMap, &mLast.frame, i);
 
-				mLastFrame.mvpMapPoints[i] = pNewMP;
+				mLast.frame.mvpMapPoints[i] = pNewMP;
 
 				mlpTemporalPoints.push_back(pNewMP);
 				nPoints++;
@@ -983,7 +992,7 @@ protected:
 		// Create "visual odometry" points if in Localization Mode
 		UpdateLastFrame();
 
-		mCurrentFrame.SetPose(mVelocity*mLastFrame.mTcw);
+		mCurrentFrame.SetPose(mVelocity*mLast.frame.mTcw);
 
 		fill(mCurrentFrame.mvpMapPoints.begin(), mCurrentFrame.mvpMapPoints.end(), static_cast<MapPoint*>(NULL));
 
@@ -993,13 +1002,13 @@ protected:
 			th = 15;
 		else
 			th = 7;
-		int nmatches = matcher.SearchByProjection(mCurrentFrame, mLastFrame, th, mSensor == System::MONOCULAR);
+		int nmatches = matcher.SearchByProjection(mCurrentFrame, mLast.frame, th, mSensor == System::MONOCULAR);
 
 		// If few matches, uses a wider window search
 		if (nmatches < 20)
 		{
 			fill(mCurrentFrame.mvpMapPoints.begin(), mCurrentFrame.mvpMapPoints.end(), static_cast<MapPoint*>(NULL));
-			nmatches = matcher.SearchByProjection(mCurrentFrame, mLastFrame, 2 * th, mSensor == System::MONOCULAR);
+			nmatches = matcher.SearchByProjection(mCurrentFrame, mLast.frame, 2 * th, mSensor == System::MONOCULAR);
 		}
 
 		if (nmatches < 20)
@@ -1075,7 +1084,7 @@ protected:
 
 		// Decide if the tracking was succesful
 		// More restrictive if there was a relocalization recently
-		if (mCurrentFrame.mnId < mnLastRelocFrameId + param_.maxFrames && mnMatchesInliers < 50)
+		if (mCurrentFrame.mnId < mLast.relocFrameId + param_.maxFrames && mnMatchesInliers < 50)
 			return false;
 
 		if (mnMatchesInliers < 30)
@@ -1097,7 +1106,7 @@ protected:
 		const int nKFs = mpMap->KeyFramesInMap();
 
 		// Do not insert keyframes if not enough frames have passed from last relocalisation
-		if (mCurrentFrame.mnId<mnLastRelocFrameId + param_.maxFrames && nKFs>param_.maxFrames)
+		if (mCurrentFrame.mnId<mLast.relocFrameId + param_.maxFrames && nKFs>param_.maxFrames)
 			return false;
 
 		// Tracked MapPoints in the reference keyframe
@@ -1137,9 +1146,9 @@ protected:
 			thRefRatio = 0.9f;
 
 		// Condition 1a: More than "MaxFrames" have passed from last keyframe insertion
-		const bool c1a = mCurrentFrame.mnId >= mnLastKeyFrameId + param_.maxFrames;
+		const bool c1a = mCurrentFrame.mnId >= mLast.keyFrameId + param_.maxFrames;
 		// Condition 1b: More than "MinFrames" have passed and Local Mapping is idle
-		const bool c1b = (mCurrentFrame.mnId >= mnLastKeyFrameId + param_.minFrames && bLocalMappingIdle);
+		const bool c1b = (mCurrentFrame.mnId >= mLast.keyFrameId + param_.minFrames && bLocalMappingIdle);
 		//Condition 1c: tracking is weak
 		const bool c1c = mSensor != System::MONOCULAR && (mnMatchesInliers < nRefMatches*0.25 || bNeedToInsertClose);
 		// Condition 2: Few tracked points compared to reference keyframe. Lots of visual odometry compared to map matches.
@@ -1247,8 +1256,8 @@ protected:
 
 		mpLocalMapper->SetNotStop(false);
 
-		mnLastKeyFrameId = mCurrentFrame.mnId;
-		mpLastKeyFrame = pKF;
+		mLast.keyFrameId = mCurrentFrame.mnId;
+		mLast.keyFrame = pKF;
 	}
 
 	void SearchLocalPoints()
@@ -1297,7 +1306,7 @@ protected:
 			if (mSensor == System::RGBD)
 				th = 3;
 			// If the camera has been relocalised recently, perform a coarser search
-			if (mCurrentFrame.mnId < mnLastRelocFrameId + 2)
+			if (mCurrentFrame.mnId < mLast.relocFrameId + 2)
 				th = 5;
 			matcher.SearchByProjection(mCurrentFrame, mvpLocalMapPoints, th);
 		}
@@ -1606,7 +1615,7 @@ protected:
 		}
 		else
 		{
-			mnLastRelocFrameId = mCurrentFrame.mnId;
+			mLast.relocFrameId = mCurrentFrame.mnId;
 			return true;
 		}
 	}
@@ -1674,10 +1683,7 @@ protected:
 	int mnMatchesInliers;
 
 	//Last Frame, KeyFrame and Relocalisation Info
-	KeyFrame* mpLastKeyFrame;
-	Frame mLastFrame;
-	unsigned int mnLastKeyFrameId;
-	unsigned int mnLastRelocFrameId;
+	LastFrameInfo mLast;
 
 	//Motion Model
 	cv::Mat mVelocity;
