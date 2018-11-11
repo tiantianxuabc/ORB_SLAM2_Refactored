@@ -24,6 +24,7 @@
 
 #include <thread>
 #include <iomanip>
+#include <Eigen/Geometry>
 
 #include "Tracking.h"
 #include "FrameDrawer.h"
@@ -34,13 +35,32 @@
 #include "KeyFrameDatabase.h"
 #include "ORBVocabulary.h"
 #include "Viewer.h"
-#include "Converter.h"
 #include "Usleep.h"
 
 namespace ORB_SLAM2
 {
 
 using namespace std;
+
+namespace Converter
+{
+
+static std::vector<float> toQuaternion(const cv::Mat1f &M)
+{
+	Eigen::Matrix3d eigMat;
+	for (int i = 0; i < 3; i++) for (int j = 0; j < 3; j++) eigMat(i, j) = M(i, j);
+	Eigen::Quaterniond q(eigMat);
+
+	std::vector<float> v(4);
+	v[0] = q.x();
+	v[1] = q.y();
+	v[2] = q.z();
+	v[3] = q.w();
+
+	return v;
+}
+
+} // namespace Converter
 
 class SystemImpl : public System
 {
@@ -135,7 +155,7 @@ private:
 
 	// Loop Closer. It searches loops with every new keyframe. If there is a loop it performs
 	// a pose graph optimization and full bundle adjustment (in a new thread) afterwards.
-	LoopClosing* mpLoopCloser;
+	std::shared_ptr<LoopClosing> mpLoopCloser;
 
 	// The viewer draws the map and the current camera pose. It uses Pangolin.
 	Viewer* mpViewer;
@@ -227,7 +247,7 @@ SystemImpl::SystemImpl(const string &strVocFile, const string &strSettingsFile, 
     mptLocalMapping = new thread(&ORB_SLAM2::LocalMapping::Run,mpLocalMapper);
 
     //Initialize the Loop Closing thread and launch
-    mpLoopCloser = new LoopClosing(mpMap, mpKeyFrameDatabase, mpVocabulary, mSensor!=MONOCULAR);
+    mpLoopCloser = LoopClosing::Create(mpMap, mpKeyFrameDatabase, mpVocabulary, mSensor!=MONOCULAR);
     mptLoopClosing = new thread(&ORB_SLAM2::LoopClosing::Run, mpLoopCloser);
 
     //Initialize the Viewer thread and launch
@@ -240,10 +260,10 @@ SystemImpl::SystemImpl(const string &strVocFile, const string &strSettingsFile, 
 
     //Set pointers between threads
     mpTracker->SetLocalMapper(mpLocalMapper);
-    mpTracker->SetLoopClosing(mpLoopCloser);
+    mpTracker->SetLoopClosing(mpLoopCloser.get());
 
     mpLocalMapper->SetTracker(mpTracker);
-    mpLocalMapper->SetLoopCloser(mpLoopCloser);
+    mpLocalMapper->SetLoopCloser(mpLoopCloser.get());
 
     mpLoopCloser->SetTracker(mpTracker);
     mpLoopCloser->SetLocalMapper(mpLocalMapper);

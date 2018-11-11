@@ -28,6 +28,18 @@
 
 #include "ORBmatcher.h"
 
+#include "Map.h"
+
+#include "KeyFrame.h"
+
+#include "KeyFrameDatabase.h"
+
+#include "ORBVocabulary.h"
+
+#include "Tracking.h"
+
+#include "LocalMapping.h"
+
 #include "Usleep.h"
 
 #include<mutex>
@@ -37,7 +49,110 @@
 namespace ORB_SLAM2
 {
 
-LoopClosing::LoopClosing(Map *pMap, KeyFrameDatabase *pDB, ORBVocabulary *pVoc, const bool bFixScale):
+class LoopClosingImpl : public LoopClosing
+{
+public:
+
+	typedef pair<set<KeyFrame*>, int> ConsistentGroup;
+	
+public:
+
+	LoopClosingImpl(Map* pMap, KeyFrameDatabase* pDB, ORBVocabulary* pVoc, const bool bFixScale);
+
+	void SetTracker(Tracking* pTracker);
+
+	void SetLocalMapper(LocalMapping* pLocalMapper);
+
+	// Main function
+	void Run();
+
+	void InsertKeyFrame(KeyFrame *pKF);
+
+	void RequestReset();
+
+	// This function will run in a separate thread
+	void RunGlobalBundleAdjustment(unsigned long nLoopKF);
+
+	bool isRunningGBA() {
+		unique_lock<std::mutex> lock(mMutexGBA);
+		return mbRunningGBA;
+	}
+	bool isFinishedGBA() {
+		unique_lock<std::mutex> lock(mMutexGBA);
+		return mbFinishedGBA;
+	}
+
+	void RequestFinish();
+
+	bool isFinished();
+
+	EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+protected:
+
+	bool CheckNewKeyFrames();
+
+	bool DetectLoop();
+
+	bool ComputeSim3();
+
+	void SearchAndFuse(const KeyFrameAndPose &CorrectedPosesMap);
+
+	void CorrectLoop();
+
+	void ResetIfRequested();
+	bool mbResetRequested;
+	std::mutex mMutexReset;
+
+	bool CheckFinish();
+	void SetFinish();
+	bool mbFinishRequested;
+	bool mbFinished;
+	std::mutex mMutexFinish;
+
+	Map* mpMap;
+	Tracking* mpTracker;
+
+	KeyFrameDatabase* mpKeyFrameDB;
+	ORBVocabulary* mpORBVocabulary;
+
+	LocalMapping *mpLocalMapper;
+
+	std::list<KeyFrame*> mlpLoopKeyFrameQueue;
+
+	std::mutex mMutexLoopQueue;
+
+	// Loop detector parameters
+	float mnCovisibilityConsistencyTh;
+
+	// Loop detector variables
+	KeyFrame* mpCurrentKF;
+	KeyFrame* mpMatchedKF;
+	std::vector<ConsistentGroup> mvConsistentGroups;
+	std::vector<KeyFrame*> mvpEnoughConsistentCandidates;
+	std::vector<KeyFrame*> mvpCurrentConnectedKFs;
+	std::vector<MapPoint*> mvpCurrentMatchedPoints;
+	std::vector<MapPoint*> mvpLoopMapPoints;
+	cv::Mat mScw;
+	g2o::Sim3 mg2oScw;
+
+	long unsigned int mLastLoopKFid;
+
+	// Variables related to Global Bundle Adjustment
+	bool mbRunningGBA;
+	bool mbFinishedGBA;
+	bool mbStopGBA;
+	std::mutex mMutexGBA;
+	std::thread* mpThreadGBA;
+
+	// Fix scale in the stereo/RGB-D case
+	bool mbFixScale;
+
+
+	bool mnFullBAIdx;
+};
+
+LoopClosingImpl::LoopClosingImpl(Map *pMap, KeyFrameDatabase *pDB, ORBVocabulary *pVoc, const bool bFixScale):
     mbResetRequested(false), mbFinishRequested(false), mbFinished(true), mpMap(pMap),
     mpKeyFrameDB(pDB), mpORBVocabulary(pVoc), mpMatchedKF(NULL), mLastLoopKFid(0), mbRunningGBA(false), mbFinishedGBA(true),
     mbStopGBA(false), mpThreadGBA(NULL), mbFixScale(bFixScale), mnFullBAIdx(0)
@@ -45,18 +160,18 @@ LoopClosing::LoopClosing(Map *pMap, KeyFrameDatabase *pDB, ORBVocabulary *pVoc, 
     mnCovisibilityConsistencyTh = 3;
 }
 
-void LoopClosing::SetTracker(Tracking *pTracker)
+void LoopClosingImpl::SetTracker(Tracking *pTracker)
 {
     mpTracker=pTracker;
 }
 
-void LoopClosing::SetLocalMapper(LocalMapping *pLocalMapper)
+void LoopClosingImpl::SetLocalMapper(LocalMapping *pLocalMapper)
 {
     mpLocalMapper=pLocalMapper;
 }
 
 
-void LoopClosing::Run()
+void LoopClosingImpl::Run()
 {
     mbFinished =false;
 
@@ -89,20 +204,20 @@ void LoopClosing::Run()
     SetFinish();
 }
 
-void LoopClosing::InsertKeyFrame(KeyFrame *pKF)
+void LoopClosingImpl::InsertKeyFrame(KeyFrame *pKF)
 {
     unique_lock<mutex> lock(mMutexLoopQueue);
     if(pKF->mnId!=0)
         mlpLoopKeyFrameQueue.push_back(pKF);
 }
 
-bool LoopClosing::CheckNewKeyFrames()
+bool LoopClosingImpl::CheckNewKeyFrames()
 {
     unique_lock<mutex> lock(mMutexLoopQueue);
     return(!mlpLoopKeyFrameQueue.empty());
 }
 
-bool LoopClosing::DetectLoop()
+bool LoopClosingImpl::DetectLoop()
 {
     {
         unique_lock<mutex> lock(mMutexLoopQueue);
@@ -230,7 +345,7 @@ bool LoopClosing::DetectLoop()
     return false;
 }
 
-bool LoopClosing::ComputeSim3()
+bool LoopClosingImpl::ComputeSim3()
 {
     // For each consistent loop candidate we try to compute a Sim3
 
@@ -401,7 +516,7 @@ bool LoopClosing::ComputeSim3()
 
 }
 
-void LoopClosing::CorrectLoop()
+void LoopClosingImpl::CorrectLoop()
 {
     cout << "Loop detected!" << endl;
 
@@ -578,7 +693,7 @@ void LoopClosing::CorrectLoop()
     mbRunningGBA = true;
     mbFinishedGBA = false;
     mbStopGBA = false;
-    mpThreadGBA = new thread(&LoopClosing::RunGlobalBundleAdjustment,this,mpCurrentKF->mnId);
+    mpThreadGBA = new thread(&LoopClosingImpl::RunGlobalBundleAdjustment,this,mpCurrentKF->mnId);
 
     // Loop closed. Release Local Mapping.
     mpLocalMapper->Release();    
@@ -586,7 +701,7 @@ void LoopClosing::CorrectLoop()
     mLastLoopKFid = mpCurrentKF->mnId;   
 }
 
-void LoopClosing::SearchAndFuse(const KeyFrameAndPose &CorrectedPosesMap)
+void LoopClosingImpl::SearchAndFuse(const KeyFrameAndPose &CorrectedPosesMap)
 {
     ORBmatcher matcher(0.8);
 
@@ -615,7 +730,7 @@ void LoopClosing::SearchAndFuse(const KeyFrameAndPose &CorrectedPosesMap)
 }
 
 
-void LoopClosing::RequestReset()
+void LoopClosingImpl::RequestReset()
 {
     {
         unique_lock<mutex> lock(mMutexReset);
@@ -633,7 +748,7 @@ void LoopClosing::RequestReset()
     }
 }
 
-void LoopClosing::ResetIfRequested()
+void LoopClosingImpl::ResetIfRequested()
 {
     unique_lock<mutex> lock(mMutexReset);
     if(mbResetRequested)
@@ -644,7 +759,7 @@ void LoopClosing::ResetIfRequested()
     }
 }
 
-void LoopClosing::RunGlobalBundleAdjustment(unsigned long nLoopKF)
+void LoopClosingImpl::RunGlobalBundleAdjustment(unsigned long nLoopKF)
 {
     cout << "Starting Global Bundle Adjustment" << endl;
 
@@ -750,29 +865,33 @@ void LoopClosing::RunGlobalBundleAdjustment(unsigned long nLoopKF)
     }
 }
 
-void LoopClosing::RequestFinish()
+void LoopClosingImpl::RequestFinish()
 {
     unique_lock<mutex> lock(mMutexFinish);
     mbFinishRequested = true;
 }
 
-bool LoopClosing::CheckFinish()
+bool LoopClosingImpl::CheckFinish()
 {
     unique_lock<mutex> lock(mMutexFinish);
     return mbFinishRequested;
 }
 
-void LoopClosing::SetFinish()
+void LoopClosingImpl::SetFinish()
 {
     unique_lock<mutex> lock(mMutexFinish);
     mbFinished = true;
 }
 
-bool LoopClosing::isFinished()
+bool LoopClosingImpl::isFinished()
 {
     unique_lock<mutex> lock(mMutexFinish);
     return mbFinished;
 }
 
+std::shared_ptr<LoopClosing> LoopClosing::Create(Map* pMap, KeyFrameDatabase* pDB, ORBVocabulary* pVoc, const bool bFixScale)
+{
+	return std::make_shared<LoopClosingImpl>(pMap, pDB, pVoc, bFixScale);
+}
 
 } //namespace ORB_SLAM
