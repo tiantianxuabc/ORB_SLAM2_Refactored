@@ -48,6 +48,12 @@ using namespace std;
 namespace ORB_SLAM2
 {
 
+TrackPoint::TrackPoint(const Frame& frame, bool lost)
+	: pReferenceKF(frame.mpReferenceKF), timestamp(frame.mTimeStamp), lost(lost)
+{
+	Tcr = frame.mTcw * frame.mpReferenceKF->GetPoseInverse();
+}
+
 static void ConvertToGray(const cv::Mat& src, cv::Mat& dst, bool RGB = false)
 {
 	static const int codes[] = { cv::COLOR_RGB2GRAY, cv::COLOR_BGR2GRAY, cv::COLOR_RGBA2GRAY, cv::COLOR_BGRA2GRAY };
@@ -308,11 +314,8 @@ public:
 			mpInitializer = static_cast<Initializer*>(NULL);
 		}
 
-		mlRelativeFramePoses.clear();
-		mlpReferences.clear();
-		mlFrameTimes.clear();
-		mlbLost.clear();
-
+		trajectory_.clear();
+		
 		if (mpViewer)
 			mpViewer->Release();
 	}
@@ -353,24 +356,9 @@ public:
 		return mvIniMatches;
 	}
 
-	const list<cv::Mat>& GetRelativeFramePoses() const override
+	const std::vector<TrackPoint>& GetTrajectory() const override
 	{
-		return mlRelativeFramePoses;
-	}
-
-	const list<KeyFrame*>& GetReferences() const override
-	{
-		return mlpReferences;
-	}
-
-	const list<double>& GetFrameTimes() const override
-	{
-		return mlFrameTimes;
-	}
-
-	const list<bool>& GetLost() const override
-	{
-		return mlbLost;
+		return trajectory_;
 	}
 
 	bool OnlyTracking() const override
@@ -399,11 +387,8 @@ public:
 
 	// Lists used to recover the full camera trajectory at the end of the execution.
 	// Basically we store the reference keyframe for each frame and its relative transformation
-	list<cv::Mat> mlRelativeFramePoses;
-	list<KeyFrame*> mlpReferences;
-	list<double> mlFrameTimes;
-	list<bool> mlbLost;
-
+	std::vector<TrackPoint> trajectory_;
+	
 	// True if local mapping is deactivated and we are performing only localization
 	bool mbOnlyTracking;
 
@@ -632,23 +617,18 @@ protected:
 		}
 
 		// Store frame pose information to retrieve the complete camera trajectory afterwards.
+		CV_Assert(mCurrentFrame.mpReferenceKF == mpReferenceKF);
+		const bool lost = mState == LOST;
 		if (!mCurrentFrame.mTcw.empty())
 		{
-			cv::Mat Tcr = mCurrentFrame.mTcw*mCurrentFrame.mpReferenceKF->GetPoseInverse();
-			mlRelativeFramePoses.push_back(Tcr);
-			mlpReferences.push_back(mpReferenceKF);
-			mlFrameTimes.push_back(mCurrentFrame.mTimeStamp);
-			mlbLost.push_back(mState == LOST);
+			trajectory_.push_back(TrackPoint(mCurrentFrame, lost));
 		}
 		else
 		{
 			// This can happen if tracking is lost
-			mlRelativeFramePoses.push_back(mlRelativeFramePoses.back());
-			mlpReferences.push_back(mlpReferences.back());
-			mlFrameTimes.push_back(mlFrameTimes.back());
-			mlbLost.push_back(mState == LOST);
+			trajectory_.push_back(trajectory_.back());
+			trajectory_.back().lost = lost;
 		}
-
 	}
 
 	// Map initialization for stereo and RGB-D
@@ -949,7 +929,7 @@ protected:
 	{
 		// Update pose according to reference keyframe
 		KeyFrame* pRef = mLastFrame.mpReferenceKF;
-		cv::Mat Tlr = mlRelativeFramePoses.back();
+		cv::Mat Tlr = trajectory_.back().Tcr;
 
 		mLastFrame.SetPose(Tlr*pRef->GetPose());
 

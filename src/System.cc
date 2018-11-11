@@ -403,18 +403,14 @@ public:
 		// We need to get first the keyframe pose and then concatenate the relative transformation.
 		// Frames not localized (tracking failure) are not saved.
 
-		// For each frame we have a reference keyframe (lRit), the timestamp (lT) and a flag
-		// which is true when tracking failed (lbL).
-		auto lRit = mpTracker->GetReferences().begin();
-		auto lT = mpTracker->GetFrameTimes().begin();
-		auto lbL = mpTracker->GetLost().begin();
-		for (auto lit = mpTracker->GetRelativeFramePoses().begin(),
-			lend = mpTracker->GetRelativeFramePoses().end(); lit != lend; lit++, lRit++, lT++, lbL++)
+		// For each frame we have a reference keyframe, the timestamp and a flag
+		// which is true when tracking failed.
+		for (const auto& track : mpTracker->GetTrajectory())
 		{
-			if (*lbL)
+			if (track.lost)
 				continue;
 
-			KeyFrame* pKF = *lRit;
+			KeyFrame* pKF = (KeyFrame*)track.pReferenceKF;
 
 			cv::Mat Trw = cv::Mat::eye(4, 4, CV_32F);
 
@@ -427,13 +423,13 @@ public:
 
 			Trw = Trw*pKF->GetPose()*Two;
 
-			cv::Mat Tcw = (*lit)*Trw;
+			cv::Mat Tcw = track.Tcr * Trw;
 			cv::Mat Rwc = Tcw.rowRange(0, 3).colRange(0, 3).t();
 			cv::Mat twc = -Rwc*Tcw.rowRange(0, 3).col(3);
 
 			vector<float> q = Converter::toQuaternion(Rwc);
 
-			f << setprecision(6) << *lT << " " << setprecision(9) << twc.at<float>(0) << " " << twc.at<float>(1) << " " << twc.at<float>(2) << " " << q[0] << " " << q[1] << " " << q[2] << " " << q[3] << endl;
+			f << setprecision(6) << track.timestamp << " " << setprecision(9) << twc.at<float>(0) << " " << twc.at<float>(1) << " " << twc.at<float>(2) << " " << q[0] << " " << q[1] << " " << q[2] << " " << q[3] << endl;
 		}
 		f.close();
 		cout << endl << "trajectory saved!" << endl;
@@ -507,13 +503,11 @@ public:
 		// We need to get first the keyframe pose and then concatenate the relative transformation.
 		// Frames not localized (tracking failure) are not saved.
 
-		// For each frame we have a reference keyframe (lRit), the timestamp (lT) and a flag
-		// which is true when tracking failed (lbL).
-		auto lRit = mpTracker->GetReferences().begin();
-		auto lT = mpTracker->GetFrameTimes().begin();
-		for (auto lit = mpTracker->GetRelativeFramePoses().begin(), lend = mpTracker->GetRelativeFramePoses().end(); lit != lend; lit++, lRit++, lT++)
+		// For each frame we have a reference keyframe, the timestamp and a flag
+		// which is true when tracking failed.
+		for (const auto& track : mpTracker->GetTrajectory())
 		{
-			ORB_SLAM2::KeyFrame* pKF = *lRit;
+			ORB_SLAM2::KeyFrame* pKF = (KeyFrame*)track.pReferenceKF;
 
 			cv::Mat Trw = cv::Mat::eye(4, 4, CV_32F);
 
@@ -526,7 +520,7 @@ public:
 
 			Trw = Trw*pKF->GetPose()*Two;
 
-			cv::Mat Tcw = (*lit)*Trw;
+			cv::Mat Tcw = track.Tcr * Trw;
 			cv::Mat Rwc = Tcw.rowRange(0, 3).colRange(0, 3).t();
 			cv::Mat twc = -Rwc*Tcw.rowRange(0, 3).col(3);
 
