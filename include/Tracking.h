@@ -66,6 +66,18 @@ public:
 		STATE_LOST = 3
 	};
 
+	struct Parameters
+	{
+		//New KeyFrame rules (according to fps)
+		int minFrames;
+		int maxFrames;
+
+		// Threshold close/far points
+		// Points seen as close by the stereo/RGBD sensor are considered reliable
+		// and inserted from just one frame. Far points requiere a match in two keyframes.
+		float thDepth;
+	};
+
 	static std::shared_ptr<Tracking> Create(System* pSys, ORBVocabulary* pVoc, FrameDrawer* pFrameDrawer, MapDrawer* pMapDrawer, Map* pMap,
 		KeyFrameDatabase* pKFDB, const string &strSettingPath, const int sensor);
 
@@ -100,7 +112,7 @@ public:
 	// Lists used to recover the full camera trajectory at the end of the execution.
 	// Basically we store the reference keyframe for each frame and its relative transformation
 	virtual const std::vector<TrackPoint>& GetTrajectory() const = 0;
-	
+
 	// True if local mapping is deactivated and we are performing only localization
 	virtual bool OnlyTracking() const = 0;
 };

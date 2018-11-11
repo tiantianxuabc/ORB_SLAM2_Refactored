@@ -218,6 +218,109 @@ struct LastFrameInfo
 	LastFrameInfo() : keyFrame(nullptr), keyFrameId(0), relocFrameId(0) {}
 };
 
+class NewKeyFrameCondition
+{
+public:
+
+	using Parameters = Tracking::Parameters;
+
+	NewKeyFrameCondition(Map* pMap, const LocalMap& LocalMap, const LastFrameInfo& last, const Parameters& param, int sensor)
+		: mpMap(pMap), mLocalMap(LocalMap), mLast(last), param_(param), mSensor(sensor) {}
+
+	bool Satisfy(const Frame& mCurrentFrame, LocalMapping* mpLocalMapper, int mnMatchesInliers) const
+	{
+		/*if (mbLocalizationMode)
+			return false;*/
+
+		// If Local Mapping is freezed by a Loop Closure do not insert keyframes
+		if (mpLocalMapper->isStopped() || mpLocalMapper->stopRequested())
+			return false;
+
+		const int nKFs = mpMap->KeyFramesInMap();
+
+		// Do not insert keyframes if not enough frames have passed from last relocalisation
+		if (mCurrentFrame.mnId<mLast.relocFrameId + param_.maxFrames && nKFs>param_.maxFrames)
+			return false;
+
+		// Tracked MapPoints in the reference keyframe
+		int nMinObs = 3;
+		if (nKFs <= 2)
+			nMinObs = 2;
+		int nRefMatches = mLocalMap.mpReferenceKF->TrackedMapPoints(nMinObs);
+
+		// Local Mapping accept keyframes?
+		bool bLocalMappingIdle = mpLocalMapper->AcceptKeyFrames();
+
+		// Check how many "close" points are being tracked and how many could be potentially created.
+		int nNonTrackedClose = 0;
+		int nTrackedClose = 0;
+		if (mSensor != System::MONOCULAR)
+		{
+			for (int i = 0; i < mCurrentFrame.N; i++)
+			{
+				if (mCurrentFrame.mvDepth[i] > 0 && mCurrentFrame.mvDepth[i] < param_.thDepth)
+				{
+					if (mCurrentFrame.mvpMapPoints[i] && !mCurrentFrame.mvbOutlier[i])
+						nTrackedClose++;
+					else
+						nNonTrackedClose++;
+				}
+			}
+		}
+
+		bool bNeedToInsertClose = (nTrackedClose < 100) && (nNonTrackedClose > 70);
+
+		// Thresholds
+		float thRefRatio = 0.75f;
+		if (nKFs < 2)
+			thRefRatio = 0.4f;
+
+		if (mSensor == System::MONOCULAR)
+			thRefRatio = 0.9f;
+
+		// Condition 1a: More than "MaxFrames" have passed from last keyframe insertion
+		const bool c1a = mCurrentFrame.mnId >= mLast.keyFrameId + param_.maxFrames;
+		// Condition 1b: More than "MinFrames" have passed and Local Mapping is idle
+		const bool c1b = (mCurrentFrame.mnId >= mLast.keyFrameId + param_.minFrames && bLocalMappingIdle);
+		//Condition 1c: tracking is weak
+		const bool c1c = mSensor != System::MONOCULAR && (mnMatchesInliers < nRefMatches*0.25 || bNeedToInsertClose);
+		// Condition 2: Few tracked points compared to reference keyframe. Lots of visual odometry compared to map matches.
+		const bool c2 = ((mnMatchesInliers < nRefMatches*thRefRatio || bNeedToInsertClose) && mnMatchesInliers > 15);
+
+		if ((c1a || c1b || c1c) && c2)
+		{
+			// If the mapping accepts keyframes, insert keyframe.
+			// Otherwise send a signal to interrupt BA
+			if (bLocalMappingIdle)
+			{
+				return true;
+			}
+			else
+			{
+				mpLocalMapper->InterruptBA();
+				if (mSensor != System::MONOCULAR)
+				{
+					if (mpLocalMapper->KeyframesInQueue() < 3)
+						return true;
+					else
+						return false;
+				}
+				else
+					return false;
+			}
+		}
+		else
+			return false;
+	}
+
+private:
+	Map* mpMap;
+	const LocalMap& mLocalMap;
+	const LastFrameInfo& mLast;
+	const Parameters& param_;
+	int mSensor;
+};
+
 static void ConvertToGray(const cv::Mat& src, cv::Mat& dst, bool RGB = false)
 {
 	static const int codes[] = { cv::COLOR_RGB2GRAY, cv::COLOR_BGR2GRAY, cv::COLOR_RGBA2GRAY, cv::COLOR_BGRA2GRAY };
@@ -244,7 +347,8 @@ public:
 		Map *pMap, KeyFrameDatabase* pKFDB, const string &strSettingPath, const int sensor) :
 		mState(STATE_NO_IMAGES), mSensor(sensor), mbLocalizationMode(false), mbVO(false), mpORBVocabulary(pVoc),
 		mpKeyFrameDB(pKFDB), mpInitializer(static_cast<Initializer*>(NULL)), mpSystem(pSys), mpViewer(NULL),
-		mpFrameDrawer(pFrameDrawer), mpMapDrawer(pMapDrawer), mpMap(pMap), mLocalMap(pMap)
+		mpFrameDrawer(pFrameDrawer), mpMapDrawer(pMapDrawer), mpMap(pMap), mLocalMap(pMap),
+		mNewKeyFrameCondition(pMap, mLocalMap, mLast, param_, sensor)
 	{
 		// Load camera parameters from settings file
 
@@ -752,7 +856,7 @@ protected:
 			mlpTemporalPoints.clear();
 
 			// Check if we need to insert a new keyframe
-			if (NeedNewKeyFrame())
+			if (!mbLocalizationMode && mNewKeyFrameCondition.Satisfy(mCurrentFrame, mpLocalMapper, mnMatchesInliers))
 				CreateNewKeyFrame();
 
 			// We allow points with high innovation (considererd outliers by the Huber Function)
@@ -1248,93 +1352,6 @@ protected:
 			return true;
 	}
 
-
-	bool NeedNewKeyFrame()
-	{
-		if (mbLocalizationMode)
-			return false;
-
-		// If Local Mapping is freezed by a Loop Closure do not insert keyframes
-		if (mpLocalMapper->isStopped() || mpLocalMapper->stopRequested())
-			return false;
-
-		const int nKFs = mpMap->KeyFramesInMap();
-
-		// Do not insert keyframes if not enough frames have passed from last relocalisation
-		if (mCurrentFrame.mnId<mLast.relocFrameId + param_.maxFrames && nKFs>param_.maxFrames)
-			return false;
-
-		// Tracked MapPoints in the reference keyframe
-		int nMinObs = 3;
-		if (nKFs <= 2)
-			nMinObs = 2;
-		int nRefMatches = mLocalMap.mpReferenceKF->TrackedMapPoints(nMinObs);
-
-		// Local Mapping accept keyframes?
-		bool bLocalMappingIdle = mpLocalMapper->AcceptKeyFrames();
-
-		// Check how many "close" points are being tracked and how many could be potentially created.
-		int nNonTrackedClose = 0;
-		int nTrackedClose = 0;
-		if (mSensor != System::MONOCULAR)
-		{
-			for (int i = 0; i < mCurrentFrame.N; i++)
-			{
-				if (mCurrentFrame.mvDepth[i] > 0 && mCurrentFrame.mvDepth[i] < param_.thDepth)
-				{
-					if (mCurrentFrame.mvpMapPoints[i] && !mCurrentFrame.mvbOutlier[i])
-						nTrackedClose++;
-					else
-						nNonTrackedClose++;
-				}
-			}
-		}
-
-		bool bNeedToInsertClose = (nTrackedClose < 100) && (nNonTrackedClose > 70);
-
-		// Thresholds
-		float thRefRatio = 0.75f;
-		if (nKFs < 2)
-			thRefRatio = 0.4f;
-
-		if (mSensor == System::MONOCULAR)
-			thRefRatio = 0.9f;
-
-		// Condition 1a: More than "MaxFrames" have passed from last keyframe insertion
-		const bool c1a = mCurrentFrame.mnId >= mLast.keyFrameId + param_.maxFrames;
-		// Condition 1b: More than "MinFrames" have passed and Local Mapping is idle
-		const bool c1b = (mCurrentFrame.mnId >= mLast.keyFrameId + param_.minFrames && bLocalMappingIdle);
-		//Condition 1c: tracking is weak
-		const bool c1c = mSensor != System::MONOCULAR && (mnMatchesInliers < nRefMatches*0.25 || bNeedToInsertClose);
-		// Condition 2: Few tracked points compared to reference keyframe. Lots of visual odometry compared to map matches.
-		const bool c2 = ((mnMatchesInliers < nRefMatches*thRefRatio || bNeedToInsertClose) && mnMatchesInliers > 15);
-
-		if ((c1a || c1b || c1c) && c2)
-		{
-			// If the mapping accepts keyframes, insert keyframe.
-			// Otherwise send a signal to interrupt BA
-			if (bLocalMappingIdle)
-			{
-				return true;
-			}
-			else
-			{
-				mpLocalMapper->InterruptBA();
-				if (mSensor != System::MONOCULAR)
-				{
-					if (mpLocalMapper->KeyframesInQueue() < 3)
-						return true;
-					else
-						return false;
-				}
-				else
-					return false;
-			}
-		}
-		else
-			return false;
-	}
-
 	void CreateNewKeyFrame()
 	{
 		if (!mpLocalMapper->SetNotStop(true))
@@ -1670,18 +1687,7 @@ protected:
 	cv::Mat mDistCoef;
 	float mbf;
 
-	struct Parameters
-	{
-		//New KeyFrame rules (according to fps)
-		int minFrames;
-		int maxFrames;
-
-		// Threshold close/far points
-		// Points seen as close by the stereo/RGBD sensor are considered reliable
-		// and inserted from just one frame. Far points requiere a match in two keyframes.
-		float thDepth;
-	};
-
+	// Parameters
 	Parameters param_;
 
 	// For RGB-D inputs only. For some datasets (e.g. TUM) the depthmap values are scaled.
@@ -1700,6 +1706,8 @@ protected:
 	bool mbRGB;
 
 	list<MapPoint*> mlpTemporalPoints;
+
+	NewKeyFrameCondition mNewKeyFrameCondition;
 };
 
 std::shared_ptr<Tracking> Tracking::Create(System* pSys, ORBVocabulary* pVoc, FrameDrawer* pFrameDrawer, MapDrawer* pMapDrawer, Map* pMap,
