@@ -66,6 +66,59 @@ static std::vector<float> toQuaternion(const cv::Mat1f &M)
 #define LOCK_MUTEX_MODE()  unique_lock<mutex> lock2(mMutexMode);
 #define LOCK_MUTEX_STATE() unique_lock<mutex> lock3(mMutexState);
 
+class ModeManager
+{
+public:
+
+	ModeManager(const std::shared_ptr<Tracking>& pTracker, const std::shared_ptr<LocalMapping>& pLocalMapper)
+		: mpTracker(pTracker), mpLocalMapper(pLocalMapper), mbActivateLocalizationMode(false), mbDeactivateLocalizationMode(false) {}
+
+	void update()
+	{
+		LOCK_MUTEX_MODE();
+		if (mbActivateLocalizationMode)
+		{
+			mpLocalMapper->RequestStop();
+
+			// Wait until Local Mapping has effectively stopped
+			while (!mpLocalMapper->isStopped())
+			{
+				usleep(1000);
+			}
+
+			mpTracker->InformOnlyTracking(true);
+			mbActivateLocalizationMode = false;
+		}
+		if (mbDeactivateLocalizationMode)
+		{
+			mpTracker->InformOnlyTracking(false);
+			mpLocalMapper->Release();
+			mbDeactivateLocalizationMode = false;
+		}
+	}
+
+	void ActivateLocalizationMode()
+	{
+		LOCK_MUTEX_MODE();
+		mbActivateLocalizationMode = true;
+	}
+
+	void DeactivateLocalizationMode()
+	{
+		LOCK_MUTEX_MODE();
+		mbDeactivateLocalizationMode = true;
+	}
+
+private:
+	// Tracker and Local Mapper
+	std::shared_ptr<Tracking> mpTracker;
+	std::shared_ptr<LocalMapping> mpLocalMapper;
+	// Change mode flags
+	mutable std::mutex mMutexMode;
+	bool mbActivateLocalizationMode;
+	bool mbDeactivateLocalizationMode;
+};
+
 class SystemImpl : public System
 {
 public:
@@ -74,7 +127,7 @@ public:
 
 	// Initialize the SLAM system. It launches the Local Mapping, Loop Closing and Viewer threads.
 	SystemImpl(const Path& vocabularyFile, const Path& settingsFile, Sensor sensor, bool useViewer)
-		: mSensor(sensor), mpViewer(nullptr), mbReset(false), mbActivateLocalizationMode(false), mbDeactivateLocalizationMode(false)
+		: mSensor(sensor), mpViewer(nullptr), mbReset(false)
 	{
 		// Output welcome message
 		cout << endl <<
@@ -149,6 +202,8 @@ public:
 
 		mpLoopCloser->SetTracker(mpTracker.get());
 		mpLoopCloser->SetLocalMapper(mpLocalMapper.get());
+
+		modeManager_ = std::make_shared<ModeManager>(mpTracker, mpLocalMapper);
 	}
 
 	// Proccess the given stereo frame. Images must be synchronized and rectified.
@@ -163,28 +218,7 @@ public:
 		}
 
 		// Check mode change
-		{
-			LOCK_MUTEX_MODE();
-			if (mbActivateLocalizationMode)
-			{
-				mpLocalMapper->RequestStop();
-
-				// Wait until Local Mapping has effectively stopped
-				while (!mpLocalMapper->isStopped())
-				{
-					usleep(1000);
-				}
-
-				mpTracker->InformOnlyTracking(true);
-				mbActivateLocalizationMode = false;
-			}
-			if (mbDeactivateLocalizationMode)
-			{
-				mpTracker->InformOnlyTracking(false);
-				mpLocalMapper->Release();
-				mbDeactivateLocalizationMode = false;
-			}
-		}
+		modeManager_->update();
 
 		// Check reset
 		{
@@ -218,28 +252,7 @@ public:
 		}
 
 		// Check mode change
-		{
-			LOCK_MUTEX_MODE();
-			if (mbActivateLocalizationMode)
-			{
-				mpLocalMapper->RequestStop();
-
-				// Wait until Local Mapping has effectively stopped
-				while (!mpLocalMapper->isStopped())
-				{
-					usleep(1000);
-				}
-
-				mpTracker->InformOnlyTracking(true);
-				mbActivateLocalizationMode = false;
-			}
-			if (mbDeactivateLocalizationMode)
-			{
-				mpTracker->InformOnlyTracking(false);
-				mpLocalMapper->Release();
-				mbDeactivateLocalizationMode = false;
-			}
-		}
+		modeManager_->update();
 
 		// Check reset
 		{
@@ -272,28 +285,7 @@ public:
 		}
 
 		// Check mode change
-		{
-			LOCK_MUTEX_MODE();
-			if (mbActivateLocalizationMode)
-			{
-				mpLocalMapper->RequestStop();
-
-				// Wait until Local Mapping has effectively stopped
-				while (!mpLocalMapper->isStopped())
-				{
-					usleep(1000);
-				}
-
-				mpTracker->InformOnlyTracking(true);
-				mbActivateLocalizationMode = false;
-			}
-			if (mbDeactivateLocalizationMode)
-			{
-				mpTracker->InformOnlyTracking(false);
-				mpLocalMapper->Release();
-				mbDeactivateLocalizationMode = false;
-			}
-		}
+		modeManager_->update();
 
 		// Check reset
 		{
@@ -318,15 +310,13 @@ public:
 	// This stops local mapping thread (map building) and performs only camera tracking.
 	void ActivateLocalizationMode() override
 	{
-		LOCK_MUTEX_MODE();
-		mbActivateLocalizationMode = true;
+		modeManager_->ActivateLocalizationMode();
 	}
 
 	// This resumes local mapping thread and performs SLAM again.
 	void DeactivateLocalizationMode() override
 	{
-		LOCK_MUTEX_MODE();
-		mbDeactivateLocalizationMode = true;
+		modeManager_->DeactivateLocalizationMode();
 	}
 
 	// Returns true if there have been a big map change (loop closure, global BA)
@@ -604,10 +594,8 @@ private:
 	bool mbReset;
 
 	// Change mode flags
-	mutable std::mutex mMutexMode;
-	bool mbActivateLocalizationMode;
-	bool mbDeactivateLocalizationMode;
-
+	std::shared_ptr<ModeManager> modeManager_;
+	
 	// Tracking state
 	int mTrackingState;
 	std::vector<MapPoint*> mTrackedMapPoints;
