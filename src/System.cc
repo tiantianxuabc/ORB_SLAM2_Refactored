@@ -73,7 +73,7 @@ public:
 	ModeManager(const std::shared_ptr<Tracking>& pTracker, const std::shared_ptr<LocalMapping>& pLocalMapper)
 		: mpTracker(pTracker), mpLocalMapper(pLocalMapper), mbActivateLocalizationMode(false), mbDeactivateLocalizationMode(false) {}
 
-	void update()
+	void Update()
 	{
 		LOCK_MUTEX_MODE();
 		if (mbActivateLocalizationMode)
@@ -110,13 +110,41 @@ public:
 	}
 
 private:
-	// Tracker and Local Mapper
 	std::shared_ptr<Tracking> mpTracker;
 	std::shared_ptr<LocalMapping> mpLocalMapper;
 	// Change mode flags
 	mutable std::mutex mMutexMode;
 	bool mbActivateLocalizationMode;
 	bool mbDeactivateLocalizationMode;
+};
+
+class ResetManager
+{
+public:
+
+	ResetManager(const std::shared_ptr<Tracking>& pTracker) : mpTracker(pTracker), mbReset(false) {}
+
+	void Update()
+	{
+		LOCK_MUTEX_RESET();
+		if (mbReset)
+		{
+			mpTracker->Reset();
+			mbReset = false;
+		}
+	}
+
+	void Reset()
+	{
+		LOCK_MUTEX_RESET();
+		mbReset = true;
+	}
+
+private:
+	std::shared_ptr<Tracking> mpTracker;
+	// Reset flag
+	mutable std::mutex mMutexReset;
+	bool mbReset;
 };
 
 class SystemImpl : public System
@@ -127,7 +155,7 @@ public:
 
 	// Initialize the SLAM system. It launches the Local Mapping, Loop Closing and Viewer threads.
 	SystemImpl(const Path& vocabularyFile, const Path& settingsFile, Sensor sensor, bool useViewer)
-		: mSensor(sensor), mpViewer(nullptr), mbReset(false)
+		: mSensor(sensor), mpViewer(nullptr)
 	{
 		// Output welcome message
 		cout << endl <<
@@ -203,6 +231,7 @@ public:
 		mpLoopCloser->SetTracker(mpTracker.get());
 		mpLoopCloser->SetLocalMapper(mpLocalMapper.get());
 
+		resetManager_ = std::make_shared<ResetManager>(mpTracker);
 		modeManager_ = std::make_shared<ModeManager>(mpTracker, mpLocalMapper);
 	}
 
@@ -218,17 +247,10 @@ public:
 		}
 
 		// Check mode change
-		modeManager_->update();
+		modeManager_->Update();
 
 		// Check reset
-		{
-			LOCK_MUTEX_RESET();
-			if (mbReset)
-			{
-				mpTracker->Reset();
-				mbReset = false;
-			}
-		}
+		resetManager_->Update();
 
 		cv::Mat Tcw = mpTracker->GrabImageStereo(imageL, imageR, timestamp);
 
@@ -252,17 +274,10 @@ public:
 		}
 
 		// Check mode change
-		modeManager_->update();
+		modeManager_->Update();
 
 		// Check reset
-		{
-			LOCK_MUTEX_RESET();
-			if (mbReset)
-			{
-				mpTracker->Reset();
-				mbReset = false;
-			}
-		}
+		resetManager_->Update();
 
 		cv::Mat Tcw = mpTracker->GrabImageRGBD(image, depth, timestamp);
 
@@ -285,17 +300,10 @@ public:
 		}
 
 		// Check mode change
-		modeManager_->update();
+		modeManager_->Update();
 
 		// Check reset
-		{
-			LOCK_MUTEX_RESET();
-			if (mbReset)
-			{
-				mpTracker->Reset();
-				mbReset = false;
-			}
-		}
+		resetManager_->Update();
 
 		cv::Mat Tcw = mpTracker->GrabImageMonocular(image, timestamp);
 
@@ -337,8 +345,7 @@ public:
 	// Reset the system (clear map)
 	void Reset() override
 	{
-		LOCK_MUTEX_RESET();
-		mbReset = true;
+		resetManager_->Reset();
 	}
 
 	// All threads will be requested to finish.
@@ -590,12 +597,11 @@ private:
 	std::thread threads_[NUM_THREADS];
 
 	// Reset flag
-	mutable std::mutex mMutexReset;
-	bool mbReset;
+	std::shared_ptr<ResetManager> resetManager_;
 
 	// Change mode flags
 	std::shared_ptr<ModeManager> modeManager_;
-	
+
 	// Tracking state
 	int mTrackingState;
 	std::vector<MapPoint*> mTrackedMapPoints;
