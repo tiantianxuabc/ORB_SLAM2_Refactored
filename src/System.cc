@@ -99,7 +99,7 @@ public:
 		//Load ORB Vocabulary
 		cout << endl << "Loading ORB Vocabulary. This could take a while..." << endl;
 
-		mpVocabulary = new ORBVocabulary();
+		mpVocabulary = std::make_shared<ORBVocabulary>();
 		bool bVocLoad = mpVocabulary->loadFromTextFile(vocabularyFile);
 		if (!bVocLoad)
 		{
@@ -110,45 +110,45 @@ public:
 		cout << "Vocabulary loaded!" << endl << endl;
 
 		//Create KeyFrame Database
-		mpKeyFrameDatabase = new KeyFrameDatabase(*mpVocabulary);
+		mpKeyFrameDatabase = std::make_shared<KeyFrameDatabase>(*mpVocabulary);
 
 		//Create the Map
-		mpMap = new Map();
+		mpMap = std::make_shared<Map>();
 
 		//Create Drawers. These are used by the Viewer
-		mpFrameDrawer = new FrameDrawer(mpMap);
-		mpMapDrawer = new MapDrawer(mpMap, settingsFile);
+		mpFrameDrawer = std::make_shared<FrameDrawer>(mpMap.get());
+		mpMapDrawer = std::make_shared<MapDrawer>(mpMap.get(), settingsFile);
 
 		//Initialize the Tracking thread
 		//(it will live in the main thread of execution, the one that called this constructor)
-		mpTracker = new Tracking(this, mpVocabulary, mpFrameDrawer, mpMapDrawer,
-			mpMap, mpKeyFrameDatabase, settingsFile, mSensor);
+		mpTracker = std::make_shared<Tracking>(this, mpVocabulary.get(), mpFrameDrawer.get(), mpMapDrawer.get(),
+			mpMap.get(), mpKeyFrameDatabase.get(), settingsFile, mSensor);
 
 		//Initialize the Local Mapping thread and launch
-		mpLocalMapper = new LocalMapping(mpMap, mSensor == MONOCULAR);
+		mpLocalMapper = std::make_shared<LocalMapping>(mpMap.get(), mSensor == MONOCULAR);
 		threads_[THREAD_LOCAL_MAPPING] = thread(&ORB_SLAM2::LocalMapping::Run, mpLocalMapper);
 
 		//Initialize the Loop Closing thread and launch
-		mpLoopCloser = LoopClosing::Create(mpMap, mpKeyFrameDatabase, mpVocabulary, mSensor != MONOCULAR);
+		mpLoopCloser = LoopClosing::Create(mpMap.get(), mpKeyFrameDatabase.get(), mpVocabulary.get(), mSensor != MONOCULAR);
 		threads_[THREAD_LOOP_CLOSING] = thread(&ORB_SLAM2::LoopClosing::Run, mpLoopCloser);
 
 		//Initialize the Viewer thread and launch
 		if (useViewer)
 		{
-			mpViewer = new Viewer(this, mpFrameDrawer, mpMapDrawer, mpTracker, settingsFile);
-			threads_[THREAD_VIEWER] = thread(&Viewer::Run, mpViewer);
-			mpTracker->SetViewer(mpViewer);
+			mpViewer = std::make_shared<Viewer>(this, mpFrameDrawer.get(), mpMapDrawer.get(), mpTracker.get(), settingsFile);
+			threads_[THREAD_VIEWER] = thread(&Viewer::Run, mpViewer.get());
+			mpTracker->SetViewer(mpViewer.get());
 		}
 
 		//Set pointers between threads
-		mpTracker->SetLocalMapper(mpLocalMapper);
+		mpTracker->SetLocalMapper(mpLocalMapper.get());
 		mpTracker->SetLoopClosing(mpLoopCloser.get());
 
-		mpLocalMapper->SetTracker(mpTracker);
+		mpLocalMapper->SetTracker(mpTracker.get());
 		mpLocalMapper->SetLoopCloser(mpLoopCloser.get());
 
-		mpLoopCloser->SetTracker(mpTracker);
-		mpLoopCloser->SetLocalMapper(mpLocalMapper);
+		mpLoopCloser->SetTracker(mpTracker.get());
+		mpLoopCloser->SetLocalMapper(mpLocalMapper.get());
 	}
 
 	// Proccess the given stereo frame. Images must be synchronized and rectified.
@@ -568,31 +568,31 @@ private:
 	Sensor mSensor;
 
 	// ORB vocabulary used for place recognition and feature matching.
-	ORBVocabulary* mpVocabulary;
+	std::shared_ptr<ORBVocabulary> mpVocabulary;
 
 	// KeyFrame database for place recognition (relocalization and loop detection).
-	KeyFrameDatabase* mpKeyFrameDatabase;
+	std::shared_ptr<KeyFrameDatabase> mpKeyFrameDatabase;
 
 	// Map structure that stores the pointers to all KeyFrames and MapPoints.
-	Map* mpMap;
+	std::shared_ptr<Map> mpMap;
 
 	// Tracker. It receives a frame and computes the associated camera pose.
 	// It also decides when to insert a new keyframe, create some new MapPoints and
 	// performs relocalization if tracking fails.
-	Tracking* mpTracker;
+	std::shared_ptr<Tracking> mpTracker;
 
 	// Local Mapper. It manages the local map and performs local bundle adjustment.
-	LocalMapping* mpLocalMapper;
+	std::shared_ptr<LocalMapping> mpLocalMapper;
 
 	// Loop Closer. It searches loops with every new keyframe. If there is a loop it performs
 	// a pose graph optimization and full bundle adjustment (in a new thread) afterwards.
 	std::shared_ptr<LoopClosing> mpLoopCloser;
 
 	// The viewer draws the map and the current camera pose. It uses Pangolin.
-	Viewer* mpViewer;
+	std::shared_ptr<Viewer> mpViewer;
 
-	FrameDrawer* mpFrameDrawer;
-	MapDrawer* mpMapDrawer;
+	std::shared_ptr<FrameDrawer> mpFrameDrawer;
+	std::shared_ptr<MapDrawer> mpMapDrawer;
 
 	// System threads: Local Mapping, Loop Closing, Viewer.
 	// The Tracking thread "lives" in the main execution thread that creates the System object.
