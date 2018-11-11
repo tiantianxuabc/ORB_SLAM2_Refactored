@@ -434,7 +434,13 @@ protected:
 			if (mState == STATE_OK)
 			{
 				// Local Mapping might have changed some MapPoints tracked in last frame
-				CheckReplacedInLastFrame();
+				for (int i = 0; i < mLastFrame.N; i++)
+				{
+					MapPoint* pMP = mLastFrame.mvpMapPoints[i];
+					MapPoint* pRep = pMP ? pMP->GetReplaced() : nullptr;
+					if (pRep)
+						mLastFrame.mvpMapPoints[i] = pRep;
+				}
 
 				const bool withMotionModel = !mVelocity.empty() && mCurrentFrame.mnId >= mnLastRelocFrameId + 2;
 				if (withMotionModel)
@@ -858,24 +864,6 @@ protected:
 
 		mState = STATE_OK;
 	}
-
-	void CheckReplacedInLastFrame()
-	{
-		for (int i = 0; i < mLastFrame.N; i++)
-		{
-			MapPoint* pMP = mLastFrame.mvpMapPoints[i];
-
-			if (pMP)
-			{
-				MapPoint* pRep = pMP->GetReplaced();
-				if (pRep)
-				{
-					mLastFrame.mvpMapPoints[i] = pRep;
-				}
-			}
-		}
-	}
-
 
 	bool TrackReferenceKeyFrame()
 	{
