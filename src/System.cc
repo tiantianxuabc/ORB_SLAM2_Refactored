@@ -118,6 +118,13 @@ private:
 	bool mbDeactivateLocalizationMode;
 };
 
+static void GetTracingResults(const Tracking& tracker, int& state, std::vector<MapPoint*>& mappoints, std::vector<cv::KeyPoint>& keypoints)
+{
+	state = tracker.mState;
+	mappoints = tracker.mCurrentFrame.mvpMapPoints;
+	keypoints = tracker.mCurrentFrame.mvKeysUn;
+}
+
 class ResetManager
 {
 public:
@@ -255,9 +262,8 @@ public:
 		cv::Mat Tcw = mpTracker->GrabImageStereo(imageL, imageR, timestamp);
 
 		LOCK_MUTEX_STATE();
-		mTrackingState = mpTracker->mState;
-		mTrackedMapPoints = mpTracker->mCurrentFrame.mvpMapPoints;
-		mTrackedKeyPointsUn = mpTracker->mCurrentFrame.mvKeysUn;
+		GetTracingResults(*mpTracker, mTrackingState, mTrackedMapPoints, mTrackedKeyPointsUn);
+
 		return Tcw;
 	}
 
@@ -282,9 +288,8 @@ public:
 		cv::Mat Tcw = mpTracker->GrabImageRGBD(image, depth, timestamp);
 
 		LOCK_MUTEX_STATE();
-		mTrackingState = mpTracker->mState;
-		mTrackedMapPoints = mpTracker->mCurrentFrame.mvpMapPoints;
-		mTrackedKeyPointsUn = mpTracker->mCurrentFrame.mvKeysUn;
+		GetTracingResults(*mpTracker, mTrackingState, mTrackedMapPoints, mTrackedKeyPointsUn);
+
 		return Tcw;
 	}
 
@@ -308,9 +313,7 @@ public:
 		cv::Mat Tcw = mpTracker->GrabImageMonocular(image, timestamp);
 
 		LOCK_MUTEX_STATE();
-		mTrackingState = mpTracker->mState;
-		mTrackedMapPoints = mpTracker->mCurrentFrame.mvpMapPoints;
-		mTrackedKeyPointsUn = mpTracker->mCurrentFrame.mvKeysUn;
+		GetTracingResults(*mpTracker, mTrackingState, mTrackedMapPoints, mTrackedKeyPointsUn);
 
 		return Tcw;
 	}
