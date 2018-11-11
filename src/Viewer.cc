@@ -128,6 +128,9 @@ Viewer::Viewer(System* pSystem, FrameDrawer *pFrameDrawer, MapDrawer *pMapDrawer
     mViewpointY = fSettings["Viewer.ViewpointY"];
     mViewpointZ = fSettings["Viewer.ViewpointZ"];
     mViewpointF = fSettings["Viewer.ViewpointF"];
+
+	mCameraSize = fSettings["Viewer.CameraSize"];
+	mCameraLineWidth = fSettings["Viewer.CameraLineWidth"];
 }
 
 void Viewer::Run()
@@ -205,7 +208,7 @@ void Viewer::Run()
 
         d_cam.Activate(s_cam);
         glClearColor(1.0f,1.0f,1.0f,1.0f);
-        DrawCurrentCamera(Twc);
+        DrawCurrentCamera(Twc, mCameraSize, mCameraLineWidth);
         if(menuShowKeyFrames || menuShowGraph)
             mpMapDrawer->DrawKeyFrames(menuShowKeyFrames,menuShowGraph);
         if(menuShowPoints)

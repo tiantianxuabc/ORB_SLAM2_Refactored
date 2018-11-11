@@ -71,6 +71,7 @@ private:
     float mImageWidth, mImageHeight;
 
     float mViewpointX, mViewpointY, mViewpointZ, mViewpointF;
+	float mCameraSize, mCameraLineWidth;
 
     bool CheckFinish();
     void SetFinish();
