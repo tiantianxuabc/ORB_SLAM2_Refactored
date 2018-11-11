@@ -338,6 +338,53 @@ static void ConvertToGray(const cv::Mat& src, cv::Mat& dst, bool RGB = false)
 	cv::cvtColor(src, dst, codes[idx]);
 }
 
+void SearchLocalPoints(const LocalMap& mLocalMap, Frame& mCurrentFrame, float th)
+{
+	// Do not search map points already matched
+	for (vector<MapPoint*>::iterator vit = mCurrentFrame.mvpMapPoints.begin(), vend = mCurrentFrame.mvpMapPoints.end(); vit != vend; vit++)
+	{
+		MapPoint* pMP = *vit;
+		if (pMP)
+		{
+			if (pMP->isBad())
+			{
+				*vit = static_cast<MapPoint*>(NULL);
+			}
+			else
+			{
+				pMP->IncreaseVisible();
+				pMP->mnLastFrameSeen = mCurrentFrame.mnId;
+				pMP->mbTrackInView = false;
+			}
+		}
+	}
+
+	int nToMatch = 0;
+
+	// Project points in frame and check its visibility
+	auto& mvpLocalMapPoints = mLocalMap.mvpLocalMapPoints;
+	for (auto vit = mvpLocalMapPoints.begin(), vend = mvpLocalMapPoints.end(); vit != vend; vit++)
+	{
+		MapPoint* pMP = *vit;
+		if (pMP->mnLastFrameSeen == mCurrentFrame.mnId)
+			continue;
+		if (pMP->isBad())
+			continue;
+		// Project (this fills MapPoint variables for matching)
+		if (mCurrentFrame.isInFrustum(pMP, 0.5))
+		{
+			pMP->IncreaseVisible();
+			nToMatch++;
+		}
+	}
+
+	if (nToMatch > 0)
+	{
+		ORBmatcher matcher(0.8);
+		matcher.SearchByProjection(mCurrentFrame, mvpLocalMapPoints, th);
+	}
+}
+
 class TrackingImpl : public Tracking
 {
 
@@ -1313,7 +1360,8 @@ protected:
 
 		mLocalMap.Update(mCurrentFrame);
 
-		SearchLocalPoints();
+		const float th = mCurrentFrame.mnId < mLast.relocFrameId + 2 < 2 ? 5 : (mSensor == System::RGBD ? 3 : 1);
+		SearchLocalPoints(mLocalMap, mCurrentFrame, th);
 
 		// Optimize Pose
 		Optimizer::PoseOptimization(&mCurrentFrame);
@@ -1430,59 +1478,6 @@ protected:
 
 		mLast.keyFrameId = mCurrentFrame.mnId;
 		mLast.keyFrame = pKF;
-	}
-
-	void SearchLocalPoints()
-	{
-		// Do not search map points already matched
-		for (vector<MapPoint*>::iterator vit = mCurrentFrame.mvpMapPoints.begin(), vend = mCurrentFrame.mvpMapPoints.end(); vit != vend; vit++)
-		{
-			MapPoint* pMP = *vit;
-			if (pMP)
-			{
-				if (pMP->isBad())
-				{
-					*vit = static_cast<MapPoint*>(NULL);
-				}
-				else
-				{
-					pMP->IncreaseVisible();
-					pMP->mnLastFrameSeen = mCurrentFrame.mnId;
-					pMP->mbTrackInView = false;
-				}
-			}
-		}
-
-		int nToMatch = 0;
-
-		// Project points in frame and check its visibility
-		auto& mvpLocalMapPoints = mLocalMap.mvpLocalMapPoints;
-		for (vector<MapPoint*>::iterator vit = mvpLocalMapPoints.begin(), vend = mvpLocalMapPoints.end(); vit != vend; vit++)
-		{
-			MapPoint* pMP = *vit;
-			if (pMP->mnLastFrameSeen == mCurrentFrame.mnId)
-				continue;
-			if (pMP->isBad())
-				continue;
-			// Project (this fills MapPoint variables for matching)
-			if (mCurrentFrame.isInFrustum(pMP, 0.5))
-			{
-				pMP->IncreaseVisible();
-				nToMatch++;
-			}
-		}
-
-		if (nToMatch > 0)
-		{
-			ORBmatcher matcher(0.8);
-			int th = 1;
-			if (mSensor == System::RGBD)
-				th = 3;
-			// If the camera has been relocalised recently, perform a coarser search
-			if (mCurrentFrame.mnId < mLast.relocFrameId + 2)
-				th = 5;
-			matcher.SearchByProjection(mCurrentFrame, mvpLocalMapPoints, th);
-		}
 	}
 
 	bool Relocalization()
