@@ -167,27 +167,27 @@ void FrameDrawer::DrawTextInfo(cv::Mat &im, int nState, cv::Mat &imText)
 void FrameDrawer::Update(Tracking *pTracker)
 {
     unique_lock<mutex> lock(mMutex);
-    pTracker->mImGray.copyTo(mIm);
-    mvCurrentKeys=pTracker->mCurrentFrame.mvKeys;
+    pTracker->GetImGray().copyTo(mIm);
+    mvCurrentKeys=pTracker->GetCurrentFrame().mvKeys;
     N = mvCurrentKeys.size();
     mvbVO = vector<bool>(N,false);
     mvbMap = vector<bool>(N,false);
-    mbOnlyTracking = pTracker->mbOnlyTracking;
+    mbOnlyTracking = pTracker->OnlyTracking();
 
 
-    if(pTracker->mLastProcessedState==Tracking::NOT_INITIALIZED)
+    if(pTracker->GetLastProcessedState()==Tracking::NOT_INITIALIZED)
     {
-        mvIniKeys=pTracker->mInitialFrame.mvKeys;
-        mvIniMatches=pTracker->mvIniMatches;
+        mvIniKeys=pTracker->GetInitialFrame().mvKeys;
+        mvIniMatches=pTracker->GetIniMatches();
     }
-    else if(pTracker->mLastProcessedState==Tracking::OK)
+    else if(pTracker->GetLastProcessedState()==Tracking::OK)
     {
         for(int i=0;i<N;i++)
         {
-            MapPoint* pMP = pTracker->mCurrentFrame.mvpMapPoints[i];
+            MapPoint* pMP = pTracker->GetCurrentFrame().mvpMapPoints[i];
             if(pMP)
             {
-                if(!pTracker->mCurrentFrame.mvbOutlier[i])
+                if(!pTracker->GetCurrentFrame().mvbOutlier[i])
                 {
                     if(pMP->Observations()>0)
                         mvbMap[i]=true;
@@ -197,7 +197,7 @@ void FrameDrawer::Update(Tracking *pTracker)
             }
         }
     }
-    mState=static_cast<int>(pTracker->mLastProcessedState);
+    mState=static_cast<int>(pTracker->GetLastProcessedState());
 }
 
 } //namespace ORB_SLAM

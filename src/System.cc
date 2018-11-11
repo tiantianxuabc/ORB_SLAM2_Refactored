@@ -120,9 +120,9 @@ private:
 
 static void GetTracingResults(const Tracking& tracker, int& state, std::vector<MapPoint*>& mappoints, std::vector<cv::KeyPoint>& keypoints)
 {
-	state = tracker.mState;
-	mappoints = tracker.mCurrentFrame.mvpMapPoints;
-	keypoints = tracker.mCurrentFrame.mvKeysUn;
+	state = tracker.GetState();
+	mappoints = tracker.GetCurrentFrame().mvpMapPoints;
+	keypoints = tracker.GetCurrentFrame().mvKeysUn;
 }
 
 class ResetManager
@@ -209,7 +209,7 @@ public:
 
 		//Initialize the Tracking thread
 		//(it will live in the main thread of execution, the one that called this constructor)
-		mpTracker = std::make_shared<Tracking>(this, mpVocabulary.get(), mpFrameDrawer.get(), mpMapDrawer.get(),
+		mpTracker = Tracking::Create(this, mpVocabulary.get(), mpFrameDrawer.get(), mpMapDrawer.get(),
 			mpMap.get(), mpKeyFrameDatabase.get(), settingsFile, mSensor);
 
 		//Initialize the Local Mapping thread and launch
@@ -405,11 +405,11 @@ public:
 
 		// For each frame we have a reference keyframe (lRit), the timestamp (lT) and a flag
 		// which is true when tracking failed (lbL).
-		list<ORB_SLAM2::KeyFrame*>::iterator lRit = mpTracker->mlpReferences.begin();
-		list<double>::iterator lT = mpTracker->mlFrameTimes.begin();
-		list<bool>::iterator lbL = mpTracker->mlbLost.begin();
-		for (list<cv::Mat>::iterator lit = mpTracker->mlRelativeFramePoses.begin(),
-			lend = mpTracker->mlRelativeFramePoses.end(); lit != lend; lit++, lRit++, lT++, lbL++)
+		auto lRit = mpTracker->GetReferences().begin();
+		auto lT = mpTracker->GetFrameTimes().begin();
+		auto lbL = mpTracker->GetLost().begin();
+		for (auto lit = mpTracker->GetRelativeFramePoses().begin(),
+			lend = mpTracker->GetRelativeFramePoses().end(); lit != lend; lit++, lRit++, lT++, lbL++)
 		{
 			if (*lbL)
 				continue;
@@ -509,9 +509,9 @@ public:
 
 		// For each frame we have a reference keyframe (lRit), the timestamp (lT) and a flag
 		// which is true when tracking failed (lbL).
-		list<ORB_SLAM2::KeyFrame*>::iterator lRit = mpTracker->mlpReferences.begin();
-		list<double>::iterator lT = mpTracker->mlFrameTimes.begin();
-		for (list<cv::Mat>::iterator lit = mpTracker->mlRelativeFramePoses.begin(), lend = mpTracker->mlRelativeFramePoses.end(); lit != lend; lit++, lRit++, lT++)
+		auto lRit = mpTracker->GetReferences().begin();
+		auto lT = mpTracker->GetFrameTimes().begin();
+		for (auto lit = mpTracker->GetRelativeFramePoses().begin(), lend = mpTracker->GetRelativeFramePoses().end(); lit != lend; lit++, lRit++, lT++)
 		{
 			ORB_SLAM2::KeyFrame* pKF = *lRit;
 
