@@ -117,8 +117,8 @@ public:
 			fps = 30;
 
 		// Max/Min Frames to insert keyframes and to check relocalisation
-		mMinFrames = 0;
-		mMaxFrames = fps;
+		param_.minFrames = 0;
+		param_.maxFrames = fps;
 
 		cout << endl << "Camera Parameters: " << endl;
 		cout << "- fx: " << fx << endl;
@@ -167,8 +167,8 @@ public:
 
 		if (sensor == System::STEREO || sensor == System::RGBD)
 		{
-			mThDepth = mbf*(float)fSettings["ThDepth"] / fx;
-			cout << endl << "Depth Threshold (Close/Far Points): " << mThDepth << endl;
+			param_.thDepth = mbf*(float)fSettings["ThDepth"] / fx;
+			cout << endl << "Depth Threshold (Close/Far Points): " << param_.thDepth << endl;
 		}
 
 		if (sensor == System::RGBD)
@@ -189,7 +189,7 @@ public:
 		ConvertToGray(imageL, mImGray);
 		ConvertToGray(imageR, imGrayRight);
 
-		mCurrentFrame = Frame(mImGray, imGrayRight, timestamp, mpORBextractorLeft, mpORBextractorRight, mpORBVocabulary, mK, mDistCoef, mbf, mThDepth);
+		mCurrentFrame = Frame(mImGray, imGrayRight, timestamp, mpORBextractorLeft, mpORBextractorRight, mpORBVocabulary, mK, mDistCoef, mbf, param_.thDepth);
 
 		Track();
 
@@ -204,7 +204,7 @@ public:
 		if ((fabs(mDepthMapFactor - 1.0f) > 1e-5) || imDepth.type() != CV_32F)
 			imDepth.convertTo(imDepth, CV_32F, mDepthMapFactor);
 
-		mCurrentFrame = Frame(mImGray, imDepth, timestamp, mpORBextractorLeft, mpORBVocabulary, mK, mDistCoef, mbf, mThDepth);
+		mCurrentFrame = Frame(mImGray, imDepth, timestamp, mpORBextractorLeft, mpORBVocabulary, mK, mDistCoef, mbf, param_.thDepth);
 
 		Track();
 
@@ -216,9 +216,9 @@ public:
 		ConvertToGray(image, mImGray);
 
 		if (mState == STATE_NOT_INITIALIZED || mState == STATE_NO_IMAGES)
-			mCurrentFrame = Frame(mImGray, timestamp, mpIniORBextractor, mpORBVocabulary, mK, mDistCoef, mbf, mThDepth);
+			mCurrentFrame = Frame(mImGray, timestamp, mpIniORBextractor, mpORBVocabulary, mK, mDistCoef, mbf, param_.thDepth);
 		else
-			mCurrentFrame = Frame(mImGray, timestamp, mpORBextractorLeft, mpORBVocabulary, mK, mDistCoef, mbf, mThDepth);
+			mCurrentFrame = Frame(mImGray, timestamp, mpORBextractorLeft, mpORBVocabulary, mK, mDistCoef, mbf, param_.thDepth);
 
 		Track();
 
@@ -938,7 +938,7 @@ protected:
 
 		sort(vDepthIdx.begin(), vDepthIdx.end());
 
-		// We insert all close points (depth<mThDepth)
+		// We insert all close points (depth<param_.thDepth)
 		// If less than 100 close points, we insert the 100 closest ones.
 		int nPoints = 0;
 		for (size_t j = 0; j < vDepthIdx.size(); j++)
@@ -970,7 +970,7 @@ protected:
 				nPoints++;
 			}
 
-			if (vDepthIdx[j].first > mThDepth && nPoints > 100)
+			if (vDepthIdx[j].first > param_.thDepth && nPoints > 100)
 				break;
 		}
 	}
@@ -1075,7 +1075,7 @@ protected:
 
 		// Decide if the tracking was succesful
 		// More restrictive if there was a relocalization recently
-		if (mCurrentFrame.mnId < mnLastRelocFrameId + mMaxFrames && mnMatchesInliers < 50)
+		if (mCurrentFrame.mnId < mnLastRelocFrameId + param_.maxFrames && mnMatchesInliers < 50)
 			return false;
 
 		if (mnMatchesInliers < 30)
@@ -1097,7 +1097,7 @@ protected:
 		const int nKFs = mpMap->KeyFramesInMap();
 
 		// Do not insert keyframes if not enough frames have passed from last relocalisation
-		if (mCurrentFrame.mnId<mnLastRelocFrameId + mMaxFrames && nKFs>mMaxFrames)
+		if (mCurrentFrame.mnId<mnLastRelocFrameId + param_.maxFrames && nKFs>param_.maxFrames)
 			return false;
 
 		// Tracked MapPoints in the reference keyframe
@@ -1116,7 +1116,7 @@ protected:
 		{
 			for (int i = 0; i < mCurrentFrame.N; i++)
 			{
-				if (mCurrentFrame.mvDepth[i] > 0 && mCurrentFrame.mvDepth[i] < mThDepth)
+				if (mCurrentFrame.mvDepth[i] > 0 && mCurrentFrame.mvDepth[i] < param_.thDepth)
 				{
 					if (mCurrentFrame.mvpMapPoints[i] && !mCurrentFrame.mvbOutlier[i])
 						nTrackedClose++;
@@ -1137,9 +1137,9 @@ protected:
 			thRefRatio = 0.9f;
 
 		// Condition 1a: More than "MaxFrames" have passed from last keyframe insertion
-		const bool c1a = mCurrentFrame.mnId >= mnLastKeyFrameId + mMaxFrames;
+		const bool c1a = mCurrentFrame.mnId >= mnLastKeyFrameId + param_.maxFrames;
 		// Condition 1b: More than "MinFrames" have passed and Local Mapping is idle
-		const bool c1b = (mCurrentFrame.mnId >= mnLastKeyFrameId + mMinFrames && bLocalMappingIdle);
+		const bool c1b = (mCurrentFrame.mnId >= mnLastKeyFrameId + param_.minFrames && bLocalMappingIdle);
 		//Condition 1c: tracking is weak
 		const bool c1c = mSensor != System::MONOCULAR && (mnMatchesInliers < nRefMatches*0.25 || bNeedToInsertClose);
 		// Condition 2: Few tracked points compared to reference keyframe. Lots of visual odometry compared to map matches.
@@ -1186,7 +1186,7 @@ protected:
 			mCurrentFrame.UpdatePoseMatrices();
 
 			// We sort points by the measured depth by the stereo/RGBD sensor.
-			// We create all those MapPoints whose depth < mThDepth.
+			// We create all those MapPoints whose depth < param_.thDepth.
 			// If there are less than 100 close points we create the 100 closest.
 			vector<pair<float, int> > vDepthIdx;
 			vDepthIdx.reserve(mCurrentFrame.N);
@@ -1237,7 +1237,7 @@ protected:
 						nPoints++;
 					}
 
-					if (vDepthIdx[j].first > mThDepth && nPoints > 100)
+					if (vDepthIdx[j].first > param_.thDepth && nPoints > 100)
 						break;
 				}
 			}
@@ -1653,14 +1653,19 @@ protected:
 	cv::Mat mDistCoef;
 	float mbf;
 
-	//New KeyFrame rules (according to fps)
-	int mMinFrames;
-	int mMaxFrames;
+	struct Parameters
+	{
+		//New KeyFrame rules (according to fps)
+		int minFrames;
+		int maxFrames;
 
-	// Threshold close/far points
-	// Points seen as close by the stereo/RGBD sensor are considered reliable
-	// and inserted from just one frame. Far points requiere a match in two keyframes.
-	float mThDepth;
+		// Threshold close/far points
+		// Points seen as close by the stereo/RGBD sensor are considered reliable
+		// and inserted from just one frame. Far points requiere a match in two keyframes.
+		float thDepth;
+	};
+
+	Parameters param_;
 
 	// For RGB-D inputs only. For some datasets (e.g. TUM) the depthmap values are scaled.
 	float mDepthMapFactor;
