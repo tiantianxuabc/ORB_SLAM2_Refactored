@@ -57,12 +57,13 @@ class Tracking
 public:
 
 	// Tracking states
-	enum eTrackingState {
-		SYSTEM_NOT_READY = -1,
-		NO_IMAGES_YET = 0,
-		NOT_INITIALIZED = 1,
-		OK = 2,
-		LOST = 3
+	enum State
+	{
+		STATE_NOT_READY = -1,
+		STATE_NO_IMAGES = 0,
+		STATE_NOT_INITIALIZED = 1,
+		STATE_OK = 2,
+		STATE_LOST = 3
 	};
 
 	static std::shared_ptr<Tracking> Create(System* pSys, ORBVocabulary* pVoc, FrameDrawer* pFrameDrawer, MapDrawer* pMapDrawer, Map* pMap,
