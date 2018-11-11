@@ -436,15 +436,14 @@ protected:
 				// Local Mapping might have changed some MapPoints tracked in last frame
 				CheckReplacedInLastFrame();
 
-				if (mVelocity.empty() || mCurrentFrame.mnId < mnLastRelocFrameId + 2)
-				{
-					success = TrackReferenceKeyFrame();
-				}
-				else
+				const bool withMotionModel = !mVelocity.empty() && mCurrentFrame.mnId >= mnLastRelocFrameId + 2;
+				if (withMotionModel)
 				{
 					success = TrackWithMotionModel();
-					if (!success)
-						success = TrackReferenceKeyFrame();
+				}
+				if (!withMotionModel || (withMotionModel && !success))
+				{
+					success = TrackReferenceKeyFrame();
 				}
 			}
 			else
@@ -541,11 +540,8 @@ protected:
 				success = TrackLocalMap();
 		}
 
-		if (success)
-			mState = STATE_OK;
-		else
-			mState = STATE_LOST;
-
+		mState = success ? STATE_OK : STATE_LOST;
+		
 		// Update drawer
 		mpFrameDrawer->Update(this);
 
