@@ -60,9 +60,9 @@ public:
 		KeyFrameDatabase* pKFDB, const string &strSettingPath, const int sensor);
 
 	// Preprocess the input and call Track(). Extract features and performs stereo matching.
-	virtual cv::Mat GrabImageStereo(const cv::Mat &imRectLeft, const cv::Mat &imRectRight, const double &timestamp) = 0;
-	virtual cv::Mat GrabImageRGBD(const cv::Mat &imRGB, const cv::Mat &imD, const double &timestamp) = 0;
-	virtual cv::Mat GrabImageMonocular(const cv::Mat &im, const double &timestamp) = 0;
+	virtual cv::Mat GrabImageStereo(const cv::Mat& imageL, const cv::Mat& imageR, double timestamp) = 0;
+	virtual cv::Mat GrabImageRGBD(const cv::Mat& image, const cv::Mat& depth, double timestamp) = 0;
+	virtual cv::Mat GrabImageMonocular(const cv::Mat& image, double timestamp) = 0;
 
 	virtual void SetLocalMapper(LocalMapping* pLocalMapper) = 0;
 	virtual void SetLoopClosing(LoopClosing* pLoopClosing) = 0;
