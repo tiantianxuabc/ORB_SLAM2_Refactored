@@ -757,7 +757,7 @@ protected:
 		}
 	}
 
-	void TrackingImpl::CreateInitialMapMonocular()
+	void CreateInitialMapMonocular()
 	{
 		// Create KeyFrames
 		KeyFrame* pKFini = new KeyFrame(mInitialFrame, mpMap, mpKeyFrameDB);
@@ -1183,7 +1183,7 @@ protected:
 			return false;
 	}
 
-	void TrackingImpl::CreateNewKeyFrame()
+	void CreateNewKeyFrame()
 	{
 		if (!mpLocalMapper->SetNotStop(true))
 			return;
