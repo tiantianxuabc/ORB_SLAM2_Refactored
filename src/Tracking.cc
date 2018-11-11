@@ -48,6 +48,23 @@ using namespace std;
 namespace ORB_SLAM2
 {
 
+static void ConvertToGray(const cv::Mat& src, cv::Mat& dst, bool RGB = false)
+{
+	static const int codes[] = { cv::COLOR_RGB2GRAY, cv::COLOR_BGR2GRAY, cv::COLOR_RGBA2GRAY, cv::COLOR_BGRA2GRAY };
+
+	const int ch = src.channels();
+	CV_Assert(ch == 1 || ch == 3 || ch == 4);
+
+	if (ch == 1)
+	{
+		dst = src;
+		return;
+	}
+
+	const int idx = ((ch == 3 ? 0 : 1) << 1) + (RGB ? 0 : 1);
+	cv::cvtColor(src, dst, codes[idx]);
+}
+
 class TrackingImpl : public Tracking
 {
 
@@ -59,35 +76,9 @@ public:
 	// Preprocess the input and call Track(). Extract features and performs stereo matching.
 	cv::Mat GrabImageStereo(const cv::Mat &imRectLeft, const cv::Mat &imRectRight, const double &timestamp) override
 	{
-		mImGray = imRectLeft;
-		cv::Mat imGrayRight = imRectRight;
-
-		if (mImGray.channels() == 3)
-		{
-			if (mbRGB)
-			{
-				cvtColor(mImGray, mImGray, CV_RGB2GRAY);
-				cvtColor(imGrayRight, imGrayRight, CV_RGB2GRAY);
-			}
-			else
-			{
-				cvtColor(mImGray, mImGray, CV_BGR2GRAY);
-				cvtColor(imGrayRight, imGrayRight, CV_BGR2GRAY);
-			}
-		}
-		else if (mImGray.channels() == 4)
-		{
-			if (mbRGB)
-			{
-				cvtColor(mImGray, mImGray, CV_RGBA2GRAY);
-				cvtColor(imGrayRight, imGrayRight, CV_RGBA2GRAY);
-			}
-			else
-			{
-				cvtColor(mImGray, mImGray, CV_BGRA2GRAY);
-				cvtColor(imGrayRight, imGrayRight, CV_BGRA2GRAY);
-			}
-		}
+		cv::Mat imGrayRight;
+		ConvertToGray(imRectLeft, mImGray);
+		ConvertToGray(imRectRight, imGrayRight);
 
 		mCurrentFrame = Frame(mImGray, imGrayRight, timestamp, mpORBextractorLeft, mpORBextractorRight, mpORBVocabulary, mK, mDistCoef, mbf, mThDepth);
 
@@ -99,24 +90,9 @@ public:
 
 	cv::Mat GrabImageRGBD(const cv::Mat &imRGB, const cv::Mat &imD, const double &timestamp) override
 	{
-		mImGray = imRGB;
+		ConvertToGray(imRGB, mImGray);
+		
 		cv::Mat imDepth = imD;
-
-		if (mImGray.channels() == 3)
-		{
-			if (mbRGB)
-				cvtColor(mImGray, mImGray, CV_RGB2GRAY);
-			else
-				cvtColor(mImGray, mImGray, CV_BGR2GRAY);
-		}
-		else if (mImGray.channels() == 4)
-		{
-			if (mbRGB)
-				cvtColor(mImGray, mImGray, CV_RGBA2GRAY);
-			else
-				cvtColor(mImGray, mImGray, CV_BGRA2GRAY);
-		}
-
 		if ((fabs(mDepthMapFactor - 1.0f) > 1e-5) || imDepth.type() != CV_32F)
 			imDepth.convertTo(imDepth, CV_32F, mDepthMapFactor);
 
@@ -130,23 +106,8 @@ public:
 
 	cv::Mat GrabImageMonocular(const cv::Mat &im, const double &timestamp) override
 	{
-		mImGray = im;
-
-		if (mImGray.channels() == 3)
-		{
-			if (mbRGB)
-				cvtColor(mImGray, mImGray, CV_RGB2GRAY);
-			else
-				cvtColor(mImGray, mImGray, CV_BGR2GRAY);
-		}
-		else if (mImGray.channels() == 4)
-		{
-			if (mbRGB)
-				cvtColor(mImGray, mImGray, CV_RGBA2GRAY);
-			else
-				cvtColor(mImGray, mImGray, CV_BGRA2GRAY);
-		}
-
+		ConvertToGray(im, mImGray);
+		
 		if (mState == NOT_INITIALIZED || mState == NO_IMAGES_YET)
 			mCurrentFrame = Frame(mImGray, timestamp, mpIniORBextractor, mpORBVocabulary, mK, mDistCoef, mbf, mThDepth);
 		else
