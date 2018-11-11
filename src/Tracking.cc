@@ -338,7 +338,7 @@ static void ConvertToGray(const cv::Mat& src, cv::Mat& dst, bool RGB = false)
 	cv::cvtColor(src, dst, codes[idx]);
 }
 
-void SearchLocalPoints(const LocalMap& mLocalMap, Frame& mCurrentFrame, float th)
+static void SearchLocalPoints(const LocalMap& mLocalMap, Frame& mCurrentFrame, float th)
 {
 	// Do not search map points already matched
 	for (vector<MapPoint*>::iterator vit = mCurrentFrame.mvpMapPoints.begin(), vend = mCurrentFrame.mvpMapPoints.end(); vit != vend; vit++)
@@ -383,6 +383,44 @@ void SearchLocalPoints(const LocalMap& mLocalMap, Frame& mCurrentFrame, float th
 		ORBmatcher matcher(0.8);
 		matcher.SearchByProjection(mCurrentFrame, mvpLocalMapPoints, th);
 	}
+}
+
+static int TrackLocalMap(LocalMap& mLocalMap, Frame& mCurrentFrame, float th, bool mbLocalizationMode, bool stereo)
+{
+	// We have an estimation of the camera pose and some map points tracked in the frame.
+	// We retrieve the local map and try to find matches to points in the local map.
+
+	mLocalMap.Update(mCurrentFrame);
+
+	SearchLocalPoints(mLocalMap, mCurrentFrame, th);
+
+	// Optimize Pose
+	Optimizer::PoseOptimization(&mCurrentFrame);
+	int mnMatchesInliers = 0;
+
+	// Update MapPoints Statistics
+	for (int i = 0; i < mCurrentFrame.N; i++)
+	{
+		if (mCurrentFrame.mvpMapPoints[i])
+		{
+			if (!mCurrentFrame.mvbOutlier[i])
+			{
+				mCurrentFrame.mvpMapPoints[i]->IncreaseFound();
+				if (!mbLocalizationMode)
+				{
+					if (mCurrentFrame.mvpMapPoints[i]->Observations() > 0)
+						mnMatchesInliers++;
+				}
+				else
+					mnMatchesInliers++;
+			}
+			else if (stereo)
+				mCurrentFrame.mvpMapPoints[i] = static_cast<MapPoint*>(NULL);
+
+		}
+	}
+
+	return mnMatchesInliers;
 }
 
 class TrackingImpl : public Tracking
@@ -847,18 +885,19 @@ protected:
 		mCurrentFrame.mpReferenceKF = mLocalMap.mpReferenceKF;
 
 		// If we have an initial estimation of the camera pose and matching. Track the local map.
-		if (!mbLocalizationMode)
+		// [In Localization Mode]
+		// mbVO true means that there are few matches to MapPoints in the map. We cannot retrieve
+		// a local map and therefore we do not perform TrackLocalMap(). Once the system relocalizes
+		// the camera we will use the local map again.
+		if (success && (!mbLocalizationMode || (mbLocalizationMode && !mbVO)))
 		{
-			if (success)
-				success = TrackLocalMap();
-		}
-		else
-		{
-			// mbVO true means that there are few matches to MapPoints in the map. We cannot retrieve
-			// a local map and therefore we do not perform TrackLocalMap(). Once the system relocalizes
-			// the camera we will use the local map again.
-			if (success && !mbVO)
-				success = TrackLocalMap();
+			const float th = mCurrentFrame.mnId < mLast.relocFrameId + 2 < 2 ? 5 : (mSensor == System::RGBD ? 3 : 1);
+			mnMatchesInliers = TrackLocalMap(mLocalMap, mCurrentFrame, th, mbLocalizationMode, mSensor == System::STEREO);
+
+			// Decide if the tracking was succesful
+			// More restrictive if there was a relocalization recently
+			const int minInliers = (mCurrentFrame.mnId < mLast.relocFrameId + param_.maxFrames) ? 50 : 30;
+			success = mnMatchesInliers >= minInliers;
 		}
 
 		mState = success ? STATE_OK : STATE_LOST;
@@ -1351,53 +1390,6 @@ protected:
 		}
 
 		return nmatchesMap >= 10;
-	}
-
-	bool TrackLocalMap()
-	{
-		// We have an estimation of the camera pose and some map points tracked in the frame.
-		// We retrieve the local map and try to find matches to points in the local map.
-
-		mLocalMap.Update(mCurrentFrame);
-
-		const float th = mCurrentFrame.mnId < mLast.relocFrameId + 2 < 2 ? 5 : (mSensor == System::RGBD ? 3 : 1);
-		SearchLocalPoints(mLocalMap, mCurrentFrame, th);
-
-		// Optimize Pose
-		Optimizer::PoseOptimization(&mCurrentFrame);
-		mnMatchesInliers = 0;
-
-		// Update MapPoints Statistics
-		for (int i = 0; i < mCurrentFrame.N; i++)
-		{
-			if (mCurrentFrame.mvpMapPoints[i])
-			{
-				if (!mCurrentFrame.mvbOutlier[i])
-				{
-					mCurrentFrame.mvpMapPoints[i]->IncreaseFound();
-					if (!mbLocalizationMode)
-					{
-						if (mCurrentFrame.mvpMapPoints[i]->Observations() > 0)
-							mnMatchesInliers++;
-					}
-					else
-						mnMatchesInliers++;
-				}
-				else if (mSensor == System::STEREO)
-					mCurrentFrame.mvpMapPoints[i] = static_cast<MapPoint*>(NULL);
-
-			}
-		}
-
-		// Decide if the tracking was succesful
-		// More restrictive if there was a relocalization recently
-		if (mCurrentFrame.mnId < mLast.relocFrameId + param_.maxFrames && mnMatchesInliers < 50)
-			return false;
-
-		if (mnMatchesInliers < 30)
-			return false;
-		else
-			return true;
 	}
 
 	void CreateNewKeyFrame()
