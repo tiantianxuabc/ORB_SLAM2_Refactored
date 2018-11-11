@@ -126,17 +126,17 @@ public:
 
 		//Initialize the Local Mapping thread and launch
 		mpLocalMapper = new LocalMapping(mpMap, mSensor == MONOCULAR);
-		mptLocalMapping = new thread(&ORB_SLAM2::LocalMapping::Run, mpLocalMapper);
+		threads_[THREAD_LOCAL_MAPPING] = thread(&ORB_SLAM2::LocalMapping::Run, mpLocalMapper);
 
 		//Initialize the Loop Closing thread and launch
 		mpLoopCloser = LoopClosing::Create(mpMap, mpKeyFrameDatabase, mpVocabulary, mSensor != MONOCULAR);
-		mptLoopClosing = new thread(&ORB_SLAM2::LoopClosing::Run, mpLoopCloser);
+		threads_[THREAD_LOOP_CLOSING] = thread(&ORB_SLAM2::LoopClosing::Run, mpLoopCloser);
 
 		//Initialize the Viewer thread and launch
 		if (useViewer)
 		{
 			mpViewer = new Viewer(this, mpFrameDrawer, mpMapDrawer, mpTracker, settingsFile);
-			mptViewer = new thread(&Viewer::Run, mpViewer);
+			threads_[THREAD_VIEWER] = thread(&Viewer::Run, mpViewer);
 			mpTracker->SetViewer(mpViewer);
 		}
 
@@ -370,6 +370,9 @@ public:
 		{
 			usleep(5000);
 		}
+
+		for (auto& t : threads_)
+			if (t.joinable()) t.join();
 	}
 
 	// Save camera trajectory in the TUM RGB-D dataset format.
@@ -593,9 +596,8 @@ private:
 
 	// System threads: Local Mapping, Loop Closing, Viewer.
 	// The Tracking thread "lives" in the main execution thread that creates the System object.
-	std::thread* mptLocalMapping;
-	std::thread* mptLoopClosing;
-	std::thread* mptViewer;
+	enum { THREAD_LOCAL_MAPPING, THREAD_LOOP_CLOSING, THREAD_VIEWER, NUM_THREADS };
+	std::thread threads_[NUM_THREADS];
 
 	// Reset flag
 	mutable std::mutex mMutexReset;
