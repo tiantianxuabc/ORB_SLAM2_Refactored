@@ -870,6 +870,78 @@ static CameraParams ReadCameraParams(const cv::FileStorage& fs)
 	return param;
 }
 
+static cv::Mat1f ReadDistCoeffs(const cv::FileStorage& fs)
+{
+	const float k1 = fs["Camera.k1"];
+	const float k2 = fs["Camera.k2"];
+	const float p1 = fs["Camera.p1"];
+	const float p2 = fs["Camera.p2"];
+	const float k3 = fs["Camera.k3"];
+	cv::Mat1f distCoeffs = k3 == 0 ? (cv::Mat1f(4, 1) << k1, k2, p1, p2) : (cv::Mat1f(5, 1) << k1, k2, p1, p2, k3);
+	return distCoeffs;
+}
+
+static float ReadFps(const cv::FileStorage& fs)
+{
+	const float fps = fs["Camera.fps"];
+	return fps == 0 ? 30 : fps;
+}
+
+struct ORBExtractorParams
+{
+	int nfeatures;
+	float scaleFactor;
+	int nlevels;
+	int initTh;
+	int minTh;
+};
+
+static ORBExtractorParams ReadExtractorParams(const cv::FileStorage& fs)
+{
+	ORBExtractorParams param;
+	param.nfeatures = fs["ORBextractor.nFeatures"];
+	param.scaleFactor = fs["ORBextractor.scaleFactor"];
+	param.nlevels = fs["ORBextractor.nLevels"];
+	param.initTh = fs["ORBextractor.iniThFAST"];
+	param.minTh = fs["ORBextractor.minThFAST"];
+	return param;
+}
+
+static float ReadDepthFactor(const cv::FileStorage& fs)
+{
+	const float factor = fs["DepthMapFactor"];
+	return fabs(factor) < 1e-5 ? 1 : 1.f / factor;
+}
+
+static void PrintSettings(const CameraParams& camera, const cv::Mat1f& distCoeffs,
+	float fps, bool rgb, const ORBExtractorParams& param, float thDepth, int sensor)
+{
+	cout << endl << "Camera Parameters: " << endl;
+	cout << "- fx: " << camera.fx << endl;
+	cout << "- fy: " << camera.fy << endl;
+	cout << "- cx: " << camera.cx << endl;
+	cout << "- cy: " << camera.cy << endl;
+	cout << "- k1: " << distCoeffs(0) << endl;
+	cout << "- k2: " << distCoeffs(1) << endl;
+	if (distCoeffs.rows == 5)
+		cout << "- k3: " << distCoeffs(4) << endl;
+	cout << "- p1: " << distCoeffs(2) << endl;
+	cout << "- p2: " << distCoeffs(3) << endl;
+	cout << "- fps: " << fps << endl;
+
+	cout << "- color order: " << (rgb ? "RGB" : "BGR") << " (ignored if grayscale)" << endl;
+
+	cout << endl << "ORB Extractor Parameters: " << endl;
+	cout << "- Number of Features: " << param.nfeatures << endl;
+	cout << "- Scale Levels: " << param.nlevels << endl;
+	cout << "- Scale Factor: " << param.scaleFactor << endl;
+	cout << "- Initial Fast Threshold: " << param.initTh << endl;
+	cout << "- Minimum Fast Threshold: " << param.minTh << endl;
+
+	if (sensor == System::STEREO || sensor == System::RGBD)
+		cout << endl << "Depth Threshold (Close/Far Points): " << thDepth << endl;
+}
+
 class TrackingImpl : public Tracking
 {
 
@@ -882,94 +954,47 @@ public:
 		mpFrameDrawer(pFrameDrawer), mpMapDrawer(pMapDrawer), mpMap(pMap), mLocalMap(pMap),
 		mMMTracker(sensor), mBoWTracker(mLast), mNewKeyFrameCondition(pMap, mLocalMap, mLast, param_, sensor)
 	{
-		// Load camera parameters from settings file
-
 		cv::FileStorage fSettings(strSettingPath, cv::FileStorage::READ);
 
+		// Load camera parameters from settings file
 		camera_ = ReadCameraParams(fSettings);
+		distCoeffs_ = ReadDistCoeffs(fSettings);
 
-		cv::Mat DistCoef(4, 1, CV_32F);
-		DistCoef.at<float>(0) = fSettings["Camera.k1"];
-		DistCoef.at<float>(1) = fSettings["Camera.k2"];
-		DistCoef.at<float>(2) = fSettings["Camera.p1"];
-		DistCoef.at<float>(3) = fSettings["Camera.p2"];
-		const float k3 = fSettings["Camera.k3"];
-		if (k3 != 0)
-		{
-			DistCoef.resize(5);
-			DistCoef.at<float>(4) = k3;
-		}
-		DistCoef.copyTo(mDistCoef);
-
-		float fps = fSettings["Camera.fps"];
-		if (fps == 0)
-			fps = 30;
+		// Load fps
+		const float fps = ReadFps(fSettings);
 
 		// Max/Min Frames to insert keyframes and to check relocalisation
 		param_.minFrames = 0;
-		param_.maxFrames = fps;
+		param_.maxFrames = static_cast<int>(fps);
 
-		cout << endl << "Camera Parameters: " << endl;
-		cout << "- fx: " << camera_.fx << endl;
-		cout << "- fy: " << camera_.fy << endl;
-		cout << "- cx: " << camera_.cx << endl;
-		cout << "- cy: " << camera_.cy << endl;
-		cout << "- k1: " << DistCoef.at<float>(0) << endl;
-		cout << "- k2: " << DistCoef.at<float>(1) << endl;
-		if (DistCoef.rows == 5)
-			cout << "- k3: " << DistCoef.at<float>(4) << endl;
-		cout << "- p1: " << DistCoef.at<float>(2) << endl;
-		cout << "- p2: " << DistCoef.at<float>(3) << endl;
-		cout << "- fps: " << fps << endl;
-
-
-		int nRGB = fSettings["Camera.RGB"];
-		mbRGB = nRGB;
-
-		if (mbRGB)
-			cout << "- color order: RGB (ignored if grayscale)" << endl;
-		else
-			cout << "- color order: BGR (ignored if grayscale)" << endl;
+		// Load color
+		mbRGB = static_cast<int>(fSettings["Camera.RGB"]) != 0;
 
 		// Load ORB parameters
+		const ORBExtractorParams extractorParams = ReadExtractorParams(fSettings);
 
-		int nFeatures = fSettings["ORBextractor.nFeatures"];
-		float fScaleFactor = fSettings["ORBextractor.scaleFactor"];
-		int nLevels = fSettings["ORBextractor.nLevels"];
-		int fIniThFAST = fSettings["ORBextractor.iniThFAST"];
-		int fMinThFAST = fSettings["ORBextractor.minThFAST"];
+		// Load depth threshold
+		if (sensor == System::STEREO || sensor == System::RGBD)
+			param_.thDepth = camera_.baseline * static_cast<float>(fSettings["ThDepth"]);
 
+		// Load depth factor
+		if (sensor == System::RGBD)
+			mDepthMapFactor = ReadDepthFactor(fSettings);
+
+		// Print settings
+		PrintSettings(camera_, distCoeffs_, fps, mbRGB, extractorParams, param_.thDepth, sensor);
+
+		// Initialize ORB extractors
+		const int nFeatures = extractorParams.nfeatures;
+		const float fScaleFactor = extractorParams.scaleFactor;
+		const int nLevels = extractorParams.nlevels;
+		const int fIniThFAST = extractorParams.initTh;
+		const int fMinThFAST = extractorParams.minTh;
 		mpORBextractorLeft = new ORBextractor(nFeatures, fScaleFactor, nLevels, fIniThFAST, fMinThFAST);
-
 		if (sensor == System::STEREO)
 			mpORBextractorRight = new ORBextractor(nFeatures, fScaleFactor, nLevels, fIniThFAST, fMinThFAST);
-
 		if (sensor == System::MONOCULAR)
 			mpIniORBextractor = new ORBextractor(2 * nFeatures, fScaleFactor, nLevels, fIniThFAST, fMinThFAST);
-
-		cout << endl << "ORB Extractor Parameters: " << endl;
-		cout << "- Number of Features: " << nFeatures << endl;
-		cout << "- Scale Levels: " << nLevels << endl;
-		cout << "- Scale Factor: " << fScaleFactor << endl;
-		cout << "- Initial Fast Threshold: " << fIniThFAST << endl;
-		cout << "- Minimum Fast Threshold: " << fMinThFAST << endl;
-
-		if (sensor == System::STEREO || sensor == System::RGBD)
-		{
-			const float thDepth = fSettings["ThDepth"];
-			param_.thDepth = camera_.baseline * thDepth;
-			cout << endl << "Depth Threshold (Close/Far Points): " << param_.thDepth << endl;
-		}
-
-		if (sensor == System::RGBD)
-		{
-			mDepthMapFactor = fSettings["DepthMapFactor"];
-			if (fabs(mDepthMapFactor) < 1e-5)
-				mDepthMapFactor = 1;
-			else
-				mDepthMapFactor = 1.0f / mDepthMapFactor;
-		}
-
 	}
 
 	// Preprocess the input and call Track(). Extract features and performs stereo matching.
@@ -980,7 +1005,7 @@ public:
 		ConvertToGray(imageR, imGrayRight);
 
 		mCurrentFrame = Frame(mImGray, imGrayRight, timestamp, mpORBextractorLeft, mpORBextractorRight, mpORBVocabulary,
-			camera_.Mat(), mDistCoef, camera_.bf, param_.thDepth);
+			camera_.Mat(), distCoeffs_, camera_.bf, param_.thDepth);
 
 		Track();
 
@@ -996,7 +1021,7 @@ public:
 			imDepth.convertTo(imDepth, CV_32F, mDepthMapFactor);
 
 		mCurrentFrame = Frame(mImGray, imDepth, timestamp, mpORBextractorLeft, mpORBVocabulary,
-			camera_.Mat(), mDistCoef, camera_.bf, param_.thDepth);
+			camera_.Mat(), distCoeffs_, camera_.bf, param_.thDepth);
 
 		Track();
 
@@ -1010,7 +1035,7 @@ public:
 		const bool init = mState == STATE_NOT_INITIALIZED || mState == STATE_NO_IMAGES;
 		ORBextractor* pORBextractor = init ? mpIniORBextractor : mpORBextractorLeft;
 		mCurrentFrame = Frame(mImGray, timestamp, pORBextractor, mpORBVocabulary,
-			camera_.Mat(), mDistCoef, camera_.bf, param_.thDepth);
+			camera_.Mat(), distCoeffs_, camera_.bf, param_.thDepth);
 
 		Track();
 
@@ -1038,22 +1063,8 @@ public:
 	void ChangeCalibration(const string &strSettingPath) override
 	{
 		cv::FileStorage fSettings(strSettingPath, cv::FileStorage::READ);
-
 		camera_ = ReadCameraParams(fSettings);
-
-		cv::Mat DistCoef(4, 1, CV_32F);
-		DistCoef.at<float>(0) = fSettings["Camera.k1"];
-		DistCoef.at<float>(1) = fSettings["Camera.k2"];
-		DistCoef.at<float>(2) = fSettings["Camera.p1"];
-		DistCoef.at<float>(3) = fSettings["Camera.p2"];
-		const float k3 = fSettings["Camera.k3"];
-		if (k3 != 0)
-		{
-			DistCoef.resize(5);
-			DistCoef.at<float>(4) = k3;
-		}
-		DistCoef.copyTo(mDistCoef);
-
+		distCoeffs_ = ReadDistCoeffs(fSettings);
 		Frame::mbInitialComputations = true;
 	}
 
@@ -1708,7 +1719,7 @@ private:
 
 	//Calibration matrix
 	CameraParams camera_;
-	cv::Mat mDistCoef;
+	cv::Mat1f distCoeffs_;
 
 	// Parameters
 	Parameters param_;
