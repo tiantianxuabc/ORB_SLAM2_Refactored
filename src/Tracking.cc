@@ -258,12 +258,12 @@ public:
 	bool Track(Frame& mCurrentFrame, Frame& mLastFrame, const cv::Mat& mVelocity,
 		int minInliers, bool* mbVO = nullptr)
 	{
-		ORBmatcher matcher(0.9, true);
+		ORBmatcher matcher(0.9f, true);
 
 		mCurrentFrame.SetPose(mVelocity*mLastFrame.mTcw);
 
 		// Project points seen in previous frame
-		const int th = mSensor == System::STEREO ? 7 : 15;
+		const float th = mSensor == System::STEREO ? 7.f : 15.f;
 		const int minMatches = 20;
 		int nmatches = 0;
 		{
@@ -308,7 +308,7 @@ public:
 
 		// We perform first an ORB matching with the reference keyframe
 		// If enough matches are found we setup a PnP solver
-		ORBmatcher matcher(0.7, true);
+		ORBmatcher matcher(0.7f, true);
 		vector<MapPoint*> vpMapPointMatches;
 
 		int nmatches = matcher.SearchByBoW(mpReferenceKF, mCurrentFrame, vpMapPointMatches);
@@ -367,7 +367,7 @@ public:
 		const int nKFs = mpMap->KeyFramesInMap();
 
 		// Do not insert keyframes if not enough frames have passed from last relocalisation
-		if (mCurrentFrame.mnId<mLast.relocFrameId + param_.maxFrames && nKFs>param_.maxFrames)
+		if ((int)mCurrentFrame.mnId<mLast.relocFrameId + param_.maxFrames && nKFs>param_.maxFrames)
 			return false;
 
 		// Tracked MapPoints in the reference keyframe
@@ -407,9 +407,9 @@ public:
 			thRefRatio = 0.9f;
 
 		// Condition 1a: More than "MaxFrames" have passed from last keyframe insertion
-		const bool c1a = mCurrentFrame.mnId >= mLast.keyFrameId + param_.maxFrames;
+		const bool c1a = (int)mCurrentFrame.mnId >= mLast.keyFrameId + param_.maxFrames;
 		// Condition 1b: More than "MinFrames" have passed and Local Mapping is idle
-		const bool c1b = (mCurrentFrame.mnId >= mLast.keyFrameId + param_.minFrames && bLocalMappingIdle);
+		const bool c1b = ((int)mCurrentFrame.mnId >= mLast.keyFrameId + param_.minFrames && bLocalMappingIdle);
 		//Condition 1c: tracking is weak
 		const bool c1c = mSensor != System::MONOCULAR && (mnMatchesInliers < nRefMatches*0.25 || bNeedToInsertClose);
 		// Condition 2: Few tracked points compared to reference keyframe. Lots of visual odometry compared to map matches.
@@ -508,7 +508,7 @@ static void SearchLocalPoints(const LocalMap& mLocalMap, Frame& mCurrentFrame, f
 
 	if (nToMatch > 0)
 	{
-		ORBmatcher matcher(0.8);
+		ORBmatcher matcher(0.8f);
 		matcher.SearchByProjection(mCurrentFrame, mvpLocalMapPoints, th);
 	}
 }
@@ -682,7 +682,7 @@ static bool Relocalization(Frame& mCurrentFrame, KeyFrameDatabase* mpKeyFrameDB,
 	if (vpCandidateKFs.empty())
 		return false;
 
-	const int nKFs = vpCandidateKFs.size();
+	const int nKFs = static_cast<int>(vpCandidateKFs.size());
 
 	// We perform first an ORB matching with each candidate
 	// If enough matches are found we setup a PnP solver
@@ -715,7 +715,7 @@ static bool Relocalization(Frame& mCurrentFrame, KeyFrameDatabase* mpKeyFrameDB,
 			else
 			{
 				PnPsolver* pSolver = new PnPsolver(mCurrentFrame, vvpMapPointMatches[i]);
-				pSolver->SetRansacParameters(0.99, 10, 300, 4, 0.5, 5.991);
+				pSolver->SetRansacParameters(0.99, 10, 300, 4, 0.5f, 5.991f);
 				vpPnPsolvers[i] = pSolver;
 				nCandidates++;
 			}
@@ -725,7 +725,7 @@ static bool Relocalization(Frame& mCurrentFrame, KeyFrameDatabase* mpKeyFrameDB,
 	// Alternatively perform some iterations of P4P RANSAC
 	// Until we found a camera pose supported by enough inliers
 	bool bMatch = false;
-	ORBmatcher matcher2(0.9, true);
+	ORBmatcher matcher2(0.9f, true);
 
 	while (nCandidates > 0 && !bMatch)
 	{
@@ -756,7 +756,7 @@ static bool Relocalization(Frame& mCurrentFrame, KeyFrameDatabase* mpKeyFrameDB,
 
 				set<MapPoint*> sFound;
 
-				const int np = vbInliers.size();
+				const int np = static_cast<int>(vbInliers.size());
 
 				for (int j = 0; j < np; j++)
 				{
@@ -1234,7 +1234,7 @@ private:
 						mLast.frame.mvpMapPoints[i] = pRep;
 				}
 
-				const bool withMotionModel = !mVelocity.empty() && mCurrentFrame.mnId >= mLast.relocFrameId + 2;
+				const bool withMotionModel = !mVelocity.empty() && (int)mCurrentFrame.mnId >= mLast.relocFrameId + 2;
 				if (withMotionModel)
 				{
 					MMTracker::UpdateLastFramePose(mLast.frame, trajectory_.back());
@@ -1337,14 +1337,14 @@ private:
 		if (success && (!mbLocalizationMode || (mbLocalizationMode && !mbVO)))
 		{
 			// If the camera has been relocalised recently, perform a coarser search
-			const bool relocalizedRecently = mCurrentFrame.mnId < mLast.relocFrameId + 2;
-			const float th = relocalizedRecently ? 5 : (mSensor == System::RGBD ? 3 : 1);
+			const bool relocalizedRecently = (int)mCurrentFrame.mnId < mLast.relocFrameId + 2;
+			const float th = relocalizedRecently ? 5.f : (mSensor == System::RGBD ? 3.f : 1.f);
 
 			mnMatchesInliers = TrackLocalMap(mLocalMap, mCurrentFrame, th, mbLocalizationMode, mSensor == System::STEREO);
 
 			// Decide if the tracking was succesful
 			// More restrictive if there was a relocalization recently
-			const int minInliers = (mCurrentFrame.mnId < mLast.relocFrameId + param_.maxFrames) ? 50 : 30;
+			const int minInliers = ((int)mCurrentFrame.mnId < mLast.relocFrameId + param_.maxFrames) ? 50 : 30;
 			success = mnMatchesInliers >= minInliers;
 		}
 
@@ -1542,7 +1542,7 @@ private:
 			}
 
 			// Find correspondences
-			ORBmatcher matcher(0.9, true);
+			ORBmatcher matcher(0.9f, true);
 			int nmatches = matcher.SearchForInitialization(mInitialFrame, mCurrentFrame, mvbPrevMatched, mvIniMatches, 100);
 
 			// Check if there are enough correspondences
