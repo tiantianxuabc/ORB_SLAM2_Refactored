@@ -485,6 +485,63 @@ void CreateMapPoints(Frame& mCurrentFrame, KeyFrame* pKF, Map* mpMap, float thDe
 	}
 }
 
+static void CreateMapPointsVO(Frame& LastFrame, list<MapPoint*>& mlpTemporalPoints, Map* mpMap, float thDepth)
+{
+	// Create "visual odometry" MapPoints
+	// We sort points according to their measured depth by the stereo/RGB-D sensor
+	vector<pair<float, int> > vDepthIdx;
+	vDepthIdx.reserve(LastFrame.N);
+	for (int i = 0; i < LastFrame.N; i++)
+	{
+		float z = LastFrame.mvDepth[i];
+		if (z > 0)
+		{
+			vDepthIdx.push_back(make_pair(z, i));
+		}
+	}
+
+	if (vDepthIdx.empty())
+		return;
+
+	sort(vDepthIdx.begin(), vDepthIdx.end());
+
+	// We insert all close points (depth<param_.thDepth)
+	// If less than 100 close points, we insert the 100 closest ones.
+	int nPoints = 0;
+	for (size_t j = 0; j < vDepthIdx.size(); j++)
+	{
+		int i = vDepthIdx[j].second;
+
+		bool bCreateNew = false;
+
+		MapPoint* pMP = LastFrame.mvpMapPoints[i];
+		if (!pMP)
+			bCreateNew = true;
+		else if (pMP->Observations() < 1)
+		{
+			bCreateNew = true;
+		}
+
+		if (bCreateNew)
+		{
+			cv::Mat x3D = LastFrame.UnprojectStereo(i);
+			MapPoint* pNewMP = new MapPoint(x3D, mpMap, &LastFrame, i);
+
+			LastFrame.mvpMapPoints[i] = pNewMP;
+
+			mlpTemporalPoints.push_back(pNewMP);
+			nPoints++;
+		}
+		else
+		{
+			nPoints++;
+		}
+
+		if (vDepthIdx[j].first > thDepth && nPoints > 100)
+			break;
+	}
+}
+
 class TrackingImpl : public Tracking
 {
 
@@ -807,7 +864,7 @@ public:
 	// True if local mapping is deactivated and we are performing only localization
 	bool mbLocalizationMode;
 
-protected:
+private:
 
 	// Main tracking function. It is independent of the input sensor.
 	void Track()
@@ -1340,79 +1397,20 @@ protected:
 		return nmatchesMap >= 10;
 	}
 
-	void UpdateLastFrame()
-	{
-		// Update pose according to reference keyframe
-		KeyFrame* pRef = mLast.frame.mpReferenceKF;
-		cv::Mat Tlr = trajectory_.back().Tcr;
-
-		mLast.frame.SetPose(Tlr*pRef->GetPose());
-
-		if (mLast.keyFrameId == mLast.frame.mnId || mSensor == System::MONOCULAR || !mbLocalizationMode)
-			return;
-
-		// Create "visual odometry" MapPoints
-		// We sort points according to their measured depth by the stereo/RGB-D sensor
-		vector<pair<float, int> > vDepthIdx;
-		vDepthIdx.reserve(mLast.frame.N);
-		for (int i = 0; i < mLast.frame.N; i++)
-		{
-			float z = mLast.frame.mvDepth[i];
-			if (z > 0)
-			{
-				vDepthIdx.push_back(make_pair(z, i));
-			}
-		}
-
-		if (vDepthIdx.empty())
-			return;
-
-		sort(vDepthIdx.begin(), vDepthIdx.end());
-
-		// We insert all close points (depth<param_.thDepth)
-		// If less than 100 close points, we insert the 100 closest ones.
-		int nPoints = 0;
-		for (size_t j = 0; j < vDepthIdx.size(); j++)
-		{
-			int i = vDepthIdx[j].second;
-
-			bool bCreateNew = false;
-
-			MapPoint* pMP = mLast.frame.mvpMapPoints[i];
-			if (!pMP)
-				bCreateNew = true;
-			else if (pMP->Observations() < 1)
-			{
-				bCreateNew = true;
-			}
-
-			if (bCreateNew)
-			{
-				cv::Mat x3D = mLast.frame.UnprojectStereo(i);
-				MapPoint* pNewMP = new MapPoint(x3D, mpMap, &mLast.frame, i);
-
-				mLast.frame.mvpMapPoints[i] = pNewMP;
-
-				mlpTemporalPoints.push_back(pNewMP);
-				nPoints++;
-			}
-			else
-			{
-				nPoints++;
-			}
-
-			if (vDepthIdx[j].first > param_.thDepth && nPoints > 100)
-				break;
-		}
-	}
-
 	bool TrackWithMotionModel()
 	{
 		ORBmatcher matcher(0.9, true);
 
 		// Update last frame pose according to its reference keyframe
 		// Create "visual odometry" points if in Localization Mode
-		UpdateLastFrame();
+
+		// Update pose according to reference keyframe
+		KeyFrame* pRef = mLast.frame.mpReferenceKF;
+		cv::Mat Tlr = trajectory_.back().Tcr;
+		mLast.frame.SetPose(Tlr*pRef->GetPose());
+
+		if (mbLocalizationMode && mSensor != System::MONOCULAR && mLast.frame.mnId != mLast.keyFrameId)
+			CreateMapPointsVO(mLast.frame, mlpTemporalPoints, mpMap, param_.thDepth);
 
 		mCurrentFrame.SetPose(mVelocity*mLast.frame.mTcw);
 
