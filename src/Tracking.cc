@@ -218,6 +218,60 @@ struct LastFrameInfo
 	LastFrameInfo() : keyFrame(nullptr), keyFrameId(0), relocFrameId(0) {}
 };
 
+class BoWTracker
+{
+public:
+
+	BoWTracker(const LastFrameInfo& Last) : mLast(Last) {}
+
+	bool Track(Frame& mCurrentFrame, KeyFrame* mpReferenceKF) const
+	{
+		// Compute Bag of Words vector
+		mCurrentFrame.ComputeBoW();
+
+		// We perform first an ORB matching with the reference keyframe
+		// If enough matches are found we setup a PnP solver
+		ORBmatcher matcher(0.7, true);
+		vector<MapPoint*> vpMapPointMatches;
+
+		int nmatches = matcher.SearchByBoW(mpReferenceKF, mCurrentFrame, vpMapPointMatches);
+
+		if (nmatches < 15)
+			return false;
+
+		mCurrentFrame.mvpMapPoints = vpMapPointMatches;
+		mCurrentFrame.SetPose(mLast.frame.mTcw);
+
+		Optimizer::PoseOptimization(&mCurrentFrame);
+
+		// Discard outliers
+		int nmatchesMap = 0;
+		for (int i = 0; i < mCurrentFrame.N; i++)
+		{
+			if (mCurrentFrame.mvpMapPoints[i])
+			{
+				if (mCurrentFrame.mvbOutlier[i])
+				{
+					MapPoint* pMP = mCurrentFrame.mvpMapPoints[i];
+
+					mCurrentFrame.mvpMapPoints[i] = static_cast<MapPoint*>(NULL);
+					mCurrentFrame.mvbOutlier[i] = false;
+					pMP->mbTrackInView = false;
+					pMP->mnLastFrameSeen = mCurrentFrame.mnId;
+					nmatches--;
+				}
+				else if (mCurrentFrame.mvpMapPoints[i]->Observations() > 0)
+					nmatchesMap++;
+			}
+		}
+
+		return nmatchesMap >= 10;
+	}
+
+private:
+	const LastFrameInfo& mLast;
+};
+
 class NewKeyFrameCondition
 {
 public:
@@ -552,7 +606,7 @@ public:
 		mState(STATE_NO_IMAGES), mSensor(sensor), mbLocalizationMode(false), mbVO(false), mpORBVocabulary(pVoc),
 		mpKeyFrameDB(pKFDB), mpInitializer(static_cast<Initializer*>(NULL)), mpSystem(pSys), mpViewer(NULL),
 		mpFrameDrawer(pFrameDrawer), mpMapDrawer(pMapDrawer), mpMap(pMap), mLocalMap(pMap),
-		mNewKeyFrameCondition(pMap, mLocalMap, mLast, param_, sensor)
+		mBoWTracker(mLast), mNewKeyFrameCondition(pMap, mLocalMap, mLast, param_, sensor)
 	{
 		// Load camera parameters from settings file
 
@@ -921,7 +975,7 @@ private:
 				}
 				if (!withMotionModel || (withMotionModel && !success))
 				{
-					success = TrackReferenceKeyFrame();
+					success = mBoWTracker.Track(mCurrentFrame, mLocalMap.mpReferenceKF);
 				}
 			}
 			else
@@ -949,7 +1003,7 @@ private:
 					}
 					else
 					{
-						success = TrackReferenceKeyFrame();
+						success = mBoWTracker.Track(mCurrentFrame, mLocalMap.mpReferenceKF);
 					}
 				}
 				else
@@ -1356,50 +1410,6 @@ private:
 		mState = STATE_OK;
 	}
 
-	bool TrackReferenceKeyFrame()
-	{
-		// Compute Bag of Words vector
-		mCurrentFrame.ComputeBoW();
-
-		// We perform first an ORB matching with the reference keyframe
-		// If enough matches are found we setup a PnP solver
-		ORBmatcher matcher(0.7, true);
-		vector<MapPoint*> vpMapPointMatches;
-
-		int nmatches = matcher.SearchByBoW(mLocalMap.mpReferenceKF, mCurrentFrame, vpMapPointMatches);
-
-		if (nmatches < 15)
-			return false;
-
-		mCurrentFrame.mvpMapPoints = vpMapPointMatches;
-		mCurrentFrame.SetPose(mLast.frame.mTcw);
-
-		Optimizer::PoseOptimization(&mCurrentFrame);
-
-		// Discard outliers
-		int nmatchesMap = 0;
-		for (int i = 0; i < mCurrentFrame.N; i++)
-		{
-			if (mCurrentFrame.mvpMapPoints[i])
-			{
-				if (mCurrentFrame.mvbOutlier[i])
-				{
-					MapPoint* pMP = mCurrentFrame.mvpMapPoints[i];
-
-					mCurrentFrame.mvpMapPoints[i] = static_cast<MapPoint*>(NULL);
-					mCurrentFrame.mvbOutlier[i] = false;
-					pMP->mbTrackInView = false;
-					pMP->mnLastFrameSeen = mCurrentFrame.mnId;
-					nmatches--;
-				}
-				else if (mCurrentFrame.mvpMapPoints[i]->Observations() > 0)
-					nmatchesMap++;
-			}
-		}
-
-		return nmatchesMap >= 10;
-	}
-
 	bool TrackWithMotionModel()
 	{
 		ORBmatcher matcher(0.9, true);
@@ -1692,6 +1702,7 @@ private:
 
 	list<MapPoint*> mlpTemporalPoints;
 
+	BoWTracker mBoWTracker;
 	NewKeyFrameCondition mNewKeyFrameCondition;
 };
 
