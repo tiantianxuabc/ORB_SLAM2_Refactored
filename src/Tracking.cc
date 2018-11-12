@@ -1010,7 +1010,10 @@ private:
 		// the camera we will use the local map again.
 		if (success && (!mbLocalizationMode || (mbLocalizationMode && !mbVO)))
 		{
-			const float th = mCurrentFrame.mnId < mLast.relocFrameId + 2 < 2 ? 5 : (mSensor == System::RGBD ? 3 : 1);
+			// If the camera has been relocalised recently, perform a coarser search
+			const bool relocalizedRecently = mCurrentFrame.mnId < mLast.relocFrameId + 2;
+			const float th = relocalizedRecently ? 5 : (mSensor == System::RGBD ? 3 : 1);
+
 			mnMatchesInliers = TrackLocalMap(mLocalMap, mCurrentFrame, th, mbLocalizationMode, mSensor == System::STEREO);
 
 			// Decide if the tracking was succesful
