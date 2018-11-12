@@ -218,6 +218,83 @@ struct LastFrameInfo
 	LastFrameInfo() : keyFrame(nullptr), keyFrameId(0), relocFrameId(0) {}
 };
 
+class MMTracker
+{
+public:
+
+	static int DiscardOutliers(Frame& mCurrentFrame)
+	{
+		int nmatchesMap = 0;
+		for (int i = 0; i < mCurrentFrame.N; i++)
+		{
+			if (mCurrentFrame.mvpMapPoints[i])
+			{
+				if (mCurrentFrame.mvbOutlier[i])
+				{
+					MapPoint* pMP = mCurrentFrame.mvpMapPoints[i];
+
+					mCurrentFrame.mvpMapPoints[i] = static_cast<MapPoint*>(NULL);
+					mCurrentFrame.mvbOutlier[i] = false;
+					pMP->mbTrackInView = false;
+					pMP->mnLastFrameSeen = mCurrentFrame.mnId;
+				}
+				else if (mCurrentFrame.mvpMapPoints[i]->Observations() > 0)
+					nmatchesMap++;
+			}
+		}
+		return nmatchesMap;
+	}
+
+	static void UpdateLastFramePose(Frame& mLastFrame, const TrackPoint& LastTrackPoint)
+	{
+		// Update pose according to reference keyframe
+		KeyFrame* pRef = mLastFrame.mpReferenceKF;
+		cv::Mat Tlr = LastTrackPoint.Tcr;
+		mLastFrame.SetPose(Tlr*pRef->GetPose());
+	}
+
+	MMTracker(int sensor) : mSensor(sensor) {}
+
+	bool Track(Frame& mCurrentFrame, Frame& mLastFrame, const cv::Mat& mVelocity,
+		bool minInliers, bool* mbVO = nullptr)
+	{
+		ORBmatcher matcher(0.9, true);
+
+		mCurrentFrame.SetPose(mVelocity*mLastFrame.mTcw);
+
+		// Project points seen in previous frame
+		const int th = mSensor == System::STEREO ? 7 : 15;
+		const int minMatches = 20;
+		int nmatches = 0;
+		{
+			fill(mCurrentFrame.mvpMapPoints.begin(), mCurrentFrame.mvpMapPoints.end(), nullptr);
+			nmatches = matcher.SearchByProjection(mCurrentFrame, mLastFrame, th, mSensor == System::MONOCULAR);
+		}
+		if (nmatches < minMatches)
+		{
+			// If few matches, uses a wider window search
+			fill(mCurrentFrame.mvpMapPoints.begin(), mCurrentFrame.mvpMapPoints.end(), nullptr);
+			nmatches = matcher.SearchByProjection(mCurrentFrame, mLastFrame, 2 * th, mSensor == System::MONOCULAR);
+		}
+
+		if (nmatches < minMatches)
+			return false;
+
+		// Optimize frame pose with all matches
+		Optimizer::PoseOptimization(&mCurrentFrame);
+
+		// Discard outliers
+		const int nmatchesMap = DiscardOutliers(mCurrentFrame);
+
+		if (mbVO)
+			*mbVO = nmatchesMap < 10;
+
+		return nmatchesMap >= minInliers;
+	}
+private:
+	int mSensor;
+};
+
 class BoWTracker
 {
 public:
@@ -606,7 +683,7 @@ public:
 		mState(STATE_NO_IMAGES), mSensor(sensor), mbLocalizationMode(false), mbVO(false), mpORBVocabulary(pVoc),
 		mpKeyFrameDB(pKFDB), mpInitializer(static_cast<Initializer*>(NULL)), mpSystem(pSys), mpViewer(NULL),
 		mpFrameDrawer(pFrameDrawer), mpMapDrawer(pMapDrawer), mpMap(pMap), mLocalMap(pMap),
-		mBoWTracker(mLast), mNewKeyFrameCondition(pMap, mLocalMap, mLast, param_, sensor)
+		mMMTracker(sensor), mBoWTracker(mLast), mNewKeyFrameCondition(pMap, mLocalMap, mLast, param_, sensor)
 	{
 		// Load camera parameters from settings file
 
@@ -971,7 +1048,8 @@ private:
 				const bool withMotionModel = !mVelocity.empty() && mCurrentFrame.mnId >= mLast.relocFrameId + 2;
 				if (withMotionModel)
 				{
-					success = TrackWithMotionModel();
+					MMTracker::UpdateLastFramePose(mLast.frame, trajectory_.back());
+					success = mMMTracker.Track(mCurrentFrame, mLast.frame, mVelocity, 10);
 				}
 				if (!withMotionModel || (withMotionModel && !success))
 				{
@@ -986,6 +1064,7 @@ private:
 		else
 		{
 			// Localization Mode: Local Mapping is deactivated
+			const bool createPoints = mSensor != System::MONOCULAR && mLast.frame.mnId != mLast.keyFrameId;
 
 			if (mState == STATE_LOST)
 			{
@@ -999,7 +1078,9 @@ private:
 
 					if (!mVelocity.empty())
 					{
-						success = TrackWithMotionModel();
+						MMTracker::UpdateLastFramePose(mLast.frame, trajectory_.back());
+						if (createPoints) CreateMapPointsVO(mLast.frame, mlpTemporalPoints, mpMap, param_.thDepth);
+						success = mMMTracker.Track(mCurrentFrame, mLast.frame, mVelocity, 21, &mbVO);
 					}
 					else
 					{
@@ -1021,7 +1102,9 @@ private:
 					cv::Mat TcwMM;
 					if (!mVelocity.empty())
 					{
-						bOKMM = TrackWithMotionModel();
+						MMTracker::UpdateLastFramePose(mLast.frame, trajectory_.back());
+						if (createPoints) CreateMapPointsVO(mLast.frame, mlpTemporalPoints, mpMap, param_.thDepth);
+						bOKMM = mMMTracker.Track(mCurrentFrame, mLast.frame, mVelocity, 21, &mbVO);
 						vpMPsMM = mCurrentFrame.mvpMapPoints;
 						vbOutMM = mCurrentFrame.mvbOutlier;
 						TcwMM = mCurrentFrame.mTcw.clone();
@@ -1410,76 +1493,6 @@ private:
 		mState = STATE_OK;
 	}
 
-	bool TrackWithMotionModel()
-	{
-		ORBmatcher matcher(0.9, true);
-
-		// Update last frame pose according to its reference keyframe
-		// Create "visual odometry" points if in Localization Mode
-
-		// Update pose according to reference keyframe
-		KeyFrame* pRef = mLast.frame.mpReferenceKF;
-		cv::Mat Tlr = trajectory_.back().Tcr;
-		mLast.frame.SetPose(Tlr*pRef->GetPose());
-
-		if (mbLocalizationMode && mSensor != System::MONOCULAR && mLast.frame.mnId != mLast.keyFrameId)
-			CreateMapPointsVO(mLast.frame, mlpTemporalPoints, mpMap, param_.thDepth);
-
-		mCurrentFrame.SetPose(mVelocity*mLast.frame.mTcw);
-
-		fill(mCurrentFrame.mvpMapPoints.begin(), mCurrentFrame.mvpMapPoints.end(), static_cast<MapPoint*>(NULL));
-
-		// Project points seen in previous frame
-		int th;
-		if (mSensor != System::STEREO)
-			th = 15;
-		else
-			th = 7;
-		int nmatches = matcher.SearchByProjection(mCurrentFrame, mLast.frame, th, mSensor == System::MONOCULAR);
-
-		// If few matches, uses a wider window search
-		if (nmatches < 20)
-		{
-			fill(mCurrentFrame.mvpMapPoints.begin(), mCurrentFrame.mvpMapPoints.end(), static_cast<MapPoint*>(NULL));
-			nmatches = matcher.SearchByProjection(mCurrentFrame, mLast.frame, 2 * th, mSensor == System::MONOCULAR);
-		}
-
-		if (nmatches < 20)
-			return false;
-
-		// Optimize frame pose with all matches
-		Optimizer::PoseOptimization(&mCurrentFrame);
-
-		// Discard outliers
-		int nmatchesMap = 0;
-		for (int i = 0; i < mCurrentFrame.N; i++)
-		{
-			if (mCurrentFrame.mvpMapPoints[i])
-			{
-				if (mCurrentFrame.mvbOutlier[i])
-				{
-					MapPoint* pMP = mCurrentFrame.mvpMapPoints[i];
-
-					mCurrentFrame.mvpMapPoints[i] = static_cast<MapPoint*>(NULL);
-					mCurrentFrame.mvbOutlier[i] = false;
-					pMP->mbTrackInView = false;
-					pMP->mnLastFrameSeen = mCurrentFrame.mnId;
-					nmatches--;
-				}
-				else if (mCurrentFrame.mvpMapPoints[i]->Observations() > 0)
-					nmatchesMap++;
-			}
-		}
-
-		if (mbLocalizationMode)
-		{
-			mbVO = nmatchesMap < 10;
-			return nmatches > 20;
-		}
-
-		return nmatchesMap >= 10;
-	}
-
 	bool Relocalization()
 	{
 		// Compute Bag of Words Vector
@@ -1702,6 +1715,7 @@ private:
 
 	list<MapPoint*> mlpTemporalPoints;
 
+	MMTracker mMMTracker;
 	BoWTracker mBoWTracker;
 	NewKeyFrameCondition mNewKeyFrameCondition;
 };
