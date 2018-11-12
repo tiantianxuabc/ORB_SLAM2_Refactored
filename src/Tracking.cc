@@ -360,9 +360,6 @@ public:
 
 	bool Satisfy(const Frame& mCurrentFrame, LocalMapping* mpLocalMapper, int mnMatchesInliers) const
 	{
-		/*if (mbLocalizationMode)
-			return false;*/
-
 		// If Local Mapping is freezed by a Loop Closure do not insert keyframes
 		if (mpLocalMapper->isStopped() || mpLocalMapper->stopRequested())
 			return false;
@@ -835,6 +832,44 @@ static bool Relocalization(Frame& mCurrentFrame, KeyFrameDatabase* mpKeyFrameDB,
 	}
 }
 
+struct CameraParams
+{
+	float fx;                 //!< focal length x (pixel)
+	float fy;                 //!< focal length y (pixel)
+	float cx;                 //!< principal point x (pixel)
+	float cy;                 //!< principal point y (pixel)
+	float bf;                 //!< stereo baseline times fx
+	float baseline;
+
+	CameraParams()
+	{
+		fx = 1.f;
+		fy = 1.f;
+		cx = 0.f;
+		cy = 0.f;
+		bf = 1.f;
+		baseline = 1.f;
+	}
+
+	cv::Mat1f Mat() const
+	{
+		cv::Mat1f K = (cv::Mat1f(3, 3) << fx, 0, cx, 0, fy, cy, 0, 0, 1);
+		return K;
+	}
+};
+
+static CameraParams ReadCameraParams(const cv::FileStorage& fs)
+{
+	CameraParams param;
+	param.fx = fs["Camera.fx"];
+	param.fy = fs["Camera.fy"];
+	param.cx = fs["Camera.cx"];
+	param.cy = fs["Camera.cy"];
+	param.bf = fs["Camera.bf"];
+	param.baseline = param.bf / param.fx;
+	return param;
+}
+
 class TrackingImpl : public Tracking
 {
 
@@ -850,17 +885,8 @@ public:
 		// Load camera parameters from settings file
 
 		cv::FileStorage fSettings(strSettingPath, cv::FileStorage::READ);
-		float fx = fSettings["Camera.fx"];
-		float fy = fSettings["Camera.fy"];
-		float cx = fSettings["Camera.cx"];
-		float cy = fSettings["Camera.cy"];
 
-		cv::Mat K = cv::Mat::eye(3, 3, CV_32F);
-		K.at<float>(0, 0) = fx;
-		K.at<float>(1, 1) = fy;
-		K.at<float>(0, 2) = cx;
-		K.at<float>(1, 2) = cy;
-		K.copyTo(mK);
+		camera_ = ReadCameraParams(fSettings);
 
 		cv::Mat DistCoef(4, 1, CV_32F);
 		DistCoef.at<float>(0) = fSettings["Camera.k1"];
@@ -875,8 +901,6 @@ public:
 		}
 		DistCoef.copyTo(mDistCoef);
 
-		mbf = fSettings["Camera.bf"];
-
 		float fps = fSettings["Camera.fps"];
 		if (fps == 0)
 			fps = 30;
@@ -886,10 +910,10 @@ public:
 		param_.maxFrames = fps;
 
 		cout << endl << "Camera Parameters: " << endl;
-		cout << "- fx: " << fx << endl;
-		cout << "- fy: " << fy << endl;
-		cout << "- cx: " << cx << endl;
-		cout << "- cy: " << cy << endl;
+		cout << "- fx: " << camera_.fx << endl;
+		cout << "- fy: " << camera_.fy << endl;
+		cout << "- cx: " << camera_.cx << endl;
+		cout << "- cy: " << camera_.cy << endl;
 		cout << "- k1: " << DistCoef.at<float>(0) << endl;
 		cout << "- k2: " << DistCoef.at<float>(1) << endl;
 		if (DistCoef.rows == 5)
@@ -932,7 +956,8 @@ public:
 
 		if (sensor == System::STEREO || sensor == System::RGBD)
 		{
-			param_.thDepth = mbf*(float)fSettings["ThDepth"] / fx;
+			const float thDepth = fSettings["ThDepth"];
+			param_.thDepth = camera_.baseline * thDepth;
 			cout << endl << "Depth Threshold (Close/Far Points): " << param_.thDepth << endl;
 		}
 
@@ -954,7 +979,8 @@ public:
 		ConvertToGray(imageL, mImGray);
 		ConvertToGray(imageR, imGrayRight);
 
-		mCurrentFrame = Frame(mImGray, imGrayRight, timestamp, mpORBextractorLeft, mpORBextractorRight, mpORBVocabulary, mK, mDistCoef, mbf, param_.thDepth);
+		mCurrentFrame = Frame(mImGray, imGrayRight, timestamp, mpORBextractorLeft, mpORBextractorRight, mpORBVocabulary,
+			camera_.Mat(), mDistCoef, camera_.bf, param_.thDepth);
 
 		Track();
 
@@ -969,7 +995,8 @@ public:
 		if ((fabs(mDepthMapFactor - 1.0f) > 1e-5) || imDepth.type() != CV_32F)
 			imDepth.convertTo(imDepth, CV_32F, mDepthMapFactor);
 
-		mCurrentFrame = Frame(mImGray, imDepth, timestamp, mpORBextractorLeft, mpORBVocabulary, mK, mDistCoef, mbf, param_.thDepth);
+		mCurrentFrame = Frame(mImGray, imDepth, timestamp, mpORBextractorLeft, mpORBVocabulary,
+			camera_.Mat(), mDistCoef, camera_.bf, param_.thDepth);
 
 		Track();
 
@@ -980,10 +1007,10 @@ public:
 	{
 		ConvertToGray(image, mImGray);
 
-		if (mState == STATE_NOT_INITIALIZED || mState == STATE_NO_IMAGES)
-			mCurrentFrame = Frame(mImGray, timestamp, mpIniORBextractor, mpORBVocabulary, mK, mDistCoef, mbf, param_.thDepth);
-		else
-			mCurrentFrame = Frame(mImGray, timestamp, mpORBextractorLeft, mpORBVocabulary, mK, mDistCoef, mbf, param_.thDepth);
+		const bool init = mState == STATE_NOT_INITIALIZED || mState == STATE_NO_IMAGES;
+		ORBextractor* pORBextractor = init ? mpIniORBextractor : mpORBextractorLeft;
+		mCurrentFrame = Frame(mImGray, timestamp, pORBextractor, mpORBVocabulary,
+			camera_.Mat(), mDistCoef, camera_.bf, param_.thDepth);
 
 		Track();
 
@@ -1011,17 +1038,8 @@ public:
 	void ChangeCalibration(const string &strSettingPath) override
 	{
 		cv::FileStorage fSettings(strSettingPath, cv::FileStorage::READ);
-		float fx = fSettings["Camera.fx"];
-		float fy = fSettings["Camera.fy"];
-		float cx = fSettings["Camera.cx"];
-		float cy = fSettings["Camera.cy"];
 
-		cv::Mat K = cv::Mat::eye(3, 3, CV_32F);
-		K.at<float>(0, 0) = fx;
-		K.at<float>(1, 1) = fy;
-		K.at<float>(0, 2) = cx;
-		K.at<float>(1, 2) = cy;
-		K.copyTo(mK);
+		camera_ = ReadCameraParams(fSettings);
 
 		cv::Mat DistCoef(4, 1, CV_32F);
 		DistCoef.at<float>(0) = fSettings["Camera.k1"];
@@ -1035,8 +1053,6 @@ public:
 			DistCoef.at<float>(4) = k3;
 		}
 		DistCoef.copyTo(mDistCoef);
-
-		mbf = fSettings["Camera.bf"];
 
 		Frame::mbInitialComputations = true;
 	}
@@ -1322,7 +1338,7 @@ private:
 		}
 
 		mState = success ? STATE_OK : STATE_LOST;
-		
+
 		// Update drawer
 		mpFrameDrawer->Update(this);
 
@@ -1678,7 +1694,7 @@ private:
 
 	//Local Map
 	LocalMap mLocalMap;
-	
+
 	// System
 	System* mpSystem;
 
@@ -1691,9 +1707,8 @@ private:
 	Map* mpMap;
 
 	//Calibration matrix
-	cv::Mat mK;
+	CameraParams camera_;
 	cv::Mat mDistCoef;
-	float mbf;
 
 	// Parameters
 	Parameters param_;
