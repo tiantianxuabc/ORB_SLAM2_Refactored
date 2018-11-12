@@ -256,7 +256,7 @@ public:
 	MMTracker(int sensor) : mSensor(sensor) {}
 
 	bool Track(Frame& mCurrentFrame, Frame& mLastFrame, const cv::Mat& mVelocity,
-		bool minInliers, bool* mbVO = nullptr)
+		int minInliers, bool* mbVO = nullptr)
 	{
 		ORBmatcher matcher(0.9, true);
 
