@@ -966,10 +966,10 @@ public:
 
 	TrackerCore(Tracking* tracking, System *pSys, FrameDrawer *pFrameDrawer, MapDrawer *pMapDrawer, Map *pMap,
 		KeyFrameDatabase* pKFDB, int sensor, const Parameters& param)
-		: mState(STATE_NO_IMAGES), mSensor(sensor), mbLocalizationMode(false), mbVO(false),
-		mpKeyFrameDB(pKFDB), mpInitializer(nullptr), tracking_(tracking), mpSystem(pSys),
-		mpFrameDrawer(pFrameDrawer), mpMapDrawer(pMapDrawer), mpMap(pMap), mLocalMap(pMap),
-		mMMTracker(sensor), mBoWTracker(mLast), mNewKeyFrameCondition(pMap, mLocalMap, mLast, param, sensor), param_(param)
+		: state_(STATE_NO_IMAGES), sensor_(sensor), localization(false), fewMatches_(false),
+		keyFrameDB_(pKFDB), mpInitializer(nullptr), tracking_(tracking), system_(pSys),
+		frameDrawer_(pFrameDrawer), mapDrawer_(pMapDrawer), map_(pMap), localMap_(pMap),
+		trackerMM_(sensor), trackerBow_(last_), mNewKeyFrameCondition(pMap, localMap_, last_, param, sensor), param_(param)
 	{
 	}
 
@@ -982,10 +982,10 @@ public:
 			mCurrentFrame.SetPose(cv::Mat::eye(4, 4, CV_32F));
 
 			// Create KeyFrame
-			KeyFrame* pKFini = new KeyFrame(mCurrentFrame, mpMap, mpKeyFrameDB);
+			KeyFrame* pKFini = new KeyFrame(mCurrentFrame, map_, keyFrameDB_);
 
 			// Insert KeyFrame in the map
-			mpMap->AddKeyFrame(pKFini);
+			map_->AddKeyFrame(pKFini);
 
 			// Create MapPoints and asscoiate to KeyFrame
 			for (int i = 0; i < mCurrentFrame.N; i++)
@@ -994,37 +994,37 @@ public:
 				if (z > 0)
 				{
 					cv::Mat x3D = mCurrentFrame.UnprojectStereo(i);
-					MapPoint* pNewMP = new MapPoint(x3D, pKFini, mpMap);
+					MapPoint* pNewMP = new MapPoint(x3D, pKFini, map_);
 					pNewMP->AddObservation(pKFini, i);
 					pKFini->AddMapPoint(pNewMP, i);
 					pNewMP->ComputeDistinctiveDescriptors();
 					pNewMP->UpdateNormalAndDepth();
-					mpMap->AddMapPoint(pNewMP);
+					map_->AddMapPoint(pNewMP);
 
 					mCurrentFrame.mvpMapPoints[i] = pNewMP;
 				}
 			}
 
-			cout << "New map created with " << mpMap->MapPointsInMap() << " points" << endl;
+			cout << "New map created with " << map_->MapPointsInMap() << " points" << endl;
 
-			mpLocalMapper->InsertKeyFrame(pKFini);
+			localMapper_->InsertKeyFrame(pKFini);
 
-			mLast.frame = Frame(mCurrentFrame);
-			mLast.keyFrameId = mCurrentFrame.mnId;
-			mLast.keyFrame = pKFini;
+			last_.frame = Frame(mCurrentFrame);
+			last_.keyFrameId = mCurrentFrame.mnId;
+			last_.keyFrame = pKFini;
 
-			mLocalMap.mvpLocalKeyFrames.push_back(pKFini);
-			mLocalMap.mvpLocalMapPoints = mpMap->GetAllMapPoints();
-			mLocalMap.mpReferenceKF = pKFini;
+			localMap_.mvpLocalKeyFrames.push_back(pKFini);
+			localMap_.mvpLocalMapPoints = map_->GetAllMapPoints();
+			localMap_.mpReferenceKF = pKFini;
 			mCurrentFrame.mpReferenceKF = pKFini;
 
-			mpMap->SetReferenceMapPoints(mLocalMap.mvpLocalMapPoints);
+			map_->SetReferenceMapPoints(localMap_.mvpLocalMapPoints);
 
-			mpMap->mvpKeyFrameOrigins.push_back(pKFini);
+			map_->mvpKeyFrameOrigins.push_back(pKFini);
 
-			mpMapDrawer->SetCurrentCameraPose(mCurrentFrame.mTcw);
+			mapDrawer_->SetCurrentCameraPose(mCurrentFrame.mTcw);
 
-			mState = STATE_OK;
+			state_ = STATE_OK;
 		}
 	}
 
@@ -1038,7 +1038,7 @@ public:
 			if (mCurrentFrame.mvKeys.size() > 100)
 			{
 				mInitialFrame = Frame(mCurrentFrame);
-				mLast.frame = Frame(mCurrentFrame);
+				last_.frame = Frame(mCurrentFrame);
 				mvbPrevMatched.resize(mCurrentFrame.mvKeysUn.size());
 				for (size_t i = 0; i < mCurrentFrame.mvKeysUn.size(); i++)
 					mvbPrevMatched[i] = mCurrentFrame.mvKeysUn[i].pt;
@@ -1106,16 +1106,16 @@ public:
 	void CreateInitialMapMonocular(Frame& mCurrentFrame)
 	{
 		// Create KeyFrames
-		KeyFrame* pKFini = new KeyFrame(mInitialFrame, mpMap, mpKeyFrameDB);
-		KeyFrame* pKFcur = new KeyFrame(mCurrentFrame, mpMap, mpKeyFrameDB);
+		KeyFrame* pKFini = new KeyFrame(mInitialFrame, map_, keyFrameDB_);
+		KeyFrame* pKFcur = new KeyFrame(mCurrentFrame, map_, keyFrameDB_);
 
 
 		pKFini->ComputeBoW();
 		pKFcur->ComputeBoW();
 
 		// Insert KFs in the map
-		mpMap->AddKeyFrame(pKFini);
-		mpMap->AddKeyFrame(pKFcur);
+		map_->AddKeyFrame(pKFini);
+		map_->AddKeyFrame(pKFcur);
 
 		// Create MapPoints and asscoiate to keyframes
 		for (size_t i = 0; i < mvIniMatches.size(); i++)
@@ -1126,7 +1126,7 @@ public:
 			//Create MapPoint.
 			cv::Mat worldPos(mvIniP3D[i]);
 
-			MapPoint* pMP = new MapPoint(worldPos, pKFcur, mpMap);
+			MapPoint* pMP = new MapPoint(worldPos, pKFcur, map_);
 
 			pKFini->AddMapPoint(pMP, i);
 			pKFcur->AddMapPoint(pMP, mvIniMatches[i]);
@@ -1142,7 +1142,7 @@ public:
 			mCurrentFrame.mvbOutlier[mvIniMatches[i]] = false;
 
 			//Add to Map
-			mpMap->AddMapPoint(pMP);
+			map_->AddMapPoint(pMP);
 		}
 
 		// Update Connections
@@ -1150,9 +1150,9 @@ public:
 		pKFcur->UpdateConnections();
 
 		// Bundle Adjustment
-		cout << "New Map created with " << mpMap->MapPointsInMap() << " points" << endl;
+		cout << "New Map created with " << map_->MapPointsInMap() << " points" << endl;
 
-		Optimizer::GlobalBundleAdjustemnt(mpMap, 20);
+		Optimizer::GlobalBundleAdjustemnt(map_, 20);
 
 		// Set median depth to 1
 		float medianDepth = pKFini->ComputeSceneMedianDepth(2);
@@ -1181,54 +1181,54 @@ public:
 			}
 		}
 
-		mpLocalMapper->InsertKeyFrame(pKFini);
-		mpLocalMapper->InsertKeyFrame(pKFcur);
+		localMapper_->InsertKeyFrame(pKFini);
+		localMapper_->InsertKeyFrame(pKFcur);
 
 		mCurrentFrame.SetPose(pKFcur->GetPose());
-		mLast.keyFrameId = mCurrentFrame.mnId;
-		mLast.keyFrame = pKFcur;
+		last_.keyFrameId = mCurrentFrame.mnId;
+		last_.keyFrame = pKFcur;
 
-		mLocalMap.mvpLocalKeyFrames.push_back(pKFcur);
-		mLocalMap.mvpLocalKeyFrames.push_back(pKFini);
-		mLocalMap.mvpLocalMapPoints = mpMap->GetAllMapPoints();
-		mLocalMap.mpReferenceKF = pKFcur;
+		localMap_.mvpLocalKeyFrames.push_back(pKFcur);
+		localMap_.mvpLocalKeyFrames.push_back(pKFini);
+		localMap_.mvpLocalMapPoints = map_->GetAllMapPoints();
+		localMap_.mpReferenceKF = pKFcur;
 		mCurrentFrame.mpReferenceKF = pKFcur;
 
-		mLast.frame = Frame(mCurrentFrame);
+		last_.frame = Frame(mCurrentFrame);
 
-		mpMap->SetReferenceMapPoints(mLocalMap.mvpLocalMapPoints);
+		map_->SetReferenceMapPoints(localMap_.mvpLocalMapPoints);
 
-		mpMapDrawer->SetCurrentCameraPose(pKFcur->GetPose());
+		mapDrawer_->SetCurrentCameraPose(pKFcur->GetPose());
 
-		mpMap->mvpKeyFrameOrigins.push_back(pKFini);
+		map_->mvpKeyFrameOrigins.push_back(pKFini);
 
-		mState = STATE_OK;
+		state_ = STATE_OK;
 	}
 
 	// Main tracking function. It is independent of the input sensor.
-	void Update(Frame& mCurrentFrame)
+	void Update(Frame& currFrame)
 	{
-		if (mState == STATE_NO_IMAGES)
+		if (state_ == STATE_NO_IMAGES)
 		{
-			mState = STATE_NOT_INITIALIZED;
+			state_ = STATE_NOT_INITIALIZED;
 		}
 
-		mLastProcessedState = mState;
+		lastProcessedState_ = state_;
 
 		// Get Map Mutex -> Map cannot be changed
-		unique_lock<mutex> lock(mpMap->mMutexMapUpdate);
+		unique_lock<mutex> lock(map_->mMutexMapUpdate);
 
-		if (mState == STATE_NOT_INITIALIZED)
+		if (state_ == STATE_NOT_INITIALIZED)
 		{
-			if (mSensor == System::STEREO || mSensor == System::RGBD)
-				StereoInitialization(mCurrentFrame);
+			if (sensor_ == System::STEREO || sensor_ == System::RGBD)
+				StereoInitialization(currFrame);
 			else
-				MonocularInitialization(mCurrentFrame);
+				MonocularInitialization(currFrame);
 
-			mpFrameDrawer->Update(tracking_);
+			frameDrawer_->Update(tracking_);
 
-			if (mState == STATE_OK)
-				trajectory_.push_back(TrackPoint(mCurrentFrame, false));
+			if (state_ == STATE_OK)
+				trajectory_.push_back(TrackPoint(currFrame, false));
 
 			return;
 		}
@@ -1237,62 +1237,64 @@ public:
 		bool success = false;
 
 		// Initial camera pose estimation using motion model or relocalization (if tracking is lost)
-		if (!mbLocalizationMode)
+		if (!localization)
 		{
 			// Local Mapping is activated. This is the normal behaviour, unless
 			// you explicitly activate the "only tracking" mode.
 
-			if (mState == STATE_OK)
+			if (state_ == STATE_OK)
 			{
 				// Local Mapping might have changed some MapPoints tracked in last frame
-				for (int i = 0; i < mLast.frame.N; i++)
+				for (int i = 0; i < last_.frame.N; i++)
 				{
-					MapPoint* pMP = mLast.frame.mvpMapPoints[i];
-					MapPoint* pRep = pMP ? pMP->GetReplaced() : nullptr;
-					if (pRep)
-						mLast.frame.mvpMapPoints[i] = pRep;
+					MapPoint* mappoint = last_.frame.mvpMapPoints[i];
+					MapPoint* replaced = mappoint ? mappoint->GetReplaced() : nullptr;
+					if (replaced)
+						last_.frame.mvpMapPoints[i] = replaced;
 				}
 
-				const bool withMotionModel = !mVelocity.empty() && (int)mCurrentFrame.mnId >= mLast.relocFrameId + 2;
+				const bool withMotionModel = !velocity_.empty() && (int)currFrame.mnId >= last_.relocFrameId + 2;
 				if (withMotionModel)
 				{
-					MMTracker::UpdateLastFramePose(mLast.frame, trajectory_.back());
-					success = mMMTracker.Track(mCurrentFrame, mLast.frame, mVelocity, 10);
+					MMTracker::UpdateLastFramePose(last_.frame, trajectory_.back());
+					success = trackerMM_.Track(currFrame, last_.frame, velocity_, 10);
 				}
 				if (!withMotionModel || (withMotionModel && !success))
 				{
-					success = mBoWTracker.Track(mCurrentFrame, mLocalMap.mpReferenceKF);
+					success = trackerBow_.Track(currFrame, localMap_.mpReferenceKF);
 				}
 			}
 			else
 			{
-				success = Relocalization(mCurrentFrame, mpKeyFrameDB, mLast);
+				success = Relocalization(currFrame, keyFrameDB_, last_);
 			}
 		}
 		else
 		{
 			// Localization Mode: Local Mapping is deactivated
-			const bool createPoints = mSensor != System::MONOCULAR && mLast.frame.mnId != mLast.keyFrameId;
+			const bool createPoints = sensor_ != System::MONOCULAR && last_.frame.mnId != last_.keyFrameId;
 
-			if (mState == STATE_LOST)
+			if (state_ == STATE_LOST)
 			{
-				success = Relocalization(mCurrentFrame, mpKeyFrameDB, mLast);
+				success = Relocalization(currFrame, keyFrameDB_, last_);
 			}
 			else
 			{
-				if (!mbVO)
+				if (!fewMatches_)
 				{
 					// In last frame we tracked enough MapPoints in the map
 
-					if (!mVelocity.empty())
+					if (!velocity_.empty())
 					{
-						MMTracker::UpdateLastFramePose(mLast.frame, trajectory_.back());
-						if (createPoints) CreateMapPointsVO(mLast.frame, mlpTemporalPoints, mpMap, param_.thDepth);
-						success = mMMTracker.Track(mCurrentFrame, mLast.frame, mVelocity, 21, &mbVO);
+						MMTracker::UpdateLastFramePose(last_.frame, trajectory_.back());
+						if (createPoints)
+							CreateMapPointsVO(last_.frame, tempPoints_, map_, param_.thDepth);
+
+						success = trackerMM_.Track(currFrame, last_.frame, velocity_, 21, &fewMatches_);
 					}
 					else
 					{
-						success = mBoWTracker.Track(mCurrentFrame, mLocalMap.mpReferenceKF);
+						success = trackerBow_.Track(currFrame, localMap_.mpReferenceKF);
 					}
 				}
 				else
@@ -1308,37 +1310,39 @@ public:
 					vector<MapPoint*> vpMPsMM;
 					vector<bool> vbOutMM;
 					cv::Mat TcwMM;
-					if (!mVelocity.empty())
+					if (!velocity_.empty())
 					{
-						MMTracker::UpdateLastFramePose(mLast.frame, trajectory_.back());
-						if (createPoints) CreateMapPointsVO(mLast.frame, mlpTemporalPoints, mpMap, param_.thDepth);
-						bOKMM = mMMTracker.Track(mCurrentFrame, mLast.frame, mVelocity, 21, &mbVO);
-						vpMPsMM = mCurrentFrame.mvpMapPoints;
-						vbOutMM = mCurrentFrame.mvbOutlier;
-						TcwMM = mCurrentFrame.mTcw.clone();
+						MMTracker::UpdateLastFramePose(last_.frame, trajectory_.back());
+						if (createPoints)
+							CreateMapPointsVO(last_.frame, tempPoints_, map_, param_.thDepth);
+
+						bOKMM = trackerMM_.Track(currFrame, last_.frame, velocity_, 21, &fewMatches_);
+						vpMPsMM = currFrame.mvpMapPoints;
+						vbOutMM = currFrame.mvbOutlier;
+						TcwMM = currFrame.mTcw.clone();
 					}
-					bOKReloc = Relocalization(mCurrentFrame, mpKeyFrameDB, mLast);
+					bOKReloc = Relocalization(currFrame, keyFrameDB_, last_);
 
 					if (bOKMM && !bOKReloc)
 					{
-						mCurrentFrame.SetPose(TcwMM);
-						mCurrentFrame.mvpMapPoints = vpMPsMM;
-						mCurrentFrame.mvbOutlier = vbOutMM;
+						currFrame.SetPose(TcwMM);
+						currFrame.mvpMapPoints = vpMPsMM;
+						currFrame.mvbOutlier = vbOutMM;
 
-						if (mbVO)
+						if (fewMatches_)
 						{
-							for (int i = 0; i < mCurrentFrame.N; i++)
+							for (int i = 0; i < currFrame.N; i++)
 							{
-								if (mCurrentFrame.mvpMapPoints[i] && !mCurrentFrame.mvbOutlier[i])
+								if (currFrame.mvpMapPoints[i] && !currFrame.mvbOutlier[i])
 								{
-									mCurrentFrame.mvpMapPoints[i]->IncreaseFound();
+									currFrame.mvpMapPoints[i]->IncreaseFound();
 								}
 							}
 						}
 					}
 					else if (bOKReloc)
 					{
-						mbVO = false;
+						fewMatches_ = false;
 					}
 
 					success = bOKReloc || bOKMM;
@@ -1346,84 +1350,84 @@ public:
 			}
 		}
 
-		mCurrentFrame.mpReferenceKF = mLocalMap.mpReferenceKF;
+		currFrame.mpReferenceKF = localMap_.mpReferenceKF;
 
 		// If we have an initial estimation of the camera pose and matching. Track the local map.
 		// [In Localization Mode]
 		// mbVO true means that there are few matches to MapPoints in the map. We cannot retrieve
 		// a local map and therefore we do not perform TrackLocalMap(). Once the system relocalizes
 		// the camera we will use the local map again.
-		if (success && (!mbLocalizationMode || (mbLocalizationMode && !mbVO)))
+		if (success && (!localization || (localization && !fewMatches_)))
 		{
 			// If the camera has been relocalised recently, perform a coarser search
-			const bool relocalizedRecently = (int)mCurrentFrame.mnId < mLast.relocFrameId + 2;
-			const float th = relocalizedRecently ? 5.f : (mSensor == System::RGBD ? 3.f : 1.f);
+			const bool relocalizedRecently = (int)currFrame.mnId < last_.relocFrameId + 2;
+			const float th = relocalizedRecently ? 5.f : (sensor_ == System::RGBD ? 3.f : 1.f);
 
-			mnMatchesInliers = TrackLocalMap(mLocalMap, mCurrentFrame, th, mbLocalizationMode, mSensor == System::STEREO);
+			matchesInliers_ = TrackLocalMap(localMap_, currFrame, th, localization, sensor_ == System::STEREO);
 
 			// Decide if the tracking was succesful
 			// More restrictive if there was a relocalization recently
-			const int minInliers = ((int)mCurrentFrame.mnId < mLast.relocFrameId + param_.maxFrames) ? 50 : 30;
-			success = mnMatchesInliers >= minInliers;
+			const int minInliers = ((int)currFrame.mnId < last_.relocFrameId + param_.maxFrames) ? 50 : 30;
+			success = matchesInliers_ >= minInliers;
 		}
 
-		mState = success ? STATE_OK : STATE_LOST;
+		state_ = success ? STATE_OK : STATE_LOST;
 
 		// Update drawer
-		mpFrameDrawer->Update(tracking_);
+		frameDrawer_->Update(tracking_);
 
 		// If tracking were good, check if we insert a keyframe
 		if (success)
 		{
 			// Update motion model
-			if (!mLast.frame.mTcw.empty())
+			if (!last_.frame.mTcw.empty())
 			{
 				cv::Mat LastTwc = cv::Mat::eye(4, 4, CV_32F);
-				mLast.frame.GetRotationInverse().copyTo(LastTwc.rowRange(0, 3).colRange(0, 3));
-				mLast.frame.GetCameraCenter().copyTo(LastTwc.rowRange(0, 3).col(3));
-				mVelocity = mCurrentFrame.mTcw*LastTwc;
+				last_.frame.GetRotationInverse().copyTo(LastTwc.rowRange(0, 3).colRange(0, 3));
+				last_.frame.GetCameraCenter().copyTo(LastTwc.rowRange(0, 3).col(3));
+				velocity_ = currFrame.mTcw * LastTwc;
 			}
 			else
-				mVelocity = cv::Mat();
+				velocity_ = cv::Mat();
 
-			mpMapDrawer->SetCurrentCameraPose(mCurrentFrame.mTcw);
+			mapDrawer_->SetCurrentCameraPose(currFrame.mTcw);
 
 			// Clean VO matches
-			for (int i = 0; i < mCurrentFrame.N; i++)
+			for (int i = 0; i < currFrame.N; i++)
 			{
-				MapPoint* pMP = mCurrentFrame.mvpMapPoints[i];
-				if (pMP)
-					if (pMP->Observations() < 1)
+				MapPoint* mappoint = currFrame.mvpMapPoints[i];
+				if (mappoint)
+					if (mappoint->Observations() < 1)
 					{
-						mCurrentFrame.mvbOutlier[i] = false;
-						mCurrentFrame.mvpMapPoints[i] = static_cast<MapPoint*>(NULL);
+						currFrame.mvbOutlier[i] = false;
+						currFrame.mvpMapPoints[i] = nullptr;
 					}
 			}
 
 			// Delete temporal MapPoints
-			for (list<MapPoint*>::iterator lit = mlpTemporalPoints.begin(), lend = mlpTemporalPoints.end(); lit != lend; lit++)
+			for (list<MapPoint*>::iterator lit = tempPoints_.begin(), lend = tempPoints_.end(); lit != lend; lit++)
 			{
-				MapPoint* pMP = *lit;
-				delete pMP;
+				MapPoint* mappoint = *lit;
+				delete mappoint;
 			}
-			mlpTemporalPoints.clear();
+			tempPoints_.clear();
 
 			// Check if we need to insert a new keyframe
-			if (!mbLocalizationMode && mNewKeyFrameCondition.Satisfy(mCurrentFrame, mpLocalMapper, mnMatchesInliers))
+			if (!localization && mNewKeyFrameCondition.Satisfy(currFrame, localMapper_, matchesInliers_))
 			{
-				if (mpLocalMapper->SetNotStop(true))
+				if (localMapper_->SetNotStop(true))
 				{
-					KeyFrame* pKF = new KeyFrame(mCurrentFrame, mpMap, mpKeyFrameDB);
-					mLocalMap.mpReferenceKF = pKF;
-					mCurrentFrame.mpReferenceKF = pKF;
+					KeyFrame* keyframe = new KeyFrame(currFrame, map_, keyFrameDB_);
+					localMap_.mpReferenceKF = keyframe;
+					currFrame.mpReferenceKF = keyframe;
 
-					if (mSensor != System::MONOCULAR)
-						CreateMapPoints(mCurrentFrame, pKF, mpMap, param_.thDepth);
+					if (sensor_ != System::MONOCULAR)
+						CreateMapPoints(currFrame, keyframe, map_, param_.thDepth);
 
-					mpLocalMapper->InsertKeyFrame(pKF);
-					mpLocalMapper->SetNotStop(false);
-					mLast.keyFrameId = mCurrentFrame.mnId;
-					mLast.keyFrame = pKF;
+					localMapper_->InsertKeyFrame(keyframe);
+					localMapper_->SetNotStop(false);
+					last_.keyFrameId = currFrame.mnId;
+					last_.keyFrame = keyframe;
 				}
 			}
 
@@ -1431,35 +1435,35 @@ public:
 			// pass to the new keyframe, so that bundle adjustment will finally decide
 			// if they are outliers or not. We don't want next frame to estimate its position
 			// with those points so we discard them in the frame.
-			for (int i = 0; i < mCurrentFrame.N; i++)
+			for (int i = 0; i < currFrame.N; i++)
 			{
-				if (mCurrentFrame.mvpMapPoints[i] && mCurrentFrame.mvbOutlier[i])
-					mCurrentFrame.mvpMapPoints[i] = static_cast<MapPoint*>(NULL);
+				if (currFrame.mvpMapPoints[i] && currFrame.mvbOutlier[i])
+					currFrame.mvpMapPoints[i] = nullptr;
 			}
 		}
 
 		// Reset if the camera get lost soon after initialization
-		if (mState == STATE_LOST)
+		if (state_ == STATE_LOST)
 		{
-			if (mpMap->KeyFramesInMap() <= 5)
+			if (map_->KeyFramesInMap() <= 5)
 			{
 				cout << "Track lost soon after initialisation, reseting..." << endl;
-				mpSystem->Reset();
+				system_->Reset();
 				return;
 			}
 		}
 
-		if (!mCurrentFrame.mpReferenceKF)
-			mCurrentFrame.mpReferenceKF = mLocalMap.mpReferenceKF;
+		if (!currFrame.mpReferenceKF)
+			currFrame.mpReferenceKF = localMap_.mpReferenceKF;
 
-		mLast.frame = Frame(mCurrentFrame);
+		last_.frame = Frame(currFrame);
 
 		// Store frame pose information to retrieve the complete camera trajectory afterwards.
-		CV_Assert(mCurrentFrame.mpReferenceKF == mLocalMap.mpReferenceKF);
-		const bool lost = mState == STATE_LOST;
-		if (!mCurrentFrame.mTcw.empty())
+		CV_Assert(currFrame.mpReferenceKF == localMap_.mpReferenceKF);
+		const bool lost = state_ == STATE_LOST;
+		if (!currFrame.mTcw.empty())
 		{
-			trajectory_.push_back(TrackPoint(mCurrentFrame, lost));
+			trajectory_.push_back(TrackPoint(currFrame, lost));
 		}
 		else
 		{
@@ -1471,7 +1475,7 @@ public:
 
 	void Clear()
 	{
-		mState = STATE_NO_IMAGES;
+		state_ = STATE_NO_IMAGES;
 
 		if (mpInitializer)
 		{
@@ -1484,7 +1488,7 @@ public:
 
 	void SetLocalMapper(LocalMapping *pLocalMapper)
 	{
-		mpLocalMapper = pLocalMapper;
+		localMapper_ = pLocalMapper;
 	}
 
 	void SetLoopClosing(LoopClosing *pLoopClosing)
@@ -1494,17 +1498,17 @@ public:
 
 	void InformOnlyTracking(const bool &flag)
 	{
-		mbLocalizationMode = flag;
+		localization = flag;
 	}
 
 	int GetState() const
 	{
-		return mState;
+		return state_;
 	}
 
 	int GetLastProcessedState() const
 	{
-		return mLastProcessedState;
+		return lastProcessedState_;
 	}
 
 	const Frame& GetInitialFrame() const
@@ -1524,7 +1528,7 @@ public:
 
 	bool OnlyTracking() const
 	{
-		return mbLocalizationMode;
+		return localization;
 	}
 
 private:
@@ -1541,11 +1545,11 @@ private:
 
 	Tracking* tracking_;
 
-	State mState;
-	State mLastProcessedState;
+	State state_;
+	State lastProcessedState_;
 
 	// Input sensor
-	int mSensor;
+	int sensor_;
 
 	// Initialization Variables (Monocular)
 	std::vector<int> mvIniLastMatches;
@@ -1559,53 +1563,53 @@ private:
 	std::vector<TrackPoint> trajectory_;
 
 	// True if local mapping is deactivated and we are performing only localization
-	bool mbLocalizationMode;
+	bool localization;
 
 	// In case of performing only localization, this flag is true when there are no matches to
 	// points in the map. Still tracking will continue if there are enough matches with temporal points.
 	// In that case we are doing visual odometry. The system will try to do relocalization to recover
 	// "zero-drift" localization to the map.
-	bool mbVO;
+	bool fewMatches_;
 
 	//Other Thread Pointers
-	LocalMapping* mpLocalMapper;
+	LocalMapping* localMapper_;
 	LoopClosing* mpLoopClosing;
 
 	//BoW
-	KeyFrameDatabase* mpKeyFrameDB;
+	KeyFrameDatabase* keyFrameDB_;
 
 	// Initalization (only for monocular)
 	Initializer* mpInitializer;
 
 	//Local Map
-	LocalMap mLocalMap;
+	LocalMap localMap_;
 
 	// System
-	System* mpSystem;
+	System* system_;
 
 	//Drawers
-	FrameDrawer* mpFrameDrawer;
-	MapDrawer* mpMapDrawer;
+	FrameDrawer* frameDrawer_;
+	MapDrawer* mapDrawer_;
 
 	//Map
-	Map* mpMap;
+	Map* map_;
 
 	// Parameters
 	TrackerParameters param_;
 
 	//Current matches in frame
-	int mnMatchesInliers;
+	int matchesInliers_;
 
 	//Last Frame, KeyFrame and Relocalisation Info
-	LastFrameInfo mLast;
+	LastFrameInfo last_;
 
 	//Motion Model
-	cv::Mat mVelocity;
+	cv::Mat velocity_;
 
-	list<MapPoint*> mlpTemporalPoints;
+	list<MapPoint*> tempPoints_;
 
-	MMTracker mMMTracker;
-	BoWTracker mBoWTracker;
+	MMTracker trackerMM_;
+	BoWTracker trackerBow_;
 	NewKeyFrameCondition mNewKeyFrameCondition;
 };
 
