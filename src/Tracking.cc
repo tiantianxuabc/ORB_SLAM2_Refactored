@@ -1681,11 +1681,9 @@ public:
 	{
 		ConvertToGray(image, imageL_, RGB_);
 
-		cv::Mat imDepth = depth;
-		if ((fabs(depthFactor_ - 1.0f) > 1e-5) || imDepth.type() != CV_32F)
-			imDepth.convertTo(imDepth, CV_32F, depthFactor_);
+		depth.convertTo(depth_, CV_32F, depthFactor_);
 
-		currFrame_ = Frame(imageL_, imDepth, timestamp, extractorL_.get(), voc_,
+		currFrame_ = Frame(imageL_, depth_, timestamp, extractorL_.get(), voc_,
 			camera_.Mat(), distCoeffs_, camera_.bf, thDepth_);
 
 		tracker_->Update(currFrame_);
@@ -1824,6 +1822,7 @@ private:
 	Frame currFrame_;
 	cv::Mat imageL_;
 	cv::Mat imageR_;
+	cv::Mat depth_;
 
 	//Other Thread Pointers
 	LocalMapping* mpLocalMapper;
