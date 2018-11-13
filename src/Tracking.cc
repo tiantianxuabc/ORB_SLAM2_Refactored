@@ -1666,46 +1666,45 @@ public:
 	// Preprocess the input and call Track(). Extract features and performs stereo matching.
 	cv::Mat GrabImageStereo(const cv::Mat& imageL, const cv::Mat& imageR, double timestamp) override
 	{
-		cv::Mat imGrayRight;
-		ConvertToGray(imageL, mImGray, RGB_);
-		ConvertToGray(imageR, imGrayRight, RGB_);
+		ConvertToGray(imageL, imageL_, RGB_);
+		ConvertToGray(imageR, imageR_, RGB_);
 
-		mCurrentFrame = Frame(mImGray, imGrayRight, timestamp, extractorL_.get(), extractorR_.get(), voc_,
+		currFrame_ = Frame(imageL_, imageR_, timestamp, extractorL_.get(), extractorR_.get(), voc_,
 			camera_.Mat(), distCoeffs_, camera_.bf, thDepth_);
 
-		tracker_->Update(mCurrentFrame);
+		tracker_->Update(currFrame_);
 
-		return mCurrentFrame.mTcw.clone();
+		return currFrame_.mTcw.clone();
 	}
 
 	cv::Mat GrabImageRGBD(const cv::Mat& image, const cv::Mat& depth, double timestamp) override
 	{
-		ConvertToGray(image, mImGray, RGB_);
+		ConvertToGray(image, imageL_, RGB_);
 
 		cv::Mat imDepth = depth;
 		if ((fabs(depthFactor_ - 1.0f) > 1e-5) || imDepth.type() != CV_32F)
 			imDepth.convertTo(imDepth, CV_32F, depthFactor_);
 
-		mCurrentFrame = Frame(mImGray, imDepth, timestamp, extractorL_.get(), voc_,
+		currFrame_ = Frame(imageL_, imDepth, timestamp, extractorL_.get(), voc_,
 			camera_.Mat(), distCoeffs_, camera_.bf, thDepth_);
 
-		tracker_->Update(mCurrentFrame);
+		tracker_->Update(currFrame_);
 
-		return mCurrentFrame.mTcw.clone();
+		return currFrame_.mTcw.clone();
 	}
 
 	cv::Mat GrabImageMonocular(const cv::Mat& image, double timestamp) override
 	{
-		ConvertToGray(image, mImGray, RGB_);
+		ConvertToGray(image, imageL_, RGB_);
 		const int state = tracker_->GetState();
 		const bool init = state == STATE_NOT_INITIALIZED || state == STATE_NO_IMAGES;
 		ORBextractor* pORBextractor = init ? extractorIni_.get() : extractorL_.get();
-		mCurrentFrame = Frame(mImGray, timestamp, pORBextractor, voc_,
+		currFrame_ = Frame(imageL_, timestamp, pORBextractor, voc_,
 			camera_.Mat(), distCoeffs_, camera_.bf, thDepth_);
 
-		tracker_->Update(mCurrentFrame);
+		tracker_->Update(currFrame_);
 
-		return mCurrentFrame.mTcw.clone();
+		return currFrame_.mTcw.clone();
 	}
 
 	void SetLocalMapper(LocalMapping *pLocalMapper) override
@@ -1791,7 +1790,7 @@ public:
 
 	const Frame& GetCurrentFrame() const override
 	{
-		return mCurrentFrame;
+		return currFrame_;
 	}
 
 	const Frame& GetInitialFrame() const override
@@ -1801,7 +1800,7 @@ public:
 
 	cv::Mat GetImGray() const override
 	{
-		return mImGray;
+		return imageL_;
 	}
 
 	const std::vector<int>& GetIniMatches() const override
@@ -1822,8 +1821,9 @@ public:
 private:
 
 	// Current Frame
-	Frame mCurrentFrame;
-	cv::Mat mImGray;
+	Frame currFrame_;
+	cv::Mat imageL_;
+	cv::Mat imageR_;
 
 	//Other Thread Pointers
 	LocalMapping* mpLocalMapper;
