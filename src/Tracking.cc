@@ -1859,10 +1859,10 @@ private:
 	float thDepth_;
 };
 
-std::shared_ptr<Tracking> Tracking::Create(System* pSys, ORBVocabulary* pVoc, FrameDrawer* pFrameDrawer, MapDrawer* pMapDrawer, Map* pMap,
-	KeyFrameDatabase* pKFDB, const string &strSettingPath, const int sensor)
+std::shared_ptr<Tracking> Tracking::Create(System* system, ORBVocabulary* voc, FrameDrawer* frameDrawer,
+	MapDrawer* mapDrawer, Map* map, KeyFrameDatabase* keyframeDB, const string& settingsFile, System::Sensor sensor)
 {
-	return std::make_shared<TrackingImpl>(pSys, pVoc, pFrameDrawer, pMapDrawer, pMap, pKFDB, strSettingPath, sensor);
+	return std::make_shared<TrackingImpl>(system, voc, frameDrawer, mapDrawer, map, keyframeDB, settingsFile, sensor);
 }
 
 } //namespace ORB_SLAM

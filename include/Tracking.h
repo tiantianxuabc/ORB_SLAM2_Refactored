@@ -66,8 +66,8 @@ public:
 		STATE_LOST = 3
 	};
 
-	static std::shared_ptr<Tracking> Create(System* pSys, ORBVocabulary* pVoc, FrameDrawer* pFrameDrawer, MapDrawer* pMapDrawer, Map* pMap,
-		KeyFrameDatabase* pKFDB, const string &strSettingPath, const int sensor);
+	static std::shared_ptr<Tracking> Create(System* system, ORBVocabulary* voc, FrameDrawer* frameDrawer,
+		MapDrawer* mapDrawer, Map* map, KeyFrameDatabase* keyframeDB, const string& settingsFile, System::Sensor sensor);
 
 	// Preprocess the input and call Track(). Extract features and performs stereo matching.
 	virtual cv::Mat GrabImageStereo(const cv::Mat& imageL, const cv::Mat& imageR, double timestamp) = 0;
