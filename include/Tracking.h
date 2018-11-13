@@ -66,18 +66,6 @@ public:
 		STATE_LOST = 3
 	};
 
-	struct Parameters
-	{
-		//New KeyFrame rules (according to fps)
-		int minFrames;
-		int maxFrames;
-
-		// Threshold close/far points
-		// Points seen as close by the stereo/RGBD sensor are considered reliable
-		// and inserted from just one frame. Far points requiere a match in two keyframes.
-		float thDepth;
-	};
-
 	static std::shared_ptr<Tracking> Create(System* pSys, ORBVocabulary* pVoc, FrameDrawer* pFrameDrawer, MapDrawer* pMapDrawer, Map* pMap,
 		KeyFrameDatabase* pKFDB, const string &strSettingPath, const int sensor);
 
