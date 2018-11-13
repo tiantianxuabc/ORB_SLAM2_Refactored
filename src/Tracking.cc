@@ -1654,13 +1654,9 @@ public:
 		const int initTh = extractorParams.initTh;
 		const int minTh = extractorParams.minTh;
 
-		extractorL_ = new ORBextractor(nfeatures, scaleFactor, nlevels, initTh, minTh);
-
-		if (sensor == System::STEREO)
-			extractorR_ = new ORBextractor(nfeatures, scaleFactor, nlevels, initTh, minTh);
-
-		if (sensor == System::MONOCULAR)
-			extractorIni_ = new ORBextractor(2 * nfeatures, scaleFactor, nlevels, initTh, minTh);
+		extractorL_ = std::make_unique<ORBextractor>(nfeatures, scaleFactor, nlevels, initTh, minTh);
+		extractorR_ = std::make_unique<ORBextractor>(nfeatures, scaleFactor, nlevels, initTh, minTh);
+		extractorIni_ = std::make_unique<ORBextractor>(2 * nfeatures, scaleFactor, nlevels, initTh, minTh);
 
 		// Initialize tracker core
 		tracker_ = std::make_unique<TrackerCore>(this, system, frameDrawer, mapDrawer, map, keyframeDB, sensor,
@@ -1674,7 +1670,7 @@ public:
 		ConvertToGray(imageL, mImGray, RGB_);
 		ConvertToGray(imageR, imGrayRight, RGB_);
 
-		mCurrentFrame = Frame(mImGray, imGrayRight, timestamp, extractorL_, extractorR_, voc_,
+		mCurrentFrame = Frame(mImGray, imGrayRight, timestamp, extractorL_.get(), extractorR_.get(), voc_,
 			camera_.Mat(), distCoeffs_, camera_.bf, thDepth_);
 
 		tracker_->Update(mCurrentFrame);
@@ -1690,7 +1686,7 @@ public:
 		if ((fabs(depthFactor_ - 1.0f) > 1e-5) || imDepth.type() != CV_32F)
 			imDepth.convertTo(imDepth, CV_32F, depthFactor_);
 
-		mCurrentFrame = Frame(mImGray, imDepth, timestamp, extractorL_, voc_,
+		mCurrentFrame = Frame(mImGray, imDepth, timestamp, extractorL_.get(), voc_,
 			camera_.Mat(), distCoeffs_, camera_.bf, thDepth_);
 
 		tracker_->Update(mCurrentFrame);
@@ -1703,7 +1699,7 @@ public:
 		ConvertToGray(image, mImGray, RGB_);
 		const int state = tracker_->GetState();
 		const bool init = state == STATE_NOT_INITIALIZED || state == STATE_NO_IMAGES;
-		ORBextractor* pORBextractor = init ? extractorIni_ : extractorL_;
+		ORBextractor* pORBextractor = init ? extractorIni_.get() : extractorL_.get();
 		mCurrentFrame = Frame(mImGray, timestamp, pORBextractor, voc_,
 			camera_.Mat(), distCoeffs_, camera_.bf, thDepth_);
 
@@ -1834,8 +1830,9 @@ private:
 	LoopClosing* mpLoopClosing;
 
 	// ORB
-	ORBextractor* extractorL_, *extractorR_;
-	ORBextractor* extractorIni_;
+	std::unique_ptr<ORBextractor> extractorL_;
+	std::unique_ptr<ORBextractor> extractorR_;
+	std::unique_ptr<ORBextractor> extractorIni_;
 
 	// BoW
 	ORBVocabulary* voc_;
