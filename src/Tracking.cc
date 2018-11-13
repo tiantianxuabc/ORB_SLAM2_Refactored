@@ -1705,31 +1705,31 @@ public:
 		return currFrame_.mTcw.clone();
 	}
 
-	void SetLocalMapper(LocalMapping *pLocalMapper) override
+	void SetLocalMapper(LocalMapping* localMapper) override
 	{
-		mpLocalMapper = pLocalMapper;
-		tracker_->SetLocalMapper(pLocalMapper);
+		localMapper_ = localMapper;
+		tracker_->SetLocalMapper(localMapper);
 	}
 
-	void SetLoopClosing(LoopClosing *pLoopClosing) override
+	void SetLoopClosing(LoopClosing* loopClosing) override
 	{
-		mpLoopClosing = pLoopClosing;
-		tracker_->SetLoopClosing(pLoopClosing);
+		loopClosing_ = loopClosing;
+		tracker_->SetLoopClosing(loopClosing);
 	}
 
-	void SetViewer(Viewer *pViewer) override
+	void SetViewer(Viewer* viewer) override
 	{
-		viewer_ = pViewer;
+		viewer_ = viewer;
 	}
 
 	// Load new settings
 	// The focal lenght should be similar or scale prediction will fail when projecting points
 	// TODO: Modify MapPoint::PredictScale to take into account focal lenght
-	void ChangeCalibration(const string &strSettingPath) override
+	void ChangeCalibration(const string& settingsFile) override
 	{
-		cv::FileStorage fSettings(strSettingPath, cv::FileStorage::READ);
-		camera_ = ReadCameraParams(fSettings);
-		distCoeffs_ = ReadDistCoeffs(fSettings);
+		cv::FileStorage settings(settingsFile, cv::FileStorage::READ);
+		camera_ = ReadCameraParams(settings);
+		distCoeffs_ = ReadDistCoeffs(settings);
 		Frame::mbInitialComputations = true;
 	}
 
@@ -1745,12 +1745,12 @@ public:
 
 		// Reset Local Mapping
 		cout << "Reseting Local Mapper...";
-		mpLocalMapper->RequestReset();
+		localMapper_->RequestReset();
 		cout << " done" << endl;
 
 		// Reset Loop Closing
 		cout << "Reseting Loop Closing...";
-		mpLoopClosing->RequestReset();
+		loopClosing_->RequestReset();
 		cout << " done" << endl;
 
 		// Clear BoW Database
@@ -1771,7 +1771,7 @@ public:
 	}
 
 	// Use this function if you have deactivated local mapping and you only want to localize the camera.
-	void InformOnlyTracking(const bool &flag) override
+	void InformOnlyTracking(bool flag) override
 	{
 		tracker_->InformOnlyTracking(flag);
 	}
@@ -1825,8 +1825,8 @@ private:
 	cv::Mat depth_;
 
 	//Other Thread Pointers
-	LocalMapping* mpLocalMapper;
-	LoopClosing* mpLoopClosing;
+	LocalMapping* localMapper_;
+	LoopClosing* loopClosing_;
 
 	// ORB
 	std::unique_ptr<ORBextractor> extractorL_;

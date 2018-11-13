@@ -74,17 +74,17 @@ public:
 	virtual cv::Mat GrabImageRGBD(const cv::Mat& image, const cv::Mat& depth, double timestamp) = 0;
 	virtual cv::Mat GrabImageMonocular(const cv::Mat& image, double timestamp) = 0;
 
-	virtual void SetLocalMapper(LocalMapping* pLocalMapper) = 0;
-	virtual void SetLoopClosing(LoopClosing* pLoopClosing) = 0;
-	virtual void SetViewer(Viewer* pViewer) = 0;
+	virtual void SetLocalMapper(LocalMapping* localMapper) = 0;
+	virtual void SetLoopClosing(LoopClosing* loopClosing) = 0;
+	virtual void SetViewer(Viewer* viewer) = 0;
 
 	// Load new settings
 	// The focal lenght should be similar or scale prediction will fail when projecting points
 	// TODO: Modify MapPoint::PredictScale to take into account focal lenght
-	virtual void ChangeCalibration(const string &strSettingPath) = 0;
+	virtual void ChangeCalibration(const string& settingsFile) = 0;
 
 	// Use this function if you have deactivated local mapping and you only want to localize the camera.
-	virtual void InformOnlyTracking(const bool &flag) = 0;
+	virtual void InformOnlyTracking(bool flag) = 0;
 
 	virtual void Reset() = 0;
 
