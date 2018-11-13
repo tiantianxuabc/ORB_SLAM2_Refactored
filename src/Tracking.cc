@@ -1694,9 +1694,12 @@ public:
 	cv::Mat GrabImageMonocular(const cv::Mat& image, double timestamp) override
 	{
 		ConvertToGray(image, imageL_, RGB_);
+
 		const int state = tracker_->GetState();
 		const bool init = state == STATE_NOT_INITIALIZED || state == STATE_NO_IMAGES;
+
 		ORBextractor* pORBextractor = init ? extractorIni_.get() : extractorL_.get();
+
 		currFrame_ = Frame(imageL_, timestamp, pORBextractor, voc_,
 			camera_.Mat(), distCoeffs_, camera_.bf, thDepth_);
 
