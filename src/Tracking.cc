@@ -974,58 +974,59 @@ public:
 	}
 
 	// Map initialization for stereo and RGB-D
-	void StereoInitialization(Frame& mCurrentFrame)
+	void StereoInitialization(Frame& currFrame)
 	{
-		if (mCurrentFrame.N > 500)
+		if (currFrame.N <= 500)
+			return;
+
+		// Set Frame pose to the origin
+		currFrame.SetPose(cv::Mat::eye(4, 4, CV_32F));
+
+		// Create KeyFrame
+		KeyFrame* keyframe = new KeyFrame(currFrame, map_, keyFrameDB_);
+
+		// Insert KeyFrame in the map
+		map_->AddKeyFrame(keyframe);
+
+		// Create MapPoints and asscoiate to KeyFrame
+		for (int i = 0; i < currFrame.N; i++)
 		{
-			// Set Frame pose to the origin
-			mCurrentFrame.SetPose(cv::Mat::eye(4, 4, CV_32F));
+			const float Z = currFrame.mvDepth[i];
+			if (Z <= 0.f)
+				continue;
 
-			// Create KeyFrame
-			KeyFrame* pKFini = new KeyFrame(mCurrentFrame, map_, keyFrameDB_);
+			cv::Mat Xw = currFrame.UnprojectStereo(i);
+			MapPoint* mappoint = new MapPoint(Xw, keyframe, map_);
+			mappoint->AddObservation(keyframe, i);
+			mappoint->ComputeDistinctiveDescriptors();
+			mappoint->UpdateNormalAndDepth();
 
-			// Insert KeyFrame in the map
-			map_->AddKeyFrame(pKFini);
+			keyframe->AddMapPoint(mappoint, i);
+			map_->AddMapPoint(mappoint);
 
-			// Create MapPoints and asscoiate to KeyFrame
-			for (int i = 0; i < mCurrentFrame.N; i++)
-			{
-				float z = mCurrentFrame.mvDepth[i];
-				if (z > 0)
-				{
-					cv::Mat x3D = mCurrentFrame.UnprojectStereo(i);
-					MapPoint* pNewMP = new MapPoint(x3D, pKFini, map_);
-					pNewMP->AddObservation(pKFini, i);
-					pKFini->AddMapPoint(pNewMP, i);
-					pNewMP->ComputeDistinctiveDescriptors();
-					pNewMP->UpdateNormalAndDepth();
-					map_->AddMapPoint(pNewMP);
-
-					mCurrentFrame.mvpMapPoints[i] = pNewMP;
-				}
-			}
-
-			cout << "New map created with " << map_->MapPointsInMap() << " points" << endl;
-
-			localMapper_->InsertKeyFrame(pKFini);
-
-			last_.frame = Frame(mCurrentFrame);
-			last_.keyFrameId = mCurrentFrame.mnId;
-			last_.keyFrame = pKFini;
-
-			localMap_.mvpLocalKeyFrames.push_back(pKFini);
-			localMap_.mvpLocalMapPoints = map_->GetAllMapPoints();
-			localMap_.mpReferenceKF = pKFini;
-			mCurrentFrame.mpReferenceKF = pKFini;
-
-			map_->SetReferenceMapPoints(localMap_.mvpLocalMapPoints);
-
-			map_->mvpKeyFrameOrigins.push_back(pKFini);
-
-			mapDrawer_->SetCurrentCameraPose(mCurrentFrame.mTcw);
-
-			state_ = STATE_OK;
+			currFrame.mvpMapPoints[i] = mappoint;
 		}
+
+		cout << "New map created with " << map_->MapPointsInMap() << " points" << endl;
+
+		localMapper_->InsertKeyFrame(keyframe);
+
+		last_.frame = Frame(currFrame);
+		last_.keyFrameId = currFrame.mnId;
+		last_.keyFrame = keyframe;
+
+		localMap_.mvpLocalKeyFrames.push_back(keyframe);
+		localMap_.mvpLocalMapPoints = map_->GetAllMapPoints();
+		localMap_.mpReferenceKF = keyframe;
+		currFrame.mpReferenceKF = keyframe;
+
+		map_->SetReferenceMapPoints(localMap_.mvpLocalMapPoints);
+
+		map_->mvpKeyFrameOrigins.push_back(keyframe);
+
+		mapDrawer_->SetCurrentCameraPose(currFrame.mTcw);
+
+		state_ = STATE_OK;
 	}
 
 	// Map initialization for monocular
