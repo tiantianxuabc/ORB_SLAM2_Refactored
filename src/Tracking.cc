@@ -964,12 +964,12 @@ public:
 
 	using Parameters = TrackerParameters;
 
-	TrackerCore(Tracking* tracking, System *pSys, FrameDrawer *pFrameDrawer, MapDrawer *pMapDrawer, Map *pMap,
-		KeyFrameDatabase* pKFDB, int sensor, const Parameters& param)
-		: state_(STATE_NO_IMAGES), sensor_(sensor), localization(false), fewMatches_(false),
-		keyFrameDB_(pKFDB), mpInitializer(nullptr), tracking_(tracking), system_(pSys),
-		frameDrawer_(pFrameDrawer), mapDrawer_(pMapDrawer), map_(pMap), localMap_(pMap),
-		trackerMM_(sensor), trackerBow_(last_), mNewKeyFrameCondition(pMap, localMap_, last_, param, sensor), param_(param)
+	TrackerCore(Tracking* tracking, System* system, FrameDrawer* frameDrawer, MapDrawer* mapDrawer, Map* map,
+		KeyFrameDatabase* keyFrameDB, int sensor, const Parameters& param)
+		: state_(STATE_NO_IMAGES), sensor_(sensor), localization_(false), fewMatches_(false),
+		keyFrameDB_(keyFrameDB), initializer_(nullptr), tracking_(tracking), system_(system),
+		frameDrawer_(frameDrawer), mapDrawer_(mapDrawer), map_(map), localMap_(map),
+		trackerMM_(sensor), trackerBow_(last_), newKeyFrameCondition_(map, localMap_, last_, param, sensor), param_(param)
 	{
 	}
 
@@ -1032,7 +1032,7 @@ public:
 	void MonocularInitialization(Frame& mCurrentFrame)
 	{
 
-		if (!mpInitializer)
+		if (!initializer_)
 		{
 			// Set Reference Frame
 			if (mCurrentFrame.mvKeys.size() > 100)
@@ -1043,10 +1043,10 @@ public:
 				for (size_t i = 0; i < mCurrentFrame.mvKeysUn.size(); i++)
 					mvbPrevMatched[i] = mCurrentFrame.mvKeysUn[i].pt;
 
-				if (mpInitializer)
-					delete mpInitializer;
+				if (initializer_)
+					delete initializer_;
 
-				mpInitializer = new Initializer(mCurrentFrame, 1.0, 200);
+				initializer_ = new Initializer(mCurrentFrame, 1.0, 200);
 
 				fill(mvIniMatches.begin(), mvIniMatches.end(), -1);
 
@@ -1058,8 +1058,8 @@ public:
 			// Try to initialize
 			if ((int)mCurrentFrame.mvKeys.size() <= 100)
 			{
-				delete mpInitializer;
-				mpInitializer = static_cast<Initializer*>(NULL);
+				delete initializer_;
+				initializer_ = static_cast<Initializer*>(NULL);
 				fill(mvIniMatches.begin(), mvIniMatches.end(), -1);
 				return;
 			}
@@ -1071,8 +1071,8 @@ public:
 			// Check if there are enough correspondences
 			if (nmatches < 100)
 			{
-				delete mpInitializer;
-				mpInitializer = static_cast<Initializer*>(NULL);
+				delete initializer_;
+				initializer_ = static_cast<Initializer*>(NULL);
 				return;
 			}
 
@@ -1080,7 +1080,7 @@ public:
 			cv::Mat tcw; // Current Camera Translation
 			vector<bool> vbTriangulated; // Triangulated Correspondences (mvIniMatches)
 
-			if (mpInitializer->Initialize(mCurrentFrame, mvIniMatches, Rcw, tcw, mvIniP3D, vbTriangulated))
+			if (initializer_->Initialize(mCurrentFrame, mvIniMatches, Rcw, tcw, mvIniP3D, vbTriangulated))
 			{
 				for (size_t i = 0, iend = mvIniMatches.size(); i < iend; i++)
 				{
@@ -1237,7 +1237,7 @@ public:
 		bool success = false;
 
 		// Initial camera pose estimation using motion model or relocalization (if tracking is lost)
-		if (!localization)
+		if (!localization_)
 		{
 			// Local Mapping is activated. This is the normal behaviour, unless
 			// you explicitly activate the "only tracking" mode.
@@ -1357,13 +1357,13 @@ public:
 		// mbVO true means that there are few matches to MapPoints in the map. We cannot retrieve
 		// a local map and therefore we do not perform TrackLocalMap(). Once the system relocalizes
 		// the camera we will use the local map again.
-		if (success && (!localization || (localization && !fewMatches_)))
+		if (success && (!localization_ || (localization_ && !fewMatches_)))
 		{
 			// If the camera has been relocalised recently, perform a coarser search
 			const bool relocalizedRecently = (int)currFrame.mnId < last_.relocFrameId + 2;
 			const float th = relocalizedRecently ? 5.f : (sensor_ == System::RGBD ? 3.f : 1.f);
 
-			matchesInliers_ = TrackLocalMap(localMap_, currFrame, th, localization, sensor_ == System::STEREO);
+			matchesInliers_ = TrackLocalMap(localMap_, currFrame, th, localization_, sensor_ == System::STEREO);
 
 			// Decide if the tracking was succesful
 			// More restrictive if there was a relocalization recently
@@ -1413,7 +1413,7 @@ public:
 			tempPoints_.clear();
 
 			// Check if we need to insert a new keyframe
-			if (!localization && mNewKeyFrameCondition.Satisfy(currFrame, localMapper_, matchesInliers_))
+			if (!localization_ && newKeyFrameCondition_.Satisfy(currFrame, localMapper_, matchesInliers_))
 			{
 				if (localMapper_->SetNotStop(true))
 				{
@@ -1477,10 +1477,10 @@ public:
 	{
 		state_ = STATE_NO_IMAGES;
 
-		if (mpInitializer)
+		if (initializer_)
 		{
-			delete mpInitializer;
-			mpInitializer = nullptr;
+			delete initializer_;
+			initializer_ = nullptr;
 		}
 
 		trajectory_.clear();
@@ -1498,7 +1498,7 @@ public:
 
 	void InformOnlyTracking(const bool &flag)
 	{
-		localization = flag;
+		localization_ = flag;
 	}
 
 	int GetState() const
@@ -1528,7 +1528,7 @@ public:
 
 	bool OnlyTracking() const
 	{
-		return localization;
+		return localization_;
 	}
 
 private:
@@ -1563,7 +1563,7 @@ private:
 	std::vector<TrackPoint> trajectory_;
 
 	// True if local mapping is deactivated and we are performing only localization
-	bool localization;
+	bool localization_;
 
 	// In case of performing only localization, this flag is true when there are no matches to
 	// points in the map. Still tracking will continue if there are enough matches with temporal points.
@@ -1579,7 +1579,7 @@ private:
 	KeyFrameDatabase* keyFrameDB_;
 
 	// Initalization (only for monocular)
-	Initializer* mpInitializer;
+	Initializer* initializer_;
 
 	//Local Map
 	LocalMap localMap_;
@@ -1610,7 +1610,7 @@ private:
 
 	MMTracker trackerMM_;
 	BoWTracker trackerBow_;
-	NewKeyFrameCondition mNewKeyFrameCondition;
+	NewKeyFrameCondition newKeyFrameCondition_;
 };
 
 class TrackingImpl : public Tracking
