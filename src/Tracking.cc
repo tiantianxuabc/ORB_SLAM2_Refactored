@@ -1614,54 +1614,53 @@ class TrackingImpl : public Tracking
 
 public:
 
-	TrackingImpl(System *pSys, ORBVocabulary* pVoc, FrameDrawer *pFrameDrawer, MapDrawer *pMapDrawer,
-		Map *pMap, KeyFrameDatabase* pKFDB, const string &strSettingPath, int sensor)
-		: mpORBVocabulary(pVoc), mpKeyFrameDB(pKFDB), mpViewer(NULL), mpMap(pMap)
+	TrackingImpl(System* system, ORBVocabulary* voc, FrameDrawer* frameDrawer, MapDrawer* mapDrawer,
+		Map* map, KeyFrameDatabase* keyframeDB, const string& settingsFile, int sensor)
+		: voc_(voc), keyframeDB_(keyframeDB), viewer_(nullptr), map_(map)
 	{
-		cv::FileStorage fSettings(strSettingPath, cv::FileStorage::READ);
+		cv::FileStorage settings(settingsFile, cv::FileStorage::READ);
 
 		// Load camera parameters from settings file
-		camera_ = ReadCameraParams(fSettings);
-		distCoeffs_ = ReadDistCoeffs(fSettings);
+		camera_ = ReadCameraParams(settings);
+		distCoeffs_ = ReadDistCoeffs(settings);
 
 		// Load fps
-		const float fps = ReadFps(fSettings);
+		const float fps = ReadFps(settings);
 
 		// Max/Min Frames to insert keyframes and to check relocalisation
 		const int minFrames = 0;
 		const int maxFrames = static_cast<int>(fps);
 
 		// Load color
-		mbRGB = static_cast<int>(fSettings["Camera.RGB"]) != 0;
+		RGB_ = static_cast<int>(settings["Camera.RGB"]) != 0;
 
 		// Load ORB parameters
-		const ORBExtractorParams extractorParams = ReadExtractorParams(fSettings);
+		const ORBExtractorParams extractorParams = ReadExtractorParams(settings);
 
 		// Load depth threshold
-		const float thDepth = fSettings["ThDepth"];
+		const float thDepth = settings["ThDepth"];
 		thDepth_ = camera_.baseline * thDepth;
 
 		// Load depth factor
-		if (sensor == System::RGBD)
-			mDepthMapFactor = ReadDepthFactor(fSettings);
+		depthFactor_ = sensor == System::RGBD ? ReadDepthFactor(settings) : 1.f;
 
 		// Print settings
-		PrintSettings(camera_, distCoeffs_, fps, mbRGB, extractorParams, thDepth_, sensor);
+		PrintSettings(camera_, distCoeffs_, fps, RGB_, extractorParams, thDepth_, sensor);
 
 		// Initialize ORB extractors
-		const int nFeatures = extractorParams.nfeatures;
-		const float fScaleFactor = extractorParams.scaleFactor;
-		const int nLevels = extractorParams.nlevels;
-		const int fIniThFAST = extractorParams.initTh;
-		const int fMinThFAST = extractorParams.minTh;
-		mpORBextractorLeft = new ORBextractor(nFeatures, fScaleFactor, nLevels, fIniThFAST, fMinThFAST);
+		const int nfeatures = extractorParams.nfeatures;
+		const float scaleFactor = extractorParams.scaleFactor;
+		const int nlevels = extractorParams.nlevels;
+		const int initTh = extractorParams.initTh;
+		const int minTh = extractorParams.minTh;
+		mpORBextractorLeft = new ORBextractor(nfeatures, scaleFactor, nlevels, initTh, minTh);
 		if (sensor == System::STEREO)
-			mpORBextractorRight = new ORBextractor(nFeatures, fScaleFactor, nLevels, fIniThFAST, fMinThFAST);
+			mpORBextractorRight = new ORBextractor(nfeatures, scaleFactor, nlevels, initTh, minTh);
 		if (sensor == System::MONOCULAR)
-			mpIniORBextractor = new ORBextractor(2 * nFeatures, fScaleFactor, nLevels, fIniThFAST, fMinThFAST);
+			mpIniORBextractor = new ORBextractor(2 * nfeatures, scaleFactor, nlevels, initTh, minTh);
 
 		// Initialize tracker core
-		tracker_ = std::make_unique<TrackerCore>(this, pSys, pFrameDrawer, pMapDrawer, pMap, pKFDB, sensor,
+		tracker_ = std::make_unique<TrackerCore>(this, system, frameDrawer, mapDrawer, map, keyframeDB, sensor,
 			TrackerCore::Parameters(minFrames, maxFrames, thDepth_));
 	}
 
@@ -1669,10 +1668,10 @@ public:
 	cv::Mat GrabImageStereo(const cv::Mat& imageL, const cv::Mat& imageR, double timestamp) override
 	{
 		cv::Mat imGrayRight;
-		ConvertToGray(imageL, mImGray, mbRGB);
-		ConvertToGray(imageR, imGrayRight, mbRGB);
+		ConvertToGray(imageL, mImGray, RGB_);
+		ConvertToGray(imageR, imGrayRight, RGB_);
 
-		mCurrentFrame = Frame(mImGray, imGrayRight, timestamp, mpORBextractorLeft, mpORBextractorRight, mpORBVocabulary,
+		mCurrentFrame = Frame(mImGray, imGrayRight, timestamp, mpORBextractorLeft, mpORBextractorRight, voc_,
 			camera_.Mat(), distCoeffs_, camera_.bf, thDepth_);
 
 		tracker_->Update(mCurrentFrame);
@@ -1682,13 +1681,13 @@ public:
 
 	cv::Mat GrabImageRGBD(const cv::Mat& image, const cv::Mat& depth, double timestamp) override
 	{
-		ConvertToGray(image, mImGray, mbRGB);
+		ConvertToGray(image, mImGray, RGB_);
 
 		cv::Mat imDepth = depth;
-		if ((fabs(mDepthMapFactor - 1.0f) > 1e-5) || imDepth.type() != CV_32F)
-			imDepth.convertTo(imDepth, CV_32F, mDepthMapFactor);
+		if ((fabs(depthFactor_ - 1.0f) > 1e-5) || imDepth.type() != CV_32F)
+			imDepth.convertTo(imDepth, CV_32F, depthFactor_);
 
-		mCurrentFrame = Frame(mImGray, imDepth, timestamp, mpORBextractorLeft, mpORBVocabulary,
+		mCurrentFrame = Frame(mImGray, imDepth, timestamp, mpORBextractorLeft, voc_,
 			camera_.Mat(), distCoeffs_, camera_.bf, thDepth_);
 
 		tracker_->Update(mCurrentFrame);
@@ -1698,11 +1697,11 @@ public:
 
 	cv::Mat GrabImageMonocular(const cv::Mat& image, double timestamp) override
 	{
-		ConvertToGray(image, mImGray, mbRGB);
+		ConvertToGray(image, mImGray, RGB_);
 		const int state = tracker_->GetState();
 		const bool init = state == STATE_NOT_INITIALIZED || state == STATE_NO_IMAGES;
 		ORBextractor* pORBextractor = init ? mpIniORBextractor : mpORBextractorLeft;
-		mCurrentFrame = Frame(mImGray, timestamp, pORBextractor, mpORBVocabulary,
+		mCurrentFrame = Frame(mImGray, timestamp, pORBextractor, voc_,
 			camera_.Mat(), distCoeffs_, camera_.bf, thDepth_);
 
 		tracker_->Update(mCurrentFrame);
@@ -1724,7 +1723,7 @@ public:
 
 	void SetViewer(Viewer *pViewer) override
 	{
-		mpViewer = pViewer;
+		viewer_ = pViewer;
 	}
 
 	// Load new settings
@@ -1741,10 +1740,10 @@ public:
 	void Reset() override
 	{
 		cout << "System Reseting" << endl;
-		if (mpViewer)
+		if (viewer_)
 		{
-			mpViewer->RequestStop();
-			while (!mpViewer->isStopped())
+			viewer_->RequestStop();
+			while (!viewer_->isStopped())
 				usleep(3000);
 		}
 
@@ -1760,19 +1759,19 @@ public:
 
 		// Clear BoW Database
 		cout << "Reseting Database...";
-		mpKeyFrameDB->clear();
+		keyframeDB_->clear();
 		cout << " done" << endl;
 
 		// Clear Map (this erase MapPoints and KeyFrames)
-		mpMap->clear();
+		map_->clear();
 
 		KeyFrame::nNextId = 0;
 		Frame::nNextId = 0;
 
 		tracker_->Clear();
 
-		if (mpViewer)
-			mpViewer->Release();
+		if (viewer_)
+			viewer_->Release();
 	}
 
 	// Use this function if you have deactivated local mapping and you only want to localize the camera.
@@ -1836,31 +1835,31 @@ private:
 	ORBextractor* mpIniORBextractor;
 
 	// BoW
-	ORBVocabulary* mpORBVocabulary;
-	KeyFrameDatabase* mpKeyFrameDB;
+	ORBVocabulary* voc_;
+	KeyFrameDatabase* keyframeDB_;
 
 	// Drawers
-	Viewer* mpViewer;
+	Viewer* viewer_;
 
 	//Map
-	Map* mpMap;
+	Map* map_;
 
 	// Calibration matrix
 	CameraParams camera_;
 	cv::Mat1f distCoeffs_;
 
 	// For RGB-D inputs only. For some datasets (e.g. TUM) the depthmap values are scaled.
-	float mDepthMapFactor;
+	float depthFactor_;
 
 	// Color order (true RGB, false BGR, ignored if grayscale)
-	bool mbRGB;
+	bool RGB_;
 
 	std::unique_ptr<TrackerCore> tracker_;
 	float thDepth_;
 };
 
 std::shared_ptr<Tracking> Tracking::Create(System* system, ORBVocabulary* voc, FrameDrawer* frameDrawer,
-	MapDrawer* mapDrawer, Map* map, KeyFrameDatabase* keyframeDB, const string& settingsFile, System::Sensor sensor)
+	MapDrawer* mapDrawer, Map* map, KeyFrameDatabase* keyframeDB, const string& settingsFile, int sensor)
 {
 	return std::make_shared<TrackingImpl>(system, voc, frameDrawer, mapDrawer, map, keyframeDB, settingsFile, sensor);
 }
