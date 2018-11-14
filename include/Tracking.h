@@ -45,7 +45,7 @@ class KeyFrame;
 struct TrackPoint
 {
 	cv::Mat Tcr;
-	const KeyFrame* pReferenceKF;
+	const KeyFrame* referenceKF;
 	double timestamp;
 	bool lost;
 	TrackPoint(const Frame& frame, bool lost);

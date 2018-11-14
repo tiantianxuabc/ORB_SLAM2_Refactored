@@ -55,7 +55,7 @@ void GlobalBundleAdjustemnt(Map* pMap, int nIterations = 5, bool *pbStopFlag = N
 }
 
 TrackPoint::TrackPoint(const Frame& frame, bool lost)
-	: pReferenceKF(frame.mpReferenceKF), timestamp(frame.mTimeStamp), lost(lost)
+	: referenceKF(frame.mpReferenceKF), timestamp(frame.mTimeStamp), lost(lost)
 {
 	Tcr = frame.mTcw * frame.mpReferenceKF->GetPoseInverse();
 }

@@ -410,7 +410,7 @@ public:
 			if (track.lost)
 				continue;
 
-			KeyFrame* pKF = (KeyFrame*)track.pReferenceKF;
+			KeyFrame* pKF = (KeyFrame*)track.referenceKF;
 
 			cv::Mat Trw = cv::Mat::eye(4, 4, CV_32F);
 
@@ -507,7 +507,7 @@ public:
 		// which is true when tracking failed.
 		for (const auto& track : mpTracker->GetTrajectory())
 		{
-			ORB_SLAM2::KeyFrame* pKF = (KeyFrame*)track.pReferenceKF;
+			ORB_SLAM2::KeyFrame* pKF = (KeyFrame*)track.referenceKF;
 
 			cv::Mat Trw = cv::Mat::eye(4, 4, CV_32F);
 
