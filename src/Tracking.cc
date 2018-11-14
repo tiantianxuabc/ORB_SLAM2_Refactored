@@ -426,42 +426,38 @@ static void ConvertToGray(const cv::Mat& src, cv::Mat& dst, bool RGB)
 	cv::cvtColor(src, dst, codes[idx]);
 }
 
-static void SearchLocalPoints(const LocalMap& mLocalMap, Frame& mCurrentFrame, float th)
+static void SearchLocalPoints(const LocalMap& localMap, Frame& currFrame, float th)
 {
 	// Do not search map points already matched
-	for (vector<MapPoint*>::iterator vit = mCurrentFrame.mvpMapPoints.begin(), vend = mCurrentFrame.mvpMapPoints.end(); vit != vend; vit++)
+	for (MapPoint* mappoint : currFrame.mvpMapPoints)
 	{
-		MapPoint* pMP = *vit;
-		if (pMP)
+		if (!mappoint)
+			continue;
+
+		if (mappoint->isBad())
 		{
-			if (pMP->isBad())
-			{
-				*vit = static_cast<MapPoint*>(NULL);
-			}
-			else
-			{
-				pMP->IncreaseVisible();
-				pMP->mnLastFrameSeen = mCurrentFrame.mnId;
-				pMP->mbTrackInView = false;
-			}
+			mappoint = nullptr;
+		}
+		else
+		{
+			mappoint->IncreaseVisible();
+			mappoint->mnLastFrameSeen = currFrame.mnId;
+			mappoint->mbTrackInView = false;
 		}
 	}
 
 	int nToMatch = 0;
 
 	// Project points in frame and check its visibility
-	auto& mvpLocalMapPoints = mLocalMap.mvpLocalMapPoints;
-	for (auto vit = mvpLocalMapPoints.begin(), vend = mvpLocalMapPoints.end(); vit != vend; vit++)
+	for (MapPoint* mappoint : localMap.mvpLocalMapPoints)
 	{
-		MapPoint* pMP = *vit;
-		if (pMP->mnLastFrameSeen == mCurrentFrame.mnId)
+		if (mappoint->mnLastFrameSeen == currFrame.mnId || mappoint->isBad())
 			continue;
-		if (pMP->isBad())
-			continue;
+
 		// Project (this fills MapPoint variables for matching)
-		if (mCurrentFrame.isInFrustum(pMP, 0.5))
+		if (currFrame.isInFrustum(mappoint, 0.5))
 		{
-			pMP->IncreaseVisible();
+			mappoint->IncreaseVisible();
 			nToMatch++;
 		}
 	}
@@ -469,7 +465,7 @@ static void SearchLocalPoints(const LocalMap& mLocalMap, Frame& mCurrentFrame, f
 	if (nToMatch > 0)
 	{
 		ORBmatcher matcher(0.8f);
-		matcher.SearchByProjection(mCurrentFrame, mvpLocalMapPoints, th);
+		matcher.SearchByProjection(currFrame, localMap.mvpLocalMapPoints, th);
 	}
 }
 
