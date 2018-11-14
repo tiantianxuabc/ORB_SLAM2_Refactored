@@ -79,157 +79,134 @@ struct TrackerParameters
 
 struct LocalMap
 {
-	LocalMap(Map* pMap) : mpMap(pMap) {}
+	LocalMap(Map* map) : map_(map) {}
 
-	void Update(Frame& mCurrentFrame)
+	void Update(Frame& currFrame)
 	{
 		// This is for visualization
-		mpMap->SetReferenceMapPoints(mvpLocalMapPoints);
+		map_->SetReferenceMapPoints(mappoints);
 
 		// Update
-		UpdateLocalKeyFrames(mCurrentFrame);
-		UpdateLocalPoints(mCurrentFrame);
+		UpdateLocalKeyFrames(currFrame);
+		UpdateLocalPoints(currFrame);
 	}
 
-	void UpdateLocalKeyFrames(Frame& mCurrentFrame)
+	void UpdateLocalKeyFrames(Frame& currFrame)
 	{
 		// Each map point vote for the keyframes in which it has been observed
-		map<KeyFrame*, int> keyframeCounter;
-		for (int i = 0; i < mCurrentFrame.N; i++)
+		std::map<KeyFrame*, int> keyframeCounter;
+		for (int i = 0; i < currFrame.N; i++)
 		{
-			if (mCurrentFrame.mvpMapPoints[i])
+			if (!currFrame.mvpMapPoints[i])
+				continue;
+
+			MapPoint* mappoint = currFrame.mvpMapPoints[i];
+			if (!mappoint->isBad())
 			{
-				MapPoint* pMP = mCurrentFrame.mvpMapPoints[i];
-				if (!pMP->isBad())
-				{
-					const map<KeyFrame*, size_t> observations = pMP->GetObservations();
-					for (map<KeyFrame*, size_t>::const_iterator it = observations.begin(), itend = observations.end(); it != itend; it++)
-						keyframeCounter[it->first]++;
-				}
-				else
-				{
-					mCurrentFrame.mvpMapPoints[i] = NULL;
-				}
+				for (const auto& observations : mappoint->GetObservations())
+					keyframeCounter[observations.first]++;
+			}
+			else
+			{
+				currFrame.mvpMapPoints[i] = nullptr;
 			}
 		}
 
 		if (keyframeCounter.empty())
 			return;
 
-		int max = 0;
-		KeyFrame* pKFmax = static_cast<KeyFrame*>(NULL);
+		int maxCount = 0;
+		KeyFrame* maxKeyFrame = nullptr;
 
-		mvpLocalKeyFrames.clear();
-		mvpLocalKeyFrames.reserve(3 * keyframeCounter.size());
+		keyframes.clear();
+		keyframes.reserve(3 * keyframeCounter.size());
 
 		// All keyframes that observe a map point are included in the local map. Also check which keyframe shares most points
-		for (map<KeyFrame*, int>::const_iterator it = keyframeCounter.begin(), itEnd = keyframeCounter.end(); it != itEnd; it++)
+		for (const auto& v : keyframeCounter)
 		{
-			KeyFrame* pKF = it->first;
+			KeyFrame* keyframe = v.first;
+			const int count = v.second;
 
-			if (pKF->isBad())
+			if (keyframe->isBad())
 				continue;
 
-			if (it->second > max)
+			if (count > maxCount)
 			{
-				max = it->second;
-				pKFmax = pKF;
+				maxCount = count;
+				maxKeyFrame = keyframe;
 			}
 
-			mvpLocalKeyFrames.push_back(it->first);
-			pKF->mnTrackReferenceForFrame = mCurrentFrame.mnId;
+			keyframes.push_back(keyframe);
+			keyframe->mnTrackReferenceForFrame = currFrame.mnId;
 		}
 
-
 		// Include also some not-already-included keyframes that are neighbors to already-included keyframes
-		for (vector<KeyFrame*>::const_iterator itKF = mvpLocalKeyFrames.begin(), itEndKF = mvpLocalKeyFrames.end(); itKF != itEndKF; itKF++)
+		for (KeyFrame* keyframe : keyframes)
 		{
 			// Limit the number of keyframes
-			if (mvpLocalKeyFrames.size() > 80)
+			if (keyframes.size() > 80)
 				break;
 
-			KeyFrame* pKF = *itKF;
-
-			const vector<KeyFrame*> vNeighs = pKF->GetBestCovisibilityKeyFrames(10);
-
-			for (vector<KeyFrame*>::const_iterator itNeighKF = vNeighs.begin(), itEndNeighKF = vNeighs.end(); itNeighKF != itEndNeighKF; itNeighKF++)
+			for (KeyFrame* neighborKF : keyframe->GetBestCovisibilityKeyFrames(10))
 			{
-				KeyFrame* pNeighKF = *itNeighKF;
-				if (!pNeighKF->isBad())
+				if (!neighborKF->isBad() && neighborKF->mnTrackReferenceForFrame != currFrame.mnId)
 				{
-					if (pNeighKF->mnTrackReferenceForFrame != mCurrentFrame.mnId)
-					{
-						mvpLocalKeyFrames.push_back(pNeighKF);
-						pNeighKF->mnTrackReferenceForFrame = mCurrentFrame.mnId;
-						break;
-					}
+					keyframes.push_back(neighborKF);
+					neighborKF->mnTrackReferenceForFrame = currFrame.mnId;
+					break;
 				}
 			}
 
-			const set<KeyFrame*> spChilds = pKF->GetChilds();
-			for (set<KeyFrame*>::const_iterator sit = spChilds.begin(), send = spChilds.end(); sit != send; sit++)
+			for (KeyFrame* childKF : keyframe->GetChilds())
 			{
-				KeyFrame* pChildKF = *sit;
-				if (!pChildKF->isBad())
+				if (!childKF->isBad() && childKF->mnTrackReferenceForFrame != currFrame.mnId)
 				{
-					if (pChildKF->mnTrackReferenceForFrame != mCurrentFrame.mnId)
-					{
-						mvpLocalKeyFrames.push_back(pChildKF);
-						pChildKF->mnTrackReferenceForFrame = mCurrentFrame.mnId;
-						break;
-					}
+					keyframes.push_back(childKF);
+					childKF->mnTrackReferenceForFrame = currFrame.mnId;
+					break;
 				}
 			}
 
-			KeyFrame* pParent = pKF->GetParent();
-			if (pParent)
+			KeyFrame* parentKF = keyframe->GetParent();
+			if (parentKF)
 			{
-				if (pParent->mnTrackReferenceForFrame != mCurrentFrame.mnId)
+				if (parentKF->mnTrackReferenceForFrame != currFrame.mnId)
 				{
-					mvpLocalKeyFrames.push_back(pParent);
-					pParent->mnTrackReferenceForFrame = mCurrentFrame.mnId;
+					keyframes.push_back(parentKF);
+					parentKF->mnTrackReferenceForFrame = currFrame.mnId;
 					break;
 				}
 			}
 
 		}
 
-		if (pKFmax)
+		if (maxKeyFrame)
 		{
-			mpReferenceKF = pKFmax;
-			mCurrentFrame.mpReferenceKF = mpReferenceKF;
+			referenceKF = maxKeyFrame;
+			currFrame.mpReferenceKF = referenceKF;
 		}
 	}
 
 	void UpdateLocalPoints(Frame& mCurrentFrame)
 	{
-		mvpLocalMapPoints.clear();
-
-		for (vector<KeyFrame*>::const_iterator itKF = mvpLocalKeyFrames.begin(), itEndKF = mvpLocalKeyFrames.end(); itKF != itEndKF; itKF++)
+		mappoints.clear();
+		for (KeyFrame* keyframe : keyframes)
 		{
-			KeyFrame* pKF = *itKF;
-			const vector<MapPoint*> vpMPs = pKF->GetMapPointMatches();
-
-			for (vector<MapPoint*>::const_iterator itMP = vpMPs.begin(), itEndMP = vpMPs.end(); itMP != itEndMP; itMP++)
+			for (MapPoint* mappoint : keyframe->GetMapPointMatches())
 			{
-				MapPoint* pMP = *itMP;
-				if (!pMP)
+				if (!mappoint || mappoint->mnTrackReferenceForFrame == mCurrentFrame.mnId || mappoint->isBad())
 					continue;
-				if (pMP->mnTrackReferenceForFrame == mCurrentFrame.mnId)
-					continue;
-				if (!pMP->isBad())
-				{
-					mvpLocalMapPoints.push_back(pMP);
-					pMP->mnTrackReferenceForFrame = mCurrentFrame.mnId;
-				}
+
+				mappoints.push_back(mappoint);
+				mappoint->mnTrackReferenceForFrame = mCurrentFrame.mnId;
 			}
 		}
 	}
 
-	KeyFrame* mpReferenceKF;
-	std::vector<KeyFrame*> mvpLocalKeyFrames;
-	std::vector<MapPoint*> mvpLocalMapPoints;
-	Map* mpMap;
+	KeyFrame* referenceKF;
+	std::vector<KeyFrame*> keyframes;
+	std::vector<MapPoint*> mappoints;
+	Map* map_;
 };
 
 static int DiscardOutliers(Frame& mCurrentFrame)
@@ -351,7 +328,7 @@ public:
 
 		// Tracked MapPoints in the reference keyframe
 		const int minObservations = nkeyframes <= 2 ? 2 : 3;
-		const int refMatches = localMap_.mpReferenceKF->TrackedMapPoints(minObservations);
+		const int refMatches = localMap_.referenceKF->TrackedMapPoints(minObservations);
 
 		// Local Mapping accept keyframes?
 		const bool acceptKeyFrames = localMapper->AcceptKeyFrames();
@@ -449,7 +426,7 @@ static void SearchLocalPoints(const LocalMap& localMap, Frame& currFrame, float 
 	int nToMatch = 0;
 
 	// Project points in frame and check its visibility
-	for (MapPoint* mappoint : localMap.mvpLocalMapPoints)
+	for (MapPoint* mappoint : localMap.mappoints)
 	{
 		if (mappoint->mnLastFrameSeen == currFrame.mnId || mappoint->isBad())
 			continue;
@@ -465,7 +442,7 @@ static void SearchLocalPoints(const LocalMap& localMap, Frame& currFrame, float 
 	if (nToMatch > 0)
 	{
 		ORBmatcher matcher(0.8f);
-		matcher.SearchByProjection(currFrame, localMap.mvpLocalMapPoints, th);
+		matcher.SearchByProjection(currFrame, localMap.mappoints, th);
 	}
 }
 
@@ -950,7 +927,7 @@ public:
 		}
 		if (!withMotionModel || (withMotionModel && !success))
 		{
-			success = TrackReferenceKeyFrame(currFrame, localMap_.mpReferenceKF, lastFrame);
+			success = TrackReferenceKeyFrame(currFrame, localMap_.referenceKF, lastFrame);
 		}
 
 		return success;
@@ -981,7 +958,7 @@ public:
 			}
 			else
 			{
-				success = TrackReferenceKeyFrame(currFrame, localMap_.mpReferenceKF, lastFrame);
+				success = TrackReferenceKeyFrame(currFrame, localMap_.referenceKF, lastFrame);
 			}
 		}
 		else
@@ -1140,12 +1117,12 @@ public:
 		lastKeyFrame_ = keyframe;
 		CV_Assert(lastKeyFrame_->mnFrameId == currFrame.mnId);
 
-		localMap_.mvpLocalKeyFrames.push_back(keyframe);
-		localMap_.mvpLocalMapPoints = map_->GetAllMapPoints();
-		localMap_.mpReferenceKF = keyframe;
+		localMap_.keyframes.push_back(keyframe);
+		localMap_.mappoints = map_->GetAllMapPoints();
+		localMap_.referenceKF = keyframe;
 		currFrame.mpReferenceKF = keyframe;
 
-		map_->SetReferenceMapPoints(localMap_.mvpLocalMapPoints);
+		map_->SetReferenceMapPoints(localMap_.mappoints);
 
 		map_->mvpKeyFrameOrigins.push_back(keyframe);
 
@@ -1314,15 +1291,15 @@ public:
 		lastKeyFrame_ = pKFcur;
 		CV_Assert(lastKeyFrame_->mnFrameId == mCurrentFrame.mnId);
 
-		localMap_.mvpLocalKeyFrames.push_back(pKFcur);
-		localMap_.mvpLocalKeyFrames.push_back(pKFini);
-		localMap_.mvpLocalMapPoints = map_->GetAllMapPoints();
-		localMap_.mpReferenceKF = pKFcur;
+		localMap_.keyframes.push_back(pKFcur);
+		localMap_.keyframes.push_back(pKFini);
+		localMap_.mappoints = map_->GetAllMapPoints();
+		localMap_.referenceKF = pKFcur;
 		mCurrentFrame.mpReferenceKF = pKFcur;
 
 		lastFrame_ = Frame(mCurrentFrame);
 
-		map_->SetReferenceMapPoints(localMap_.mvpLocalMapPoints);
+		map_->SetReferenceMapPoints(localMap_.mappoints);
 
 		mapDrawer_->SetCurrentCameraPose(pKFcur->GetPose());
 
@@ -1376,7 +1353,7 @@ public:
 		else
 			success = trackerIni_.TrackLocalization(currFrame, lastFrame_, velocity_, state_, lastKeyFrame_->mnFrameId);
 
-		currFrame.mpReferenceKF = localMap_.mpReferenceKF;
+		currFrame.mpReferenceKF = localMap_.referenceKF;
 
 		// If we have an initial estimation of the camera pose and matching. Track the local map.
 		// [In Localization Mode]
@@ -1439,7 +1416,7 @@ public:
 				if (localMapper_->SetNotStop(true))
 				{
 					KeyFrame* keyframe = new KeyFrame(currFrame, map_, keyFrameDB_);
-					localMap_.mpReferenceKF = keyframe;
+					localMap_.referenceKF = keyframe;
 					currFrame.mpReferenceKF = keyframe;
 
 					if (sensor_ != System::MONOCULAR)
@@ -1479,7 +1456,7 @@ public:
 		lastFrame_ = Frame(currFrame);
 
 		// Store frame pose information to retrieve the complete camera trajectory afterwards.
-		CV_Assert(currFrame.mpReferenceKF == localMap_.mpReferenceKF);
+		CV_Assert(currFrame.mpReferenceKF == localMap_.referenceKF);
 		const bool lost = state_ == STATE_LOST;
 		if (!currFrame.mTcw.empty())
 		{
