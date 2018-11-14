@@ -1446,19 +1446,19 @@ public:
 			for (int i = 0; i < currFrame.N; i++)
 			{
 				MapPoint* mappoint = currFrame.mvpMapPoints[i];
-				if (mappoint)
-					if (mappoint->Observations() < 1)
-					{
-						currFrame.mvbOutlier[i] = false;
-						currFrame.mvpMapPoints[i] = nullptr;
-					}
+				if (mappoint && mappoint->Observations() < 1)
+				{
+					currFrame.mvbOutlier[i] = false;
+					currFrame.mvpMapPoints[i] = nullptr;
+				}
 			}
 
 			// Delete temporal MapPoints
 			trackerIni_.DeleteTemporalMapPoints();
 
 			// Check if we need to insert a new keyframe
-			if (!localization_ && newKeyFrameCondition_.Satisfy(currFrame, localMapper_, matchesInliers_, relocalizer_.GetLastRelocFrameId(), lastKeyFrame_->mnFrameId))
+			if (!localization_ && newKeyFrameCondition_.Satisfy(currFrame, localMapper_, matchesInliers_,
+				relocalizer_.GetLastRelocFrameId(), lastKeyFrame_->mnFrameId))
 			{
 				if (localMapper_->SetNotStop(true))
 				{
