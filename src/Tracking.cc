@@ -54,6 +54,8 @@ TrackPoint::TrackPoint(const Frame& frame, bool lost)
 	Tcr = frame.mTcw * frame.mpReferenceKF->GetPoseInverse();
 }
 
+using Traject = Trajectory;
+
 struct TrackerParameters
 {
 	//New KeyFrame rules (according to fps)
@@ -957,6 +959,178 @@ static void PrintSettings(const CameraParams& camera, const cv::Mat1f& distCoeff
 		cout << endl << "Depth Threshold (Close/Far Points): " << thDepth << endl;
 }
 
+class InitialTracker
+{
+
+public:
+
+	InitialTracker(Map* map, KeyFrameDatabase* keyFrameDB, LocalMap& localMap, LastFrameInfo& last,
+		const Trajectory& trajectory, int sensor, float thDepth)
+		: sensor_(sensor), fewMatches_(false), keyFrameDB_(keyFrameDB), localMap_(localMap), map_(map),
+		last_(last), trajectory_(trajectory), trackerMM_(sensor), trackerBow_(last), thDepth_(thDepth)
+	{
+	}
+
+	bool TrackNormal(Frame& currFrame, const cv::Mat& velocity, int state)
+	{
+		// Local Mapping is activated. This is the normal behaviour, unless
+		// you explicitly activate the "only tracking" mode.
+
+		if (state != Tracking::STATE_OK)
+			return Relocalization(currFrame, keyFrameDB_, last_);
+
+		// Local Mapping might have changed some MapPoints tracked in last frame
+		for (int i = 0; i < last_.frame.N; i++)
+		{
+			MapPoint* mappoint = last_.frame.mvpMapPoints[i];
+			MapPoint* replaced = mappoint ? mappoint->GetReplaced() : nullptr;
+			if (replaced)
+				last_.frame.mvpMapPoints[i] = replaced;
+		}
+
+		bool success = false;
+		const bool withMotionModel = !velocity.empty() && (int)currFrame.mnId >= last_.relocFrameId + 2;
+		if (withMotionModel)
+		{
+			MMTracker::UpdateLastFramePose(last_.frame, trajectory_.back());
+			success = trackerMM_.Track(currFrame, last_.frame, velocity, 10);
+		}
+		if (!withMotionModel || (withMotionModel && !success))
+		{
+			success = trackerBow_.Track(currFrame, localMap_.mpReferenceKF);
+		}
+
+		return success;
+	}
+
+	bool TrackLocalization(Frame& currFrame, const cv::Mat& velocity, int state)
+	{
+		// Localization Mode: Local Mapping is deactivated
+
+		if (state != Tracking::STATE_OK)
+			return Relocalization(currFrame, keyFrameDB_, last_);
+
+		const bool createPoints = sensor_ != System::MONOCULAR && last_.frame.mnId != last_.keyFrameId;
+		bool success = false;
+
+		if (!fewMatches_)
+		{
+			// In last frame we tracked enough MapPoints in the map
+
+			if (!velocity.empty())
+			{
+				MMTracker::UpdateLastFramePose(last_.frame, trajectory_.back());
+				if (createPoints)
+					CreateMapPointsVO(last_.frame, tempPoints_, map_, thDepth_);
+
+				success = trackerMM_.Track(currFrame, last_.frame, velocity, 21, &fewMatches_);
+			}
+			else
+			{
+				success = trackerBow_.Track(currFrame, localMap_.mpReferenceKF);
+			}
+		}
+		else
+		{
+			// In last frame we tracked mainly "visual odometry" points.
+
+			// We compute two camera poses, one from motion model and one doing relocalization.
+			// If relocalization is sucessfull we choose that solution, otherwise we retain
+			// the "visual odometry" solution.
+
+			bool bOKMM = false;
+			bool bOKReloc = false;
+			vector<MapPoint*> vpMPsMM;
+			vector<bool> vbOutMM;
+			cv::Mat TcwMM;
+			if (!velocity.empty())
+			{
+				MMTracker::UpdateLastFramePose(last_.frame, trajectory_.back());
+				if (createPoints)
+					CreateMapPointsVO(last_.frame, tempPoints_, map_, thDepth_);
+
+				bOKMM = trackerMM_.Track(currFrame, last_.frame, velocity, 21, &fewMatches_);
+				vpMPsMM = currFrame.mvpMapPoints;
+				vbOutMM = currFrame.mvbOutlier;
+				TcwMM = currFrame.mTcw.clone();
+			}
+			bOKReloc = Relocalization(currFrame, keyFrameDB_, last_);
+
+			if (bOKMM && !bOKReloc)
+			{
+				currFrame.SetPose(TcwMM);
+				currFrame.mvpMapPoints = vpMPsMM;
+				currFrame.mvbOutlier = vbOutMM;
+
+				if (fewMatches_)
+				{
+					for (int i = 0; i < currFrame.N; i++)
+					{
+						if (currFrame.mvpMapPoints[i] && !currFrame.mvbOutlier[i])
+						{
+							currFrame.mvpMapPoints[i]->IncreaseFound();
+						}
+					}
+				}
+			}
+			else if (bOKReloc)
+			{
+				fewMatches_ = false;
+			}
+
+			success = bOKReloc || bOKMM;
+		}
+
+		return success;
+	}
+
+	bool FewMatches() const
+	{
+		return fewMatches_;
+	}
+
+	void DeleteTemporalMapPoints()
+	{
+		for (MapPoint* mappoint : tempPoints_)
+			delete mappoint;
+		tempPoints_.clear();
+	}
+
+private:
+
+	// Input sensor
+	int sensor_;
+
+	// In case of performing only localization, this flag is true when there are no matches to
+	// points in the map. Still tracking will continue if there are enough matches with temporal points.
+	// In that case we are doing visual odometry. The system will try to do relocalization to recover
+	// "zero-drift" localization to the map.
+	bool fewMatches_;
+
+	//BoW
+	KeyFrameDatabase* keyFrameDB_;
+
+	//Local Map
+	LocalMap& localMap_;
+
+	//Map
+	Map* map_;
+
+	//Last Frame, KeyFrame and Relocalisation Info
+	LastFrameInfo& last_;
+
+	// Lists used to recover the full camera trajectory at the end of the execution.
+	// Basically we store the reference keyframe for each frame and its relative transformation
+	const Trajectory& trajectory_;
+
+	list<MapPoint*> tempPoints_;
+
+	MMTracker trackerMM_;
+	BoWTracker trackerBow_;
+
+	float thDepth_;
+};
+
 class TrackerCore
 {
 
@@ -966,10 +1140,10 @@ public:
 
 	TrackerCore(Tracking* tracking, System* system, FrameDrawer* frameDrawer, MapDrawer* mapDrawer, Map* map,
 		KeyFrameDatabase* keyFrameDB, int sensor, const Parameters& param)
-		: state_(STATE_NO_IMAGES), sensor_(sensor), localization_(false), fewMatches_(false),
-		keyFrameDB_(keyFrameDB), initializer_(nullptr), tracking_(tracking), system_(system),
-		frameDrawer_(frameDrawer), mapDrawer_(mapDrawer), map_(map), localMap_(map),
-		trackerMM_(sensor), trackerBow_(last_), newKeyFrameCondition_(map, localMap_, last_, param, sensor), param_(param)
+		: state_(STATE_NO_IMAGES), sensor_(sensor), localization_(false), keyFrameDB_(keyFrameDB),
+		initializer_(nullptr), tracking_(tracking), system_(system), frameDrawer_(frameDrawer), mapDrawer_(mapDrawer),
+		map_(map), localMap_(map), newKeyFrameCondition_(map, localMap_, last_, param, sensor),
+		trackerIni_(map, keyFrameDB, localMap_, last_, trajectory_, sensor, param.thDepth), param_(param)
 	{
 	}
 
@@ -1206,25 +1380,33 @@ public:
 		state_ = STATE_OK;
 	}
 
+	void Initialization(Frame& currFrame, int sensor)
+	{
+		if (sensor == System::STEREO || sensor == System::RGBD)
+		{
+			StereoInitialization(currFrame);
+		}
+		else
+		{
+			MonocularInitialization(currFrame);
+		}
+	}
+
 	// Main tracking function. It is independent of the input sensor.
 	void Update(Frame& currFrame)
 	{
 		if (state_ == STATE_NO_IMAGES)
-		{
 			state_ = STATE_NOT_INITIALIZED;
-		}
 
 		lastProcessedState_ = state_;
 
 		// Get Map Mutex -> Map cannot be changed
 		unique_lock<mutex> lock(map_->mMutexMapUpdate);
 
+		// Initialize Tracker if not initialized.
 		if (state_ == STATE_NOT_INITIALIZED)
 		{
-			if (sensor_ == System::STEREO || sensor_ == System::RGBD)
-				StereoInitialization(currFrame);
-			else
-				MonocularInitialization(currFrame);
+			Initialization(currFrame, sensor_);
 
 			frameDrawer_->Update(tracking_);
 
@@ -1239,117 +1421,9 @@ public:
 
 		// Initial camera pose estimation using motion model or relocalization (if tracking is lost)
 		if (!localization_)
-		{
-			// Local Mapping is activated. This is the normal behaviour, unless
-			// you explicitly activate the "only tracking" mode.
-
-			if (state_ == STATE_OK)
-			{
-				// Local Mapping might have changed some MapPoints tracked in last frame
-				for (int i = 0; i < last_.frame.N; i++)
-				{
-					MapPoint* mappoint = last_.frame.mvpMapPoints[i];
-					MapPoint* replaced = mappoint ? mappoint->GetReplaced() : nullptr;
-					if (replaced)
-						last_.frame.mvpMapPoints[i] = replaced;
-				}
-
-				const bool withMotionModel = !velocity_.empty() && (int)currFrame.mnId >= last_.relocFrameId + 2;
-				if (withMotionModel)
-				{
-					MMTracker::UpdateLastFramePose(last_.frame, trajectory_.back());
-					success = trackerMM_.Track(currFrame, last_.frame, velocity_, 10);
-				}
-				if (!withMotionModel || (withMotionModel && !success))
-				{
-					success = trackerBow_.Track(currFrame, localMap_.mpReferenceKF);
-				}
-			}
-			else
-			{
-				success = Relocalization(currFrame, keyFrameDB_, last_);
-			}
-		}
+			success = trackerIni_.TrackNormal(currFrame, velocity_, state_);
 		else
-		{
-			// Localization Mode: Local Mapping is deactivated
-			const bool createPoints = sensor_ != System::MONOCULAR && last_.frame.mnId != last_.keyFrameId;
-
-			if (state_ == STATE_LOST)
-			{
-				success = Relocalization(currFrame, keyFrameDB_, last_);
-			}
-			else
-			{
-				if (!fewMatches_)
-				{
-					// In last frame we tracked enough MapPoints in the map
-
-					if (!velocity_.empty())
-					{
-						MMTracker::UpdateLastFramePose(last_.frame, trajectory_.back());
-						if (createPoints)
-							CreateMapPointsVO(last_.frame, tempPoints_, map_, param_.thDepth);
-
-						success = trackerMM_.Track(currFrame, last_.frame, velocity_, 21, &fewMatches_);
-					}
-					else
-					{
-						success = trackerBow_.Track(currFrame, localMap_.mpReferenceKF);
-					}
-				}
-				else
-				{
-					// In last frame we tracked mainly "visual odometry" points.
-
-					// We compute two camera poses, one from motion model and one doing relocalization.
-					// If relocalization is sucessfull we choose that solution, otherwise we retain
-					// the "visual odometry" solution.
-
-					bool bOKMM = false;
-					bool bOKReloc = false;
-					vector<MapPoint*> vpMPsMM;
-					vector<bool> vbOutMM;
-					cv::Mat TcwMM;
-					if (!velocity_.empty())
-					{
-						MMTracker::UpdateLastFramePose(last_.frame, trajectory_.back());
-						if (createPoints)
-							CreateMapPointsVO(last_.frame, tempPoints_, map_, param_.thDepth);
-
-						bOKMM = trackerMM_.Track(currFrame, last_.frame, velocity_, 21, &fewMatches_);
-						vpMPsMM = currFrame.mvpMapPoints;
-						vbOutMM = currFrame.mvbOutlier;
-						TcwMM = currFrame.mTcw.clone();
-					}
-					bOKReloc = Relocalization(currFrame, keyFrameDB_, last_);
-
-					if (bOKMM && !bOKReloc)
-					{
-						currFrame.SetPose(TcwMM);
-						currFrame.mvpMapPoints = vpMPsMM;
-						currFrame.mvbOutlier = vbOutMM;
-
-						if (fewMatches_)
-						{
-							for (int i = 0; i < currFrame.N; i++)
-							{
-								if (currFrame.mvpMapPoints[i] && !currFrame.mvbOutlier[i])
-								{
-									currFrame.mvpMapPoints[i]->IncreaseFound();
-								}
-							}
-						}
-					}
-					else if (bOKReloc)
-					{
-						fewMatches_ = false;
-					}
-
-					success = bOKReloc || bOKMM;
-				}
-			}
-		}
+			success = trackerIni_.TrackLocalization(currFrame, velocity_, state_);
 
 		currFrame.mpReferenceKF = localMap_.mpReferenceKF;
 
@@ -1358,7 +1432,7 @@ public:
 		// mbVO true means that there are few matches to MapPoints in the map. We cannot retrieve
 		// a local map and therefore we do not perform TrackLocalMap(). Once the system relocalizes
 		// the camera we will use the local map again.
-		if (success && (!localization_ || (localization_ && !fewMatches_)))
+		if (success && (!localization_ || (localization_ && !trackerIni_.FewMatches())))
 		{
 			// If the camera has been relocalised recently, perform a coarser search
 			const bool relocalizedRecently = (int)currFrame.mnId < last_.relocFrameId + 2;
@@ -1406,12 +1480,7 @@ public:
 			}
 
 			// Delete temporal MapPoints
-			for (list<MapPoint*>::iterator lit = tempPoints_.begin(), lend = tempPoints_.end(); lit != lend; lit++)
-			{
-				MapPoint* mappoint = *lit;
-				delete mappoint;
-			}
-			tempPoints_.clear();
+			trackerIni_.DeleteTemporalMapPoints();
 
 			// Check if we need to insert a new keyframe
 			if (!localization_ && newKeyFrameCondition_.Satisfy(currFrame, localMapper_, matchesInliers_))
@@ -1454,8 +1523,7 @@ public:
 			}
 		}
 
-		if (!currFrame.mpReferenceKF)
-			currFrame.mpReferenceKF = localMap_.mpReferenceKF;
+		CV_Assert(currFrame.mpReferenceKF);
 
 		last_.frame = Frame(currFrame);
 
@@ -1522,7 +1590,7 @@ public:
 		return mvIniMatches;
 	}
 
-	const std::vector<TrackPoint>& GetTrajectory() const
+	const Trajectory& GetTrajectory() const
 	{
 		return trajectory_;
 	}
@@ -1561,7 +1629,7 @@ private:
 
 	// Lists used to recover the full camera trajectory at the end of the execution.
 	// Basically we store the reference keyframe for each frame and its relative transformation
-	std::vector<TrackPoint> trajectory_;
+	Trajectory trajectory_;
 
 	// True if local mapping is deactivated and we are performing only localization
 	bool localization_;
@@ -1570,7 +1638,7 @@ private:
 	// points in the map. Still tracking will continue if there are enough matches with temporal points.
 	// In that case we are doing visual odometry. The system will try to do relocalization to recover
 	// "zero-drift" localization to the map.
-	bool fewMatches_;
+	//bool fewMatches_;
 
 	//Other Thread Pointers
 	LocalMapping* localMapper_;
@@ -1607,10 +1675,11 @@ private:
 	//Motion Model
 	cv::Mat velocity_;
 
-	list<MapPoint*> tempPoints_;
-
+	/*list<MapPoint*> tempPoints_;
 	MMTracker trackerMM_;
-	BoWTracker trackerBow_;
+	BoWTracker trackerBow_;*/
+	InitialTracker trackerIni_;
+
 	NewKeyFrameCondition newKeyFrameCondition_;
 };
 
@@ -1814,7 +1883,7 @@ public:
 		return tracker_->GetIniMatches();
 	}
 
-	const std::vector<TrackPoint>& GetTrajectory() const override
+	const Trajectory& GetTrajectory() const override
 	{
 		return tracker_->GetTrajectory();
 	}

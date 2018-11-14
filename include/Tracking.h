@@ -51,6 +51,8 @@ struct TrackPoint
 	TrackPoint(const Frame& frame, bool lost);
 };
 
+using Trajectory = std::vector<TrackPoint>;
+
 class Tracking
 {
 
@@ -99,7 +101,7 @@ public:
 
 	// Lists used to recover the full camera trajectory at the end of the execution.
 	// Basically we store the reference keyframe for each frame and its relative transformation
-	virtual const std::vector<TrackPoint>& GetTrajectory() const = 0;
+	virtual const Trajectory& GetTrajectory() const = 0;
 
 	// True if local mapping is deactivated and we are performing only localization
 	virtual bool OnlyTracking() const = 0;
