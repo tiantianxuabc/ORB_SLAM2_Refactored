@@ -1275,7 +1275,7 @@ public:
 
 		currFrame.SetPose(pKFcur->GetPose());
 		lastKeyFrame_ = pKFcur;
-		CV_Assert(lastKeyFrame_->mnFrameId == mCurrentFrame.mnId);
+		CV_Assert(lastKeyFrame_->mnFrameId == currFrame.mnId);
 
 		localMap_.keyframes.push_back(pKFcur);
 		localMap_.keyframes.push_back(pKFini);
