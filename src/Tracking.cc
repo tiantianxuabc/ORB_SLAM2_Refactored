@@ -258,72 +258,73 @@ static int DiscardOutliers(Frame& mCurrentFrame)
 static void UpdateLastFramePose(Frame& mLastFrame, const TrackPoint& LastTrackPoint)
 {
 	// Update pose according to reference keyframe
-	KeyFrame* pRef = mLastFrame.mpReferenceKF;
+	KeyFrame* referenceKF = mLastFrame.mpReferenceKF;
 	cv::Mat Tlr = LastTrackPoint.Tcr;
-	mLastFrame.SetPose(Tlr*pRef->GetPose());
+	mLastFrame.SetPose(Tlr * referenceKF->GetPose());
 }
 
-bool TrackWithMotionModel(Frame& mCurrentFrame, Frame& mLastFrame, const cv::Mat& mVelocity,
-	int minInliers, int sensor, bool* mbVO = nullptr)
+bool TrackWithMotionModel(Frame& currFrame, Frame& lastFrame, const cv::Mat& velocity,
+	int minInliers, int sensor, bool* fewMatches = nullptr)
 {
 	ORBmatcher matcher(0.9f, true);
 
-	mCurrentFrame.SetPose(mVelocity*mLastFrame.mTcw);
+	currFrame.SetPose(velocity * lastFrame.mTcw);
 
 	// Project points seen in previous frame
-	const float th = sensor == System::STEREO ? 7.f : 15.f;
+	const float threshold = sensor == System::STEREO ? 7.f : 15.f;
 	const int minMatches = 20;
 	int nmatches = 0;
 	{
-		fill(mCurrentFrame.mvpMapPoints.begin(), mCurrentFrame.mvpMapPoints.end(), nullptr);
-		nmatches = matcher.SearchByProjection(mCurrentFrame, mLastFrame, th, sensor == System::MONOCULAR);
+		std::fill(std::begin(currFrame.mvpMapPoints), std::end(currFrame.mvpMapPoints), nullptr);
+		nmatches = matcher.SearchByProjection(currFrame, lastFrame, threshold, sensor == System::MONOCULAR);
 	}
 	if (nmatches < minMatches)
 	{
 		// If few matches, uses a wider window search
-		fill(mCurrentFrame.mvpMapPoints.begin(), mCurrentFrame.mvpMapPoints.end(), nullptr);
-		nmatches = matcher.SearchByProjection(mCurrentFrame, mLastFrame, 2 * th, sensor == System::MONOCULAR);
+		std::fill(std::begin(currFrame.mvpMapPoints), std::end(currFrame.mvpMapPoints), nullptr);
+		nmatches = matcher.SearchByProjection(currFrame, lastFrame, 2 * threshold, sensor == System::MONOCULAR);
 	}
 
 	if (nmatches < minMatches)
 		return false;
 
 	// Optimize frame pose with all matches
-	Optimizer::PoseOptimization(&mCurrentFrame);
+	Optimizer::PoseOptimization(&currFrame);
 
 	// Discard outliers
-	const int nmatchesMap = DiscardOutliers(mCurrentFrame);
+	const int ninliers = DiscardOutliers(currFrame);
 
-	if (mbVO)
-		*mbVO = nmatchesMap < 10;
+	if (fewMatches)
+		*fewMatches = ninliers < 10;
 
-	return nmatchesMap >= minInliers;
+	return ninliers >= minInliers;
 }
 
-static bool TrackReferenceKeyFrame(Frame& mCurrentFrame, KeyFrame* mpReferenceKF, Frame& mLastFrame)
+static bool TrackReferenceKeyFrame(Frame& currFrame, KeyFrame* referenceKF, Frame& lastFrame, int minInliers = 10)
 {
 	// Compute Bag of Words vector
-	mCurrentFrame.ComputeBoW();
+	currFrame.ComputeBoW();
 
 	// We perform first an ORB matching with the reference keyframe
 	// If enough matches are found we setup a PnP solver
 	ORBmatcher matcher(0.7f, true);
-	vector<MapPoint*> vpMapPointMatches;
+	vector<MapPoint*> mappoints;
 
-	int nmatches = matcher.SearchByBoW(mpReferenceKF, mCurrentFrame, vpMapPointMatches);
+	const int minMatches = 15;
+	const int nmatches = matcher.SearchByBoW(referenceKF, currFrame, mappoints);
 
-	if (nmatches < 15)
+	if (nmatches < minMatches)
 		return false;
 
-	mCurrentFrame.mvpMapPoints = vpMapPointMatches;
-	mCurrentFrame.SetPose(mLastFrame.mTcw);
+	currFrame.mvpMapPoints = mappoints;
+	currFrame.SetPose(lastFrame.mTcw);
 
-	Optimizer::PoseOptimization(&mCurrentFrame);
+	Optimizer::PoseOptimization(&currFrame);
 
 	// Discard outliers
-	const int nmatchesMap = DiscardOutliers(mCurrentFrame);
+	const int ninliers = DiscardOutliers(currFrame);
 
-	return nmatchesMap >= 10;
+	return ninliers >= minInliers;
 }
 
 class NewKeyFrameCondition
