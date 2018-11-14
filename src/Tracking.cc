@@ -39,7 +39,6 @@
 #include "Initializer.h"
 #include "MapDrawer.h"
 #include "System.h"
-#include "Optimizer.h"
 #include "PnPsolver.h"
 #include "Usleep.h"
 
@@ -48,13 +47,20 @@ using namespace std;
 namespace ORB_SLAM2
 {
 
+namespace Optimizer
+{
+
+int PoseOptimization(Frame* pFrame);
+void GlobalBundleAdjustemnt(Map* pMap, int nIterations = 5, bool *pbStopFlag = NULL,
+	const unsigned long nLoopKF = 0, const bool bRobust = true);
+
+}
+
 TrackPoint::TrackPoint(const Frame& frame, bool lost)
 	: pReferenceKF(frame.mpReferenceKF), timestamp(frame.mTimeStamp), lost(lost)
 {
 	Tcr = frame.mTcw * frame.mpReferenceKF->GetPoseInverse();
 }
-
-using Traject = Trajectory;
 
 struct TrackerParameters
 {
