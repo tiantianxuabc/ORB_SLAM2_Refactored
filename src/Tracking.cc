@@ -483,65 +483,64 @@ static int TrackLocalMap(LocalMap& localMap, Frame& currFrame, float th, bool lo
 	return ninliers;
 }
 
-void CreateMapPoints(Frame& mCurrentFrame, KeyFrame* pKF, Map* mpMap, float thDepth)
+void CreateMapPoints(Frame& currFrame, KeyFrame* keyframe, Map* map, float thDepth)
 {
-	mCurrentFrame.UpdatePoseMatrices();
+	currFrame.UpdatePoseMatrices();
 
 	// We sort points by the measured depth by the stereo/RGBD sensor.
 	// We create all those MapPoints whose depth < param_.thDepth.
 	// If there are less than 100 close points we create the 100 closest.
-	vector<pair<float, int> > vDepthIdx;
-	vDepthIdx.reserve(mCurrentFrame.N);
-	for (int i = 0; i < mCurrentFrame.N; i++)
+	std::vector<std::pair<float, int> > depthIndices;
+	depthIndices.reserve(currFrame.N);
+	for (int i = 0; i < currFrame.N; i++)
 	{
-		float z = mCurrentFrame.mvDepth[i];
-		if (z > 0)
-		{
-			vDepthIdx.push_back(make_pair(z, i));
-		}
+		float Z = currFrame.mvDepth[i];
+		if (Z > 0)
+			depthIndices.push_back(make_pair(Z, i));
 	}
 
-	if (!vDepthIdx.empty())
+	if (depthIndices.empty())
+		return;
+
+	std::sort(std::begin(depthIndices), std::end(depthIndices));
+
+	int npoints = 0;
+	for (const auto& v : depthIndices)
 	{
-		sort(vDepthIdx.begin(), vDepthIdx.end());
+		const float Z = v.first;
+		const int i = v.second;
 
-		int nPoints = 0;
-		for (size_t j = 0; j < vDepthIdx.size(); j++)
+		bool create = false;
+
+		MapPoint* mappoint = currFrame.mvpMapPoints[i];
+		if (!mappoint)
 		{
-			int i = vDepthIdx[j].second;
-
-			bool bCreateNew = false;
-
-			MapPoint* pMP = mCurrentFrame.mvpMapPoints[i];
-			if (!pMP)
-				bCreateNew = true;
-			else if (pMP->Observations() < 1)
-			{
-				bCreateNew = true;
-				mCurrentFrame.mvpMapPoints[i] = static_cast<MapPoint*>(NULL);
-			}
-
-			if (bCreateNew)
-			{
-				cv::Mat x3D = mCurrentFrame.UnprojectStereo(i);
-				MapPoint* pNewMP = new MapPoint(x3D, pKF, mpMap);
-				pNewMP->AddObservation(pKF, i);
-				pKF->AddMapPoint(pNewMP, i);
-				pNewMP->ComputeDistinctiveDescriptors();
-				pNewMP->UpdateNormalAndDepth();
-				mpMap->AddMapPoint(pNewMP);
-
-				mCurrentFrame.mvpMapPoints[i] = pNewMP;
-				nPoints++;
-			}
-			else
-			{
-				nPoints++;
-			}
-
-			if (vDepthIdx[j].first > thDepth && nPoints > 100)
-				break;
+			create = true;
 		}
+		else if (mappoint->Observations() < 1)
+		{
+			create = true;
+			currFrame.mvpMapPoints[i] = nullptr;
+		}
+
+		if (create)
+		{
+			const cv::Mat Xw = currFrame.UnprojectStereo(i);
+
+			MapPoint* newpoint = new MapPoint(Xw, keyframe, map);
+			newpoint->AddObservation(keyframe, i);
+			newpoint->ComputeDistinctiveDescriptors();
+			newpoint->UpdateNormalAndDepth();
+
+			keyframe->AddMapPoint(newpoint, i);
+			map->AddMapPoint(newpoint);
+			currFrame.mvpMapPoints[i] = newpoint;
+		}
+
+		npoints++;
+
+		if (Z > thDepth && npoints > 100)
+			break;
 	}
 }
 
