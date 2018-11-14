@@ -235,12 +235,12 @@ static int DiscardOutliers(Frame& currFrame)
 	return ninliers;
 }
 
-static void UpdateLastFramePose(Frame& mLastFrame, const TrackPoint& LastTrackPoint)
+static void UpdateLastFramePose(Frame& lastFrame, const TrackPoint& lastTrackPoint)
 {
 	// Update pose according to reference keyframe
-	KeyFrame* referenceKF = mLastFrame.mpReferenceKF;
-	cv::Mat Tlr = LastTrackPoint.Tcr;
-	mLastFrame.SetPose(Tlr * referenceKF->GetPose());
+	KeyFrame* referenceKF = lastFrame.mpReferenceKF;
+	cv::Mat Tlr = lastTrackPoint.Tcr;
+	lastFrame.SetPose(Tlr * referenceKF->GetPose());
 }
 
 bool TrackWithMotionModel(Frame& currFrame, Frame& lastFrame, const cv::Mat& velocity,
