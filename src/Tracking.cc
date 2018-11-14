@@ -473,42 +473,38 @@ static void SearchLocalPoints(const LocalMap& mLocalMap, Frame& mCurrentFrame, f
 	}
 }
 
-static int TrackLocalMap(LocalMap& mLocalMap, Frame& mCurrentFrame, float th, bool mbLocalizationMode, bool stereo)
+static int TrackLocalMap(LocalMap& localMap, Frame& currFrame, float th, bool localization, bool stereo)
 {
 	// We have an estimation of the camera pose and some map points tracked in the frame.
 	// We retrieve the local map and try to find matches to points in the local map.
 
-	mLocalMap.Update(mCurrentFrame);
+	localMap.Update(currFrame);
 
-	SearchLocalPoints(mLocalMap, mCurrentFrame, th);
+	SearchLocalPoints(localMap, currFrame, th);
 
 	// Optimize Pose
-	Optimizer::PoseOptimization(&mCurrentFrame);
-	int mnMatchesInliers = 0;
+	Optimizer::PoseOptimization(&currFrame);
+	int ninliers = 0;
 
 	// Update MapPoints Statistics
-	for (int i = 0; i < mCurrentFrame.N; i++)
+	for (int i = 0; i < currFrame.N; i++)
 	{
-		if (mCurrentFrame.mvpMapPoints[i])
-		{
-			if (!mCurrentFrame.mvbOutlier[i])
-			{
-				mCurrentFrame.mvpMapPoints[i]->IncreaseFound();
-				if (!mbLocalizationMode)
-				{
-					if (mCurrentFrame.mvpMapPoints[i]->Observations() > 0)
-						mnMatchesInliers++;
-				}
-				else
-					mnMatchesInliers++;
-			}
-			else if (stereo)
-				mCurrentFrame.mvpMapPoints[i] = static_cast<MapPoint*>(NULL);
+		if (!currFrame.mvpMapPoints[i])
+			continue;
 
+		if (!currFrame.mvbOutlier[i])
+		{
+			currFrame.mvpMapPoints[i]->IncreaseFound();
+			if (localization || (!localization && currFrame.mvpMapPoints[i]->Observations() > 0))
+				ninliers++;
+		}
+		else if (stereo)
+		{
+			currFrame.mvpMapPoints[i] = nullptr;
 		}
 	}
 
-	return mnMatchesInliers;
+	return ninliers;
 }
 
 void CreateMapPoints(Frame& mCurrentFrame, KeyFrame* pKF, Map* mpMap, float thDepth)
