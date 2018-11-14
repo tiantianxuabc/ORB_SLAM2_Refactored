@@ -35,28 +35,31 @@ namespace ORB_SLAM2
 typedef map<KeyFrame*, g2o::Sim3, std::less<KeyFrame*>,
 	Eigen::aligned_allocator<std::pair<const KeyFrame*, g2o::Sim3> > > KeyFrameAndPose;
 
-class Optimizer
+namespace Optimizer
 {
-public:
-    void static BundleAdjustment(const std::vector<KeyFrame*> &vpKF, const std::vector<MapPoint*> &vpMP,
-                                 int nIterations = 5, bool *pbStopFlag=NULL, const unsigned long nLoopKF=0,
-                                 const bool bRobust = true);
-    void static GlobalBundleAdjustemnt(Map* pMap, int nIterations=5, bool *pbStopFlag=NULL,
-                                       const unsigned long nLoopKF=0, const bool bRobust = true);
-    void static LocalBundleAdjustment(KeyFrame* pKF, bool *pbStopFlag, Map *pMap);
-    int static PoseOptimization(Frame* pFrame);
+//public:
+void BundleAdjustment(const std::vector<KeyFrame*> &vpKF, const std::vector<MapPoint*> &vpMP,
+	int nIterations = 5, bool *pbStopFlag = NULL, const unsigned long nLoopKF = 0,
+	const bool bRobust = true);
 
-    // if bFixScale is true, 6DoF optimization (stereo,rgbd), 7DoF otherwise (mono)
-    void static OptimizeEssentialGraph(Map* pMap, KeyFrame* pLoopKF, KeyFrame* pCurKF,
-                                       const KeyFrameAndPose &NonCorrectedSim3,
-                                       const KeyFrameAndPose &CorrectedSim3,
-                                       const map<KeyFrame *, set<KeyFrame *> > &LoopConnections,
-                                       const bool &bFixScale);
+void GlobalBundleAdjustemnt(Map* pMap, int nIterations = 5, bool *pbStopFlag = NULL,
+	const unsigned long nLoopKF = 0, const bool bRobust = true);
 
-    // if bFixScale is true, optimize SE3 (stereo,rgbd), Sim3 otherwise (mono)
-    static int OptimizeSim3(KeyFrame* pKF1, KeyFrame* pKF2, std::vector<MapPoint *> &vpMatches1,
-                            g2o::Sim3 &g2oS12, const float th2, const bool bFixScale);
-};
+void LocalBundleAdjustment(KeyFrame* pKF, bool *pbStopFlag, Map *pMap);
+
+int PoseOptimization(Frame* pFrame);
+
+// if bFixScale is true, 6DoF optimization (stereo,rgbd), 7DoF otherwise (mono)
+void OptimizeEssentialGraph(Map* pMap, KeyFrame* pLoopKF, KeyFrame* pCurKF,
+	const KeyFrameAndPose &NonCorrectedSim3,
+	const KeyFrameAndPose &CorrectedSim3,
+	const map<KeyFrame *, set<KeyFrame *> > &LoopConnections,
+	const bool &bFixScale);
+
+// if bFixScale is true, optimize SE3 (stereo,rgbd), Sim3 otherwise (mono)
+int OptimizeSim3(KeyFrame* pKF1, KeyFrame* pKF2, std::vector<MapPoint *> &vpMatches1,
+	g2o::Sim3 &g2oS12, const float th2, const bool bFixScale);
+}
 
 } //namespace ORB_SLAM
 
