@@ -187,18 +187,18 @@ struct LocalMap
 		}
 	}
 
-	void UpdateLocalPoints(Frame& mCurrentFrame)
+	void UpdateLocalPoints(Frame& currFrame)
 	{
 		mappoints.clear();
 		for (KeyFrame* keyframe : keyframes)
 		{
 			for (MapPoint* mappoint : keyframe->GetMapPointMatches())
 			{
-				if (!mappoint || mappoint->mnTrackReferenceForFrame == mCurrentFrame.mnId || mappoint->isBad())
+				if (!mappoint || mappoint->mnTrackReferenceForFrame == currFrame.mnId || mappoint->isBad())
 					continue;
 
 				mappoints.push_back(mappoint);
-				mappoint->mnTrackReferenceForFrame = mCurrentFrame.mnId;
+				mappoint->mnTrackReferenceForFrame = currFrame.mnId;
 			}
 		}
 	}
@@ -209,27 +209,30 @@ struct LocalMap
 	Map* map_;
 };
 
-static int DiscardOutliers(Frame& mCurrentFrame)
+static int DiscardOutliers(Frame& currFrame)
 {
-	int nmatchesMap = 0;
-	for (int i = 0; i < mCurrentFrame.N; i++)
+	int ninliers = 0;
+	for (int i = 0; i < currFrame.N; i++)
 	{
-		if (mCurrentFrame.mvpMapPoints[i])
-		{
-			if (mCurrentFrame.mvbOutlier[i])
-			{
-				MapPoint* pMP = mCurrentFrame.mvpMapPoints[i];
+		if (!currFrame.mvpMapPoints[i])
+			continue;
 
-				mCurrentFrame.mvpMapPoints[i] = static_cast<MapPoint*>(NULL);
-				mCurrentFrame.mvbOutlier[i] = false;
-				pMP->mbTrackInView = false;
-				pMP->mnLastFrameSeen = mCurrentFrame.mnId;
-			}
-			else if (mCurrentFrame.mvpMapPoints[i]->Observations() > 0)
-				nmatchesMap++;
+		if (currFrame.mvbOutlier[i])
+		{
+			MapPoint* mappoint = currFrame.mvpMapPoints[i];
+
+			currFrame.mvpMapPoints[i] = nullptr;
+			currFrame.mvbOutlier[i] = false;
+
+			mappoint->mbTrackInView = false;
+			mappoint->mnLastFrameSeen = currFrame.mnId;
+		}
+		else if (currFrame.mvpMapPoints[i]->Observations() > 0)
+		{
+			ninliers++;
 		}
 	}
-	return nmatchesMap;
+	return ninliers;
 }
 
 static void UpdateLastFramePose(Frame& mLastFrame, const TrackPoint& LastTrackPoint)
