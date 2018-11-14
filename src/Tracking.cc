@@ -42,8 +42,6 @@
 #include "PnPsolver.h"
 #include "Usleep.h"
 
-using namespace std;
-
 namespace ORB_SLAM2
 {
 
