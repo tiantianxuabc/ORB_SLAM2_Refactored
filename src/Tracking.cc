@@ -1120,26 +1120,25 @@ public:
 	}
 
 	// Map initialization for monocular
-	void MonocularInitialization(Frame& mCurrentFrame)
+	void MonocularInitialization(Frame& currFrame)
 	{
-
 		if (!initializer_)
 		{
 			// Set Reference Frame
-			if (mCurrentFrame.mvKeys.size() > 100)
+			if (currFrame.mvKeys.size() > 100)
 			{
-				mInitialFrame = Frame(mCurrentFrame);
-				lastFrame_ = Frame(mCurrentFrame);
-				mvbPrevMatched.resize(mCurrentFrame.mvKeysUn.size());
-				for (size_t i = 0; i < mCurrentFrame.mvKeysUn.size(); i++)
-					mvbPrevMatched[i] = mCurrentFrame.mvKeysUn[i].pt;
+				initFrame_ = Frame(currFrame);
+				lastFrame_ = Frame(currFrame);
+				prevMatched_.resize(currFrame.mvKeysUn.size());
+				for (size_t i = 0; i < currFrame.mvKeysUn.size(); i++)
+					prevMatched_[i] = currFrame.mvKeysUn[i].pt;
 
 				if (initializer_)
 					delete initializer_;
 
-				initializer_ = new Initializer(mCurrentFrame, 1.0, 200);
+				initializer_ = new Initializer(currFrame, 1.0, 200);
 
-				fill(mvIniMatches.begin(), mvIniMatches.end(), -1);
+				fill(iniMatches_.begin(), iniMatches_.end(), -1);
 
 				return;
 			}
@@ -1147,17 +1146,17 @@ public:
 		else
 		{
 			// Try to initialize
-			if ((int)mCurrentFrame.mvKeys.size() <= 100)
+			if ((int)currFrame.mvKeys.size() <= 100)
 			{
 				delete initializer_;
 				initializer_ = static_cast<Initializer*>(NULL);
-				fill(mvIniMatches.begin(), mvIniMatches.end(), -1);
+				fill(iniMatches_.begin(), iniMatches_.end(), -1);
 				return;
 			}
 
 			// Find correspondences
 			ORBmatcher matcher(0.9f, true);
-			int nmatches = matcher.SearchForInitialization(mInitialFrame, mCurrentFrame, mvbPrevMatched, mvIniMatches, 100);
+			int nmatches = matcher.SearchForInitialization(initFrame_, currFrame, prevMatched_, iniMatches_, 100);
 
 			// Check if there are enough correspondences
 			if (nmatches < 100)
@@ -1169,37 +1168,36 @@ public:
 
 			cv::Mat Rcw; // Current Camera Rotation
 			cv::Mat tcw; // Current Camera Translation
-			vector<bool> vbTriangulated; // Triangulated Correspondences (mvIniMatches)
+			vector<bool> triangulated; // Triangulated Correspondences (mvIniMatches)
 
-			if (initializer_->Initialize(mCurrentFrame, mvIniMatches, Rcw, tcw, mvIniP3D, vbTriangulated))
+			if (initializer_->Initialize(currFrame, iniMatches_, Rcw, tcw, mvIniP3D, triangulated))
 			{
-				for (size_t i = 0, iend = mvIniMatches.size(); i < iend; i++)
+				for (size_t i = 0, iend = iniMatches_.size(); i < iend; i++)
 				{
-					if (mvIniMatches[i] >= 0 && !vbTriangulated[i])
+					if (iniMatches_[i] >= 0 && !triangulated[i])
 					{
-						mvIniMatches[i] = -1;
+						iniMatches_[i] = -1;
 						nmatches--;
 					}
 				}
 
 				// Set Frame Poses
-				mInitialFrame.SetPose(cv::Mat::eye(4, 4, CV_32F));
+				initFrame_.SetPose(cv::Mat::eye(4, 4, CV_32F));
 				cv::Mat Tcw = cv::Mat::eye(4, 4, CV_32F);
 				Rcw.copyTo(Tcw.rowRange(0, 3).colRange(0, 3));
 				tcw.copyTo(Tcw.rowRange(0, 3).col(3));
-				mCurrentFrame.SetPose(Tcw);
+				currFrame.SetPose(Tcw);
 
-				CreateInitialMapMonocular(mCurrentFrame);
+				CreateInitialMapMonocular(currFrame);
 			}
 		}
 	}
 
-	void CreateInitialMapMonocular(Frame& mCurrentFrame)
+	void CreateInitialMapMonocular(Frame& currFrame)
 	{
 		// Create KeyFrames
-		KeyFrame* pKFini = new KeyFrame(mInitialFrame, map_, keyFrameDB_);
-		KeyFrame* pKFcur = new KeyFrame(mCurrentFrame, map_, keyFrameDB_);
-
+		KeyFrame* pKFini = new KeyFrame(initFrame_, map_, keyFrameDB_);
+		KeyFrame* pKFcur = new KeyFrame(currFrame, map_, keyFrameDB_);
 
 		pKFini->ComputeBoW();
 		pKFcur->ComputeBoW();
@@ -1209,9 +1207,9 @@ public:
 		map_->AddKeyFrame(pKFcur);
 
 		// Create MapPoints and asscoiate to keyframes
-		for (size_t i = 0; i < mvIniMatches.size(); i++)
+		for (size_t i = 0; i < iniMatches_.size(); i++)
 		{
-			if (mvIniMatches[i] < 0)
+			if (iniMatches_[i] < 0)
 				continue;
 
 			//Create MapPoint.
@@ -1220,17 +1218,17 @@ public:
 			MapPoint* pMP = new MapPoint(worldPos, pKFcur, map_);
 
 			pKFini->AddMapPoint(pMP, i);
-			pKFcur->AddMapPoint(pMP, mvIniMatches[i]);
+			pKFcur->AddMapPoint(pMP, iniMatches_[i]);
 
 			pMP->AddObservation(pKFini, i);
-			pMP->AddObservation(pKFcur, mvIniMatches[i]);
+			pMP->AddObservation(pKFcur, iniMatches_[i]);
 
 			pMP->ComputeDistinctiveDescriptors();
 			pMP->UpdateNormalAndDepth();
 
 			//Fill Current Frame structure
-			mCurrentFrame.mvpMapPoints[mvIniMatches[i]] = pMP;
-			mCurrentFrame.mvbOutlier[mvIniMatches[i]] = false;
+			currFrame.mvpMapPoints[iniMatches_[i]] = pMP;
+			currFrame.mvbOutlier[iniMatches_[i]] = false;
 
 			//Add to Map
 			map_->AddMapPoint(pMP);
@@ -1275,7 +1273,7 @@ public:
 		localMapper_->InsertKeyFrame(pKFini);
 		localMapper_->InsertKeyFrame(pKFcur);
 
-		mCurrentFrame.SetPose(pKFcur->GetPose());
+		currFrame.SetPose(pKFcur->GetPose());
 		lastKeyFrame_ = pKFcur;
 		CV_Assert(lastKeyFrame_->mnFrameId == mCurrentFrame.mnId);
 
@@ -1283,9 +1281,9 @@ public:
 		localMap_.keyframes.push_back(pKFini);
 		localMap_.mappoints = map_->GetAllMapPoints();
 		localMap_.referenceKF = pKFcur;
-		mCurrentFrame.mpReferenceKF = pKFcur;
+		currFrame.mpReferenceKF = pKFcur;
 
-		lastFrame_ = Frame(mCurrentFrame);
+		lastFrame_ = Frame(currFrame);
 
 		map_->SetReferenceMapPoints(localMap_.mappoints);
 
@@ -1478,7 +1476,7 @@ public:
 
 	void SetLoopClosing(LoopClosing *pLoopClosing)
 	{
-		mpLoopClosing = pLoopClosing;
+		loopClosing_ = pLoopClosing;
 	}
 
 	void InformOnlyTracking(const bool &flag)
@@ -1498,12 +1496,12 @@ public:
 
 	const Frame& GetInitialFrame() const
 	{
-		return mInitialFrame;
+		return initFrame_;
 	}
 
 	const std::vector<int>& GetIniMatches() const
 	{
-		return mvIniMatches;
+		return iniMatches_;
 	}
 
 	const Trajectory& GetTrajectory() const
@@ -1537,11 +1535,11 @@ private:
 	int sensor_;
 
 	// Initialization Variables (Monocular)
-	std::vector<int> mvIniLastMatches;
-	std::vector<int> mvIniMatches;
-	std::vector<cv::Point2f> mvbPrevMatched;
+	std::vector<int> iniLastMatches_;
+	std::vector<int> iniMatches_;
+	std::vector<cv::Point2f> prevMatched_;
 	std::vector<cv::Point3f> mvIniP3D;
-	Frame mInitialFrame;
+	Frame initFrame_;
 
 	// Lists used to recover the full camera trajectory at the end of the execution.
 	// Basically we store the reference keyframe for each frame and its relative transformation
@@ -1552,7 +1550,7 @@ private:
 
 	//Other Thread Pointers
 	LocalMapping* localMapper_;
-	LoopClosing* mpLoopClosing;
+	LoopClosing* loopClosing_;
 
 	//BoW
 	KeyFrameDatabase* keyFrameDB_;
