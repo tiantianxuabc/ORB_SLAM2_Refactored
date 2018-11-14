@@ -494,9 +494,9 @@ void CreateMapPoints(Frame& currFrame, KeyFrame* keyframe, Map* map, float thDep
 	depthIndices.reserve(currFrame.N);
 	for (int i = 0; i < currFrame.N; i++)
 	{
-		float Z = currFrame.mvDepth[i];
+		const float Z = currFrame.mvDepth[i];
 		if (Z > 0)
-			depthIndices.push_back(make_pair(Z, i));
+			depthIndices.push_back(std::make_pair(Z, i));
 	}
 
 	if (depthIndices.empty())
@@ -544,59 +544,45 @@ void CreateMapPoints(Frame& currFrame, KeyFrame* keyframe, Map* map, float thDep
 	}
 }
 
-static void CreateMapPointsVO(Frame& LastFrame, list<MapPoint*>& mlpTemporalPoints, Map* mpMap, float thDepth)
+static void CreateMapPointsVO(Frame& lastFrame, list<MapPoint*>& tempPoints, Map* map, float thDepth)
 {
 	// Create "visual odometry" MapPoints
 	// We sort points according to their measured depth by the stereo/RGB-D sensor
-	vector<pair<float, int> > vDepthIdx;
-	vDepthIdx.reserve(LastFrame.N);
-	for (int i = 0; i < LastFrame.N; i++)
+	std::vector<std::pair<float, int>> depthIndices;
+	depthIndices.reserve(lastFrame.N);
+	for (int i = 0; i < lastFrame.N; i++)
 	{
-		float z = LastFrame.mvDepth[i];
-		if (z > 0)
-		{
-			vDepthIdx.push_back(make_pair(z, i));
-		}
+		const float Z = lastFrame.mvDepth[i];
+		if (Z > 0)
+			depthIndices.push_back(std::make_pair(Z, i));
 	}
 
-	if (vDepthIdx.empty())
+	if (depthIndices.empty())
 		return;
 
-	sort(vDepthIdx.begin(), vDepthIdx.end());
+	std::sort(std::begin(depthIndices), std::end(depthIndices));
 
 	// We insert all close points (depth<param_.thDepth)
 	// If less than 100 close points, we insert the 100 closest ones.
-	int nPoints = 0;
-	for (size_t j = 0; j < vDepthIdx.size(); j++)
+	int npoints = 0;
+	for (const auto& v : depthIndices)
 	{
-		int i = vDepthIdx[j].second;
+		const float Z = v.first;
+		const int i = v.second;
 
-		bool bCreateNew = false;
-
-		MapPoint* pMP = LastFrame.mvpMapPoints[i];
-		if (!pMP)
-			bCreateNew = true;
-		else if (pMP->Observations() < 1)
+		MapPoint* mappoint = lastFrame.mvpMapPoints[i];
+		if (!mappoint || mappoint->Observations() < 1)
 		{
-			bCreateNew = true;
+			const cv::Mat Xw = lastFrame.UnprojectStereo(i);
+			MapPoint* newpoint = new MapPoint(Xw, map, &lastFrame, i);
+
+			lastFrame.mvpMapPoints[i] = newpoint;
+			tempPoints.push_back(newpoint);
 		}
 
-		if (bCreateNew)
-		{
-			cv::Mat x3D = LastFrame.UnprojectStereo(i);
-			MapPoint* pNewMP = new MapPoint(x3D, mpMap, &LastFrame, i);
+		npoints++;
 
-			LastFrame.mvpMapPoints[i] = pNewMP;
-
-			mlpTemporalPoints.push_back(pNewMP);
-			nPoints++;
-		}
-		else
-		{
-			nPoints++;
-		}
-
-		if (vDepthIdx[j].first > thDepth && nPoints > 100)
+		if (Z > thDepth && npoints > 100)
 			break;
 	}
 }
