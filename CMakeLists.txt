@@ -61,6 +61,7 @@ src/Sim3Solver.cc
 src/Initializer.cc
 src/Viewer.cc
 src/Usleep.cc
+src/CameraParameters.cc
 )
 
 target_link_libraries(${PROJECT_NAME}

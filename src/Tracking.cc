@@ -41,6 +41,7 @@
 #include "System.h"
 #include "PnPsolver.h"
 #include "Usleep.h"
+#include "CameraParameters.h"
 
 namespace ORB_SLAM2
 {
@@ -761,32 +762,6 @@ public:
 private:
 
 	int mnLastRelocFrameId;
-};
-
-struct CameraParams
-{
-	float fx;                 //!< focal length x (pixel)
-	float fy;                 //!< focal length y (pixel)
-	float cx;                 //!< principal point x (pixel)
-	float cy;                 //!< principal point y (pixel)
-	float bf;                 //!< stereo baseline times fx
-	float baseline;
-
-	CameraParams()
-	{
-		fx = 1.f;
-		fy = 1.f;
-		cx = 0.f;
-		cy = 0.f;
-		bf = 1.f;
-		baseline = 1.f;
-	}
-
-	cv::Mat1f Mat() const
-	{
-		cv::Mat1f K = (cv::Mat1f(3, 3) << fx, 0, cx, 0, fy, cy, 0, 0, 1);
-		return K;
-	}
 };
 
 static CameraParams ReadCameraParams(const cv::FileStorage& fs)

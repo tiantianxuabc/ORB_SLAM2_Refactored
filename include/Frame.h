@@ -29,6 +29,7 @@
 #include "ORBVocabulary.h"
 #include "KeyFrame.h"
 #include "ORBextractor.h"
+#include "CameraParameters.h"
 
 #include <opencv2/opencv.hpp>
 
