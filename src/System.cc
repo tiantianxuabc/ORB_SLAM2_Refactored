@@ -45,20 +45,7 @@ using namespace std;
 namespace Converter
 {
 
-static std::vector<float> toQuaternion(const cv::Mat1f &M)
-{
-	Eigen::Matrix3d eigMat;
-	for (int i = 0; i < 3; i++) for (int j = 0; j < 3; j++) eigMat(i, j) = M(i, j);
-	Eigen::Quaterniond q(eigMat);
-
-	std::vector<float> v(4);
-	v[0] = q.x();
-	v[1] = q.y();
-	v[2] = q.z();
-	v[3] = q.w();
-
-	return v;
-}
+std::vector<float> toQuaternion(const cv::Mat &M);
 
 } // namespace Converter
 

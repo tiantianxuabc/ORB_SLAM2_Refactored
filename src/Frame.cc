@@ -19,7 +19,6 @@
 */
 
 #include "Frame.h"
-#include "Converter.h"
 #include "ORBmatcher.h"
 
 #include "MapPoint.h"
@@ -31,6 +30,13 @@
 
 namespace ORB_SLAM2
 {
+
+namespace Converter
+{
+
+std::vector<cv::Mat> toDescriptorVector(const cv::Mat &Descriptors);
+
+} // namespace Converter
 
 long unsigned int Frame::nNextId = 0;
 bool Frame::mbInitialComputations = true;
