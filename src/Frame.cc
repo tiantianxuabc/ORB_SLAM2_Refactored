@@ -34,8 +34,6 @@ namespace ORB_SLAM2
 
 long unsigned int Frame::nNextId = 0;
 bool Frame::mbInitialComputations = true;
-//float Frame::cx, Frame::cy, Frame::fx, Frame::fy, Frame::invfx, Frame::invfy;
-//float Frame::mnMinX, Frame::mnMinY, Frame::mnMaxX, Frame::mnMaxY;
 ImageBounds Frame::imageBounds;
 float Frame::mfGridElementWidthInv, Frame::mfGridElementHeightInv;
 
@@ -43,10 +41,7 @@ float ImageBounds::Width() const { return mnMaxX - mnMinX; }
 float ImageBounds::Height() const { return mnMaxY - mnMinY; }
 bool ImageBounds::Contains(float x, float y) const
 {
-	return (x >= mnMinX && x < mnMaxX && y >= mnMinY && y < mnMaxY);
-	/*if (u < mnMinX || u > mnMaxX || v < mnMinY || v > mnMaxY)
-		return false;
-	return true;*/
+	return x >= mnMinX && x < mnMaxX && y >= mnMinY && y < mnMaxY;
 }
 
 Frame::Frame()
@@ -115,23 +110,10 @@ Frame::Frame(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timeSt
 	if (mbInitialComputations)
 	{
 		ComputeImageBounds(imLeft);
-
-		//mfGridElementWidthInv = static_cast<float>(FRAME_GRID_COLS) / (mnMaxX - mnMinX);
-		//mfGridElementHeightInv = static_cast<float>(FRAME_GRID_ROWS) / (mnMaxY - mnMinY);
 		mfGridElementWidthInv = static_cast<float>(FRAME_GRID_COLS) / imageBounds.Width();
 		mfGridElementHeightInv = static_cast<float>(FRAME_GRID_ROWS) / imageBounds.Height();
-
-		/*fx = K.at<float>(0, 0);
-		fy = K.at<float>(1, 1);
-		cx = K.at<float>(0, 2);
-		cy = K.at<float>(1, 2);
-		invfx = 1.0f / fx;
-		invfy = 1.0f / fy;*/
-
 		mbInitialComputations = false;
 	}
-
-	//mb = mbf / fx;
 
 	AssignFeaturesToGrid();
 }
@@ -172,23 +154,10 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &timeSt
 	if (mbInitialComputations)
 	{
 		ComputeImageBounds(imGray);
-
-		//mfGridElementWidthInv = static_cast<float>(FRAME_GRID_COLS) / static_cast<float>(mnMaxX - mnMinX);
-		//mfGridElementHeightInv = static_cast<float>(FRAME_GRID_ROWS) / static_cast<float>(mnMaxY - mnMinY);
 		mfGridElementWidthInv = static_cast<float>(FRAME_GRID_COLS) / imageBounds.Width();
 		mfGridElementHeightInv = static_cast<float>(FRAME_GRID_ROWS) / imageBounds.Height();
-
-		/*fx = K.at<float>(0, 0);
-		fy = K.at<float>(1, 1);
-		cx = K.at<float>(0, 2);
-		cy = K.at<float>(1, 2);
-		invfx = 1.0f / fx;
-		invfy = 1.0f / fy;*/
-
 		mbInitialComputations = false;
 	}
-
-	//mb = mbf / fx;
 
 	AssignFeaturesToGrid();
 }
@@ -232,23 +201,10 @@ Frame::Frame(const cv::Mat &imGray, const double &timeStamp, ORBextractor* extra
 	if (mbInitialComputations)
 	{
 		ComputeImageBounds(imGray);
-
-		//mfGridElementWidthInv = static_cast<float>(FRAME_GRID_COLS) / static_cast<float>(mnMaxX - mnMinX);
-		//mfGridElementHeightInv = static_cast<float>(FRAME_GRID_ROWS) / static_cast<float>(mnMaxY - mnMinY);
 		mfGridElementWidthInv = static_cast<float>(FRAME_GRID_COLS) / imageBounds.Width();
 		mfGridElementHeightInv = static_cast<float>(FRAME_GRID_ROWS) / imageBounds.Height();
-		/*fx = K.at<float>(0, 0);
-		fy = K.at<float>(1, 1);
-		cx = K.at<float>(0, 2);
-		cy = K.at<float>(1, 2);
-		invfx = 1.0f / fx;
-		invfy = 1.0f / fy;*/
-
 		mbInitialComputations = false;
 	}
-
-	//mb = mbf / fx;
-
 	AssignFeaturesToGrid();
 }
 
