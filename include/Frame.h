@@ -113,21 +113,8 @@ public:
 	double mTimeStamp;
 
 	// Calibration matrix and OpenCV distortion parameters.
-	/*cv::Mat mK;
-	static float fx;
-	static float fy;
-	static float cx;
-	static float cy;
-	static float invfx;
-	static float invfy;*/
 	CameraParams camera;
 	cv::Mat mDistCoef;
-
-	// Stereo baseline multiplied by fx.
-	//float mbf;
-
-	// Stereo baseline in meters.
-	//float mb;
 
 	// Threshold close/far points. Close points are inserted from 1 view.
 	// Far points are inserted as in the monocular case from 2 views.
