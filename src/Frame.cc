@@ -28,7 +28,7 @@ namespace ORB_SLAM2
 
 long unsigned int Frame::nNextId = 0;
 bool Frame::mbInitialComputations = true;
-float Frame::cx, Frame::cy, Frame::fx, Frame::fy, Frame::invfx, Frame::invfy;
+//float Frame::cx, Frame::cy, Frame::fx, Frame::fy, Frame::invfx, Frame::invfy;
 float Frame::mnMinX, Frame::mnMinY, Frame::mnMaxX, Frame::mnMaxY;
 float Frame::mfGridElementWidthInv, Frame::mfGridElementHeightInv;
 
@@ -38,8 +38,8 @@ Frame::Frame()
 //Copy Constructor
 Frame::Frame(const Frame &frame)
 	:mpORBvocabulary(frame.mpORBvocabulary), mpORBextractorLeft(frame.mpORBextractorLeft), mpORBextractorRight(frame.mpORBextractorRight),
-	mTimeStamp(frame.mTimeStamp), mK(frame.mK.clone()), mDistCoef(frame.mDistCoef.clone()),
-	mbf(frame.mbf), mb(frame.mb), mThDepth(frame.mThDepth), N(frame.N), mvKeys(frame.mvKeys),
+	mTimeStamp(frame.mTimeStamp), camera(frame.camera), mDistCoef(frame.mDistCoef.clone()),
+	mThDepth(frame.mThDepth), N(frame.N), mvKeys(frame.mvKeys),
 	mvKeysRight(frame.mvKeysRight), mvKeysUn(frame.mvKeysUn), mvuRight(frame.mvuRight),
 	mvDepth(frame.mvDepth), mBowVec(frame.mBowVec), mFeatVec(frame.mFeatVec),
 	mDescriptors(frame.mDescriptors.clone()), mDescriptorsRight(frame.mDescriptorsRight.clone()),
@@ -58,9 +58,10 @@ Frame::Frame(const Frame &frame)
 }
 
 
-Frame::Frame(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timeStamp, ORBextractor* extractorLeft, ORBextractor* extractorRight, ORBVocabulary* voc, cv::Mat &K, cv::Mat &distCoef, const float &bf, const float &thDepth)
-	:mpORBvocabulary(voc), mpORBextractorLeft(extractorLeft), mpORBextractorRight(extractorRight), mTimeStamp(timeStamp), mK(K.clone()), mDistCoef(distCoef.clone()), mbf(bf), mThDepth(thDepth),
-	mpReferenceKF(static_cast<KeyFrame*>(NULL))
+Frame::Frame(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timeStamp, ORBextractor* extractorLeft, 
+	ORBextractor* extractorRight, ORBVocabulary* voc, const CameraParams& camera, cv::Mat &distCoef, const float &thDepth)
+	:mpORBvocabulary(voc), mpORBextractorLeft(extractorLeft), mpORBextractorRight(extractorRight), mTimeStamp(timeStamp), 
+	camera(camera), mDistCoef(distCoef.clone()), mThDepth(thDepth), mpReferenceKF(static_cast<KeyFrame*>(NULL))
 {
 	// Frame ID
 	mnId = nNextId++;
@@ -101,24 +102,25 @@ Frame::Frame(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timeSt
 		mfGridElementWidthInv = static_cast<float>(FRAME_GRID_COLS) / (mnMaxX - mnMinX);
 		mfGridElementHeightInv = static_cast<float>(FRAME_GRID_ROWS) / (mnMaxY - mnMinY);
 
-		fx = K.at<float>(0, 0);
+		/*fx = K.at<float>(0, 0);
 		fy = K.at<float>(1, 1);
 		cx = K.at<float>(0, 2);
 		cy = K.at<float>(1, 2);
 		invfx = 1.0f / fx;
-		invfy = 1.0f / fy;
+		invfy = 1.0f / fy;*/
 
 		mbInitialComputations = false;
 	}
 
-	mb = mbf / fx;
+	//mb = mbf / fx;
 
 	AssignFeaturesToGrid();
 }
 
-Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &timeStamp, ORBextractor* extractor, ORBVocabulary* voc, cv::Mat &K, cv::Mat &distCoef, const float &bf, const float &thDepth)
+Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &timeStamp, ORBextractor* extractor, 
+	ORBVocabulary* voc, const CameraParams& camera, cv::Mat &distCoef, const float &thDepth)
 	:mpORBvocabulary(voc), mpORBextractorLeft(extractor), mpORBextractorRight(static_cast<ORBextractor*>(NULL)),
-	mTimeStamp(timeStamp), mK(K.clone()), mDistCoef(distCoef.clone()), mbf(bf), mThDepth(thDepth)
+	mTimeStamp(timeStamp), camera(camera), mDistCoef(distCoef.clone()), mThDepth(thDepth)
 {
 	// Frame ID
 	mnId = nNextId++;
@@ -155,25 +157,26 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &timeSt
 		mfGridElementWidthInv = static_cast<float>(FRAME_GRID_COLS) / static_cast<float>(mnMaxX - mnMinX);
 		mfGridElementHeightInv = static_cast<float>(FRAME_GRID_ROWS) / static_cast<float>(mnMaxY - mnMinY);
 
-		fx = K.at<float>(0, 0);
+		/*fx = K.at<float>(0, 0);
 		fy = K.at<float>(1, 1);
 		cx = K.at<float>(0, 2);
 		cy = K.at<float>(1, 2);
 		invfx = 1.0f / fx;
-		invfy = 1.0f / fy;
+		invfy = 1.0f / fy;*/
 
 		mbInitialComputations = false;
 	}
 
-	mb = mbf / fx;
+	//mb = mbf / fx;
 
 	AssignFeaturesToGrid();
 }
 
 
-Frame::Frame(const cv::Mat &imGray, const double &timeStamp, ORBextractor* extractor, ORBVocabulary* voc, cv::Mat &K, cv::Mat &distCoef, const float &bf, const float &thDepth)
+Frame::Frame(const cv::Mat &imGray, const double &timeStamp, ORBextractor* extractor, ORBVocabulary* voc, 
+	const CameraParams& camera, cv::Mat &distCoef, const float &thDepth)
 	:mpORBvocabulary(voc), mpORBextractorLeft(extractor), mpORBextractorRight(static_cast<ORBextractor*>(NULL)),
-	mTimeStamp(timeStamp), mK(K.clone()), mDistCoef(distCoef.clone()), mbf(bf), mThDepth(thDepth)
+	mTimeStamp(timeStamp), camera(camera), mDistCoef(distCoef.clone()), mThDepth(thDepth)
 {
 	// Frame ID
 	mnId = nNextId++;
@@ -212,17 +215,17 @@ Frame::Frame(const cv::Mat &imGray, const double &timeStamp, ORBextractor* extra
 		mfGridElementWidthInv = static_cast<float>(FRAME_GRID_COLS) / static_cast<float>(mnMaxX - mnMinX);
 		mfGridElementHeightInv = static_cast<float>(FRAME_GRID_ROWS) / static_cast<float>(mnMaxY - mnMinY);
 
-		fx = K.at<float>(0, 0);
+		/*fx = K.at<float>(0, 0);
 		fy = K.at<float>(1, 1);
 		cx = K.at<float>(0, 2);
 		cy = K.at<float>(1, 2);
 		invfx = 1.0f / fx;
-		invfy = 1.0f / fy;
+		invfy = 1.0f / fy;*/
 
 		mbInitialComputations = false;
 	}
 
-	mb = mbf / fx;
+	//mb = mbf / fx;
 
 	AssignFeaturesToGrid();
 }
@@ -285,8 +288,8 @@ bool Frame::isInFrustum(MapPoint *pMP, float viewingCosLimit)
 
 	// Project in image and check it is not outside
 	const float invz = 1.0f / PcZ;
-	const float u = fx*PcX*invz + cx;
-	const float v = fy*PcY*invz + cy;
+	const float u = camera.fx*PcX*invz + camera.cx;
+	const float v = camera.fy*PcY*invz + camera.cy;
 
 	if (u<mnMinX || u>mnMaxX)
 		return false;
@@ -316,7 +319,7 @@ bool Frame::isInFrustum(MapPoint *pMP, float viewingCosLimit)
 	// Data used by the tracking
 	pMP->mbTrackInView = true;
 	pMP->mTrackProjX = u;
-	pMP->mTrackProjXR = u - mbf*invz;
+	pMP->mTrackProjXR = u - camera.bf*invz;
 	pMP->mTrackProjY = v;
 	pMP->mnTrackScaleLevel = nPredictedLevel;
 	pMP->mTrackViewCos = viewCos;
@@ -417,6 +420,8 @@ void Frame::UndistortKeyPoints()
 		mat.at<float>(i, 1) = mvKeys[i].pt.y;
 	}
 
+	const cv::Mat1f mK = camera.Mat();
+
 	// Undistort points
 	mat = mat.reshape(2);
 	cv::undistortPoints(mat, mat, mK, mDistCoef, cv::Mat(), mK);
@@ -442,6 +447,8 @@ void Frame::ComputeImageBounds(const cv::Mat &imLeft)
 		mat.at<float>(1, 0) = imLeft.cols; mat.at<float>(1, 1) = 0.0;
 		mat.at<float>(2, 0) = 0.0; mat.at<float>(2, 1) = imLeft.rows;
 		mat.at<float>(3, 0) = imLeft.cols; mat.at<float>(3, 1) = imLeft.rows;
+
+		const cv::Mat1f mK = camera.Mat();
 
 		// Undistort corners
 		mat = mat.reshape(2);
@@ -493,9 +500,9 @@ void Frame::ComputeStereoMatches()
 	}
 
 	// Set limits for search
-	const float minZ = mb;
+	const float minZ = camera.baseline;
 	const float minD = 0;
-	const float maxD = mbf / minZ;
+	const float maxD = camera.bf / minZ;
 
 	// For each left keypoint search a match in the right image
 	vector<pair<int, int> > vDistIdx;
@@ -616,7 +623,7 @@ void Frame::ComputeStereoMatches()
 					disparity = 0.01;
 					bestuR = uL - 0.01;
 				}
-				mvDepth[iL] = mbf / disparity;
+				mvDepth[iL] = camera.bf / disparity;
 				mvuRight[iL] = bestuR;
 				vDistIdx.push_back(pair<int, int>(bestDist, iL));
 			}
@@ -658,7 +665,7 @@ void Frame::ComputeStereoFromRGBD(const cv::Mat &imDepth)
 		if (d > 0)
 		{
 			mvDepth[i] = d;
-			mvuRight[i] = kpU.pt.x - mbf / d;
+			mvuRight[i] = kpU.pt.x - camera.bf / d;
 		}
 	}
 }
@@ -666,6 +673,10 @@ void Frame::ComputeStereoFromRGBD(const cv::Mat &imDepth)
 cv::Mat Frame::UnprojectStereo(const int &i)
 {
 	const float z = mvDepth[i];
+	const float invfx = 1.f / camera.fx;
+	const float invfy = 1.f / camera.fy;
+	const float cx = camera.cx;
+	const float cy = camera.cy;
 	if (z > 0)
 	{
 		const float u = mvKeysUn[i].pt.x;

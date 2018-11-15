@@ -28,6 +28,7 @@
 #include "ORBextractor.h"
 #include "Frame.h"
 #include "KeyFrameDatabase.h"
+#include "CameraParameters.h"
 
 #include <mutex>
 
@@ -154,7 +155,9 @@ public:
     long unsigned int mnBAGlobalForKF;
 
     // Calibration parameters
-    const float fx, fy, cx, cy, invfx, invfy, mbf, mb, mThDepth;
+	const CameraParams camera;
+	const float mThDepth;
+    //const float fx, fy, cx, cy, invfx, invfy, mbf, mb, mThDepth;
 
     // Number of KeyPoints
     const int N;
@@ -186,7 +189,7 @@ public:
     const int mnMinY;
     const int mnMaxX;
     const int mnMaxY;
-    const cv::Mat mK;
+    //const cv::Mat mK;
 
 
     // The following variables need to be accessed trough a mutex to be thread safe.

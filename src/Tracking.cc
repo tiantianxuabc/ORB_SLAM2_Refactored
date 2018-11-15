@@ -1624,7 +1624,7 @@ public:
 		ConvertToGray(imageR, imageR_, RGB_);
 
 		currFrame_ = Frame(imageL_, imageR_, timestamp, extractorL_.get(), extractorR_.get(), voc_,
-			camera_.Mat(), distCoeffs_, camera_.bf, thDepth_);
+			camera_, distCoeffs_, thDepth_);
 
 		tracker_->Update(currFrame_);
 
@@ -1637,8 +1637,7 @@ public:
 
 		depth.convertTo(depth_, CV_32F, depthFactor_);
 
-		currFrame_ = Frame(imageL_, depth_, timestamp, extractorL_.get(), voc_,
-			camera_.Mat(), distCoeffs_, camera_.bf, thDepth_);
+		currFrame_ = Frame(imageL_, depth_, timestamp, extractorL_.get(), voc_, camera_, distCoeffs_, thDepth_);
 
 		tracker_->Update(currFrame_);
 
@@ -1654,8 +1653,7 @@ public:
 
 		ORBextractor* pORBextractor = init ? extractorIni_.get() : extractorL_.get();
 
-		currFrame_ = Frame(imageL_, timestamp, pORBextractor, voc_,
-			camera_.Mat(), distCoeffs_, camera_.bf, thDepth_);
+		currFrame_ = Frame(imageL_, timestamp, pORBextractor, voc_, camera_, distCoeffs_, thDepth_);
 
 		tracker_->Update(currFrame_);
 

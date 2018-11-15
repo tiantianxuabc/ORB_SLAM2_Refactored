@@ -133,10 +133,10 @@ void Optimizer::BundleAdjustment(const vector<KeyFrame *> &vpKFs, const vector<M
                     rk->setDelta(thHuber2D);
                 }
 
-                e->fx = pKF->fx;
-                e->fy = pKF->fy;
-                e->cx = pKF->cx;
-                e->cy = pKF->cy;
+                e->fx = pKF->camera.fx;
+                e->fy = pKF->camera.fy;
+                e->cx = pKF->camera.cx;
+                e->cy = pKF->camera.cy;
 
                 optimizer.addEdge(e);
             }
@@ -162,11 +162,11 @@ void Optimizer::BundleAdjustment(const vector<KeyFrame *> &vpKFs, const vector<M
                     rk->setDelta(thHuber3D);
                 }
 
-                e->fx = pKF->fx;
-                e->fy = pKF->fy;
-                e->cx = pKF->cx;
-                e->cy = pKF->cy;
-                e->bf = pKF->mbf;
+                e->fx = pKF->camera.fx;
+                e->fy = pKF->camera.fy;
+                e->cx = pKF->camera.cx;
+                e->cy = pKF->camera.cy;
+                e->bf = pKF->camera.bf;
 
                 optimizer.addEdge(e);
             }
@@ -303,10 +303,10 @@ int Optimizer::PoseOptimization(Frame *pFrame)
                 e->setRobustKernel(rk);
                 rk->setDelta(deltaMono);
 
-                e->fx = pFrame->fx;
-                e->fy = pFrame->fy;
-                e->cx = pFrame->cx;
-                e->cy = pFrame->cy;
+                e->fx = pFrame->camera.fx;
+                e->fy = pFrame->camera.fy;
+                e->cx = pFrame->camera.cx;
+                e->cy = pFrame->camera.cy;
                 cv::Mat Xw = pMP->GetWorldPos();
                 e->Xw[0] = Xw.at<float>(0);
                 e->Xw[1] = Xw.at<float>(1);
@@ -340,11 +340,11 @@ int Optimizer::PoseOptimization(Frame *pFrame)
                 e->setRobustKernel(rk);
                 rk->setDelta(deltaStereo);
 
-                e->fx = pFrame->fx;
-                e->fy = pFrame->fy;
-                e->cx = pFrame->cx;
-                e->cy = pFrame->cy;
-                e->bf = pFrame->mbf;
+                e->fx = pFrame->camera.fx;
+                e->fy = pFrame->camera.fy;
+                e->cx = pFrame->camera.cx;
+                e->cy = pFrame->camera.cy;
+                e->bf = pFrame->camera.bf;
                 cv::Mat Xw = pMP->GetWorldPos();
                 e->Xw[0] = Xw.at<float>(0);
                 e->Xw[1] = Xw.at<float>(1);
@@ -608,10 +608,10 @@ void Optimizer::LocalBundleAdjustment(KeyFrame *pKF, bool* pbStopFlag, Map* pMap
                     e->setRobustKernel(rk);
                     rk->setDelta(thHuberMono);
 
-                    e->fx = pKFi->fx;
-                    e->fy = pKFi->fy;
-                    e->cx = pKFi->cx;
-                    e->cy = pKFi->cy;
+                    e->fx = pKFi->camera.fx;
+                    e->fy = pKFi->camera.fy;
+                    e->cx = pKFi->camera.cx;
+                    e->cy = pKFi->camera.cy;
 
                     optimizer.addEdge(e);
                     vpEdgesMono.push_back(e);
@@ -637,11 +637,11 @@ void Optimizer::LocalBundleAdjustment(KeyFrame *pKF, bool* pbStopFlag, Map* pMap
                     e->setRobustKernel(rk);
                     rk->setDelta(thHuberStereo);
 
-                    e->fx = pKFi->fx;
-                    e->fy = pKFi->fy;
-                    e->cx = pKFi->cx;
-                    e->cy = pKFi->cy;
-                    e->bf = pKFi->mbf;
+                    e->fx = pKFi->camera.fx;
+                    e->fy = pKFi->camera.fy;
+                    e->cx = pKFi->camera.cx;
+                    e->cy = pKFi->camera.cy;
+                    e->bf = pKFi->camera.bf;
 
                     optimizer.addEdge(e);
                     vpEdgesStereo.push_back(e);
@@ -1056,8 +1056,8 @@ int Optimizer::OptimizeSim3(KeyFrame *pKF1, KeyFrame *pKF2, vector<MapPoint *> &
     optimizer.setAlgorithm(solver);
 
     // Calibration
-    const cv::Mat &K1 = pKF1->mK;
-    const cv::Mat &K2 = pKF2->mK;
+    const cv::Mat &K1 = pKF1->camera.Mat();
+    const cv::Mat &K2 = pKF2->camera.Mat();
 
     // Camera poses
     const cv::Mat R1w = pKF1->GetRotation();
