@@ -30,27 +30,28 @@
 namespace ORB_SLAM2
 {
 
-class Converter
+namespace Converter
 {
-public:
-    static std::vector<cv::Mat> toDescriptorVector(const cv::Mat &Descriptors);
 
-    static g2o::SE3Quat toSE3Quat(const cv::Mat &cvT);
-    static g2o::SE3Quat toSE3Quat(const g2o::Sim3 &gSim3);
+std::vector<cv::Mat> toDescriptorVector(const cv::Mat &Descriptors);
 
-    static cv::Mat toCvMat(const g2o::SE3Quat &SE3);
-    static cv::Mat toCvMat(const g2o::Sim3 &Sim3);
-    static cv::Mat toCvMat(const Eigen::Matrix<double,4,4> &m);
-    static cv::Mat toCvMat(const Eigen::Matrix3d &m);
-    static cv::Mat toCvMat(const Eigen::Matrix<double,3,1> &m);
-    static cv::Mat toCvSE3(const Eigen::Matrix<double,3,3> &R, const Eigen::Matrix<double,3,1> &t);
+g2o::SE3Quat toSE3Quat(const cv::Mat &cvT);
+g2o::SE3Quat toSE3Quat(const g2o::Sim3 &gSim3);
 
-    static Eigen::Matrix<double,3,1> toVector3d(const cv::Mat &cvVector);
-    static Eigen::Matrix<double,3,1> toVector3d(const cv::Point3f &cvPoint);
-    static Eigen::Matrix<double,3,3> toMatrix3d(const cv::Mat &cvMat3);
+cv::Mat toCvMat(const g2o::SE3Quat &SE3);
+cv::Mat toCvMat(const g2o::Sim3 &Sim3);
+cv::Mat toCvMat(const Eigen::Matrix<double, 4, 4> &m);
+cv::Mat toCvMat(const Eigen::Matrix3d &m);
+cv::Mat toCvMat(const Eigen::Matrix<double, 3, 1> &m);
+cv::Mat toCvSE3(const Eigen::Matrix<double, 3, 3> &R, const Eigen::Matrix<double, 3, 1> &t);
 
-    static std::vector<float> toQuaternion(const cv::Mat &M);
-};
+Eigen::Matrix<double, 3, 1> toVector3d(const cv::Mat &cvVector);
+Eigen::Matrix<double, 3, 1> toVector3d(const cv::Point3f &cvPoint);
+Eigen::Matrix<double, 3, 3> toMatrix3d(const cv::Mat &cvMat3);
+
+std::vector<float> toQuaternion(const cv::Mat &M);
+
+} // namespace Converter
 
 }// namespace ORB_SLAM
 
