@@ -21,13 +21,13 @@
 #ifndef KEYFRAME_H
 #define KEYFRAME_H
 
-#include "MapPoint.h"
+//#include "MapPoint.h"
 #include "Thirdparty/DBoW2/DBoW2/BowVector.h"
 #include "Thirdparty/DBoW2/DBoW2/FeatureVector.h"
 #include "ORBVocabulary.h"
-#include "ORBextractor.h"
+//#include "ORBextractor.h"
 #include "Frame.h"
-#include "KeyFrameDatabase.h"
+//#include "KeyFrameDatabase.h"
 #include "CameraParameters.h"
 
 #include <mutex>
@@ -38,8 +38,9 @@ namespace ORB_SLAM2
 
 class Map;
 class MapPoint;
-class Frame;
+//class Frame;
 class KeyFrameDatabase;
+//class ORBVocabulary;
 
 class KeyFrame
 {
@@ -185,10 +186,11 @@ public:
     const std::vector<float> mvInvLevelSigma2;
 
     // Image bounds and calibration
-    const int mnMinX;
+	ImageBounds imageBounds;
+    /*const int mnMinX;
     const int mnMinY;
     const int mnMaxX;
-    const int mnMaxY;
+    const int mnMaxY;*/
     //const cv::Mat mK;
 
 

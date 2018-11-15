@@ -21,6 +21,12 @@
 #include "Frame.h"
 #include "Converter.h"
 #include "ORBmatcher.h"
+
+#include "MapPoint.h"
+#include "ORBVocabulary.h"
+#include "KeyFrame.h"
+#include "ORBextractor.h"
+
 #include <thread>
 
 namespace ORB_SLAM2
@@ -29,8 +35,19 @@ namespace ORB_SLAM2
 long unsigned int Frame::nNextId = 0;
 bool Frame::mbInitialComputations = true;
 //float Frame::cx, Frame::cy, Frame::fx, Frame::fy, Frame::invfx, Frame::invfy;
-float Frame::mnMinX, Frame::mnMinY, Frame::mnMaxX, Frame::mnMaxY;
+//float Frame::mnMinX, Frame::mnMinY, Frame::mnMaxX, Frame::mnMaxY;
+ImageBounds Frame::imageBounds;
 float Frame::mfGridElementWidthInv, Frame::mfGridElementHeightInv;
+
+float ImageBounds::Width() const { return mnMaxX - mnMinX; }
+float ImageBounds::Height() const { return mnMaxY - mnMinY; }
+bool ImageBounds::Contains(float x, float y) const
+{
+	return (x >= mnMinX && x < mnMaxX && y >= mnMinY && y < mnMaxY);
+	/*if (u < mnMinX || u > mnMaxX || v < mnMinY || v > mnMaxY)
+		return false;
+	return true;*/
+}
 
 Frame::Frame()
 {}
@@ -99,8 +116,10 @@ Frame::Frame(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timeSt
 	{
 		ComputeImageBounds(imLeft);
 
-		mfGridElementWidthInv = static_cast<float>(FRAME_GRID_COLS) / (mnMaxX - mnMinX);
-		mfGridElementHeightInv = static_cast<float>(FRAME_GRID_ROWS) / (mnMaxY - mnMinY);
+		//mfGridElementWidthInv = static_cast<float>(FRAME_GRID_COLS) / (mnMaxX - mnMinX);
+		//mfGridElementHeightInv = static_cast<float>(FRAME_GRID_ROWS) / (mnMaxY - mnMinY);
+		mfGridElementWidthInv = static_cast<float>(FRAME_GRID_COLS) / imageBounds.Width();
+		mfGridElementHeightInv = static_cast<float>(FRAME_GRID_ROWS) / imageBounds.Height();
 
 		/*fx = K.at<float>(0, 0);
 		fy = K.at<float>(1, 1);
@@ -154,8 +173,10 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &timeSt
 	{
 		ComputeImageBounds(imGray);
 
-		mfGridElementWidthInv = static_cast<float>(FRAME_GRID_COLS) / static_cast<float>(mnMaxX - mnMinX);
-		mfGridElementHeightInv = static_cast<float>(FRAME_GRID_ROWS) / static_cast<float>(mnMaxY - mnMinY);
+		//mfGridElementWidthInv = static_cast<float>(FRAME_GRID_COLS) / static_cast<float>(mnMaxX - mnMinX);
+		//mfGridElementHeightInv = static_cast<float>(FRAME_GRID_ROWS) / static_cast<float>(mnMaxY - mnMinY);
+		mfGridElementWidthInv = static_cast<float>(FRAME_GRID_COLS) / imageBounds.Width();
+		mfGridElementHeightInv = static_cast<float>(FRAME_GRID_ROWS) / imageBounds.Height();
 
 		/*fx = K.at<float>(0, 0);
 		fy = K.at<float>(1, 1);
@@ -212,9 +233,10 @@ Frame::Frame(const cv::Mat &imGray, const double &timeStamp, ORBextractor* extra
 	{
 		ComputeImageBounds(imGray);
 
-		mfGridElementWidthInv = static_cast<float>(FRAME_GRID_COLS) / static_cast<float>(mnMaxX - mnMinX);
-		mfGridElementHeightInv = static_cast<float>(FRAME_GRID_ROWS) / static_cast<float>(mnMaxY - mnMinY);
-
+		//mfGridElementWidthInv = static_cast<float>(FRAME_GRID_COLS) / static_cast<float>(mnMaxX - mnMinX);
+		//mfGridElementHeightInv = static_cast<float>(FRAME_GRID_ROWS) / static_cast<float>(mnMaxY - mnMinY);
+		mfGridElementWidthInv = static_cast<float>(FRAME_GRID_COLS) / imageBounds.Width();
+		mfGridElementHeightInv = static_cast<float>(FRAME_GRID_ROWS) / imageBounds.Height();
 		/*fx = K.at<float>(0, 0);
 		fy = K.at<float>(1, 1);
 		cx = K.at<float>(0, 2);
@@ -291,9 +313,11 @@ bool Frame::isInFrustum(MapPoint *pMP, float viewingCosLimit)
 	const float u = camera.fx*PcX*invz + camera.cx;
 	const float v = camera.fy*PcY*invz + camera.cy;
 
-	if (u<mnMinX || u>mnMaxX)
+	/*if (u<mnMinX || u>mnMaxX)
 		return false;
 	if (v<mnMinY || v>mnMaxY)
+		return false;*/
+	if (!imageBounds.Contains(u, v))
 		return false;
 
 	// Check distance is in the scale invariance region of the MapPoint
@@ -331,6 +355,9 @@ vector<size_t> Frame::GetFeaturesInArea(const float &x, const float  &y, const f
 {
 	vector<size_t> vIndices;
 	vIndices.reserve(N);
+
+	const float mnMinX = imageBounds.mnMinX;
+	const float mnMinY = imageBounds.mnMinY;
 
 	const int nMinCellX = max(0, (int)floor((x - mnMinX - r)*mfGridElementWidthInv));
 	if (nMinCellX >= FRAME_GRID_COLS)
@@ -384,8 +411,8 @@ vector<size_t> Frame::GetFeaturesInArea(const float &x, const float  &y, const f
 
 bool Frame::PosInGrid(const cv::KeyPoint &kp, int &posX, int &posY)
 {
-	posX = round((kp.pt.x - mnMinX)*mfGridElementWidthInv);
-	posY = round((kp.pt.y - mnMinY)*mfGridElementHeightInv);
+	posX = round((kp.pt.x - imageBounds.mnMinX)*mfGridElementWidthInv);
+	posY = round((kp.pt.y - imageBounds.mnMinY)*mfGridElementHeightInv);
 
 	//Keypoint's coordinates are undistorted, which could cause to go out of the image
 	if (posX < 0 || posX >= FRAME_GRID_COLS || posY < 0 || posY >= FRAME_GRID_ROWS)
@@ -455,18 +482,18 @@ void Frame::ComputeImageBounds(const cv::Mat &imLeft)
 		cv::undistortPoints(mat, mat, mK, mDistCoef, cv::Mat(), mK);
 		mat = mat.reshape(1);
 
-		mnMinX = min(mat.at<float>(0, 0), mat.at<float>(2, 0));
-		mnMaxX = max(mat.at<float>(1, 0), mat.at<float>(3, 0));
-		mnMinY = min(mat.at<float>(0, 1), mat.at<float>(1, 1));
-		mnMaxY = max(mat.at<float>(2, 1), mat.at<float>(3, 1));
+		imageBounds.mnMinX = min(mat.at<float>(0, 0), mat.at<float>(2, 0));
+		imageBounds.mnMaxX = max(mat.at<float>(1, 0), mat.at<float>(3, 0));
+		imageBounds.mnMinY = min(mat.at<float>(0, 1), mat.at<float>(1, 1));
+		imageBounds.mnMaxY = max(mat.at<float>(2, 1), mat.at<float>(3, 1));
 
 	}
 	else
 	{
-		mnMinX = 0.0f;
-		mnMaxX = imLeft.cols;
-		mnMinY = 0.0f;
-		mnMaxY = imLeft.rows;
+		imageBounds.mnMinX = 0.0f;
+		imageBounds.mnMaxX = imLeft.cols;
+		imageBounds.mnMinY = 0.0f;
+		imageBounds.mnMaxY = imLeft.rows;
 	}
 }
 

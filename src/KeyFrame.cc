@@ -21,6 +21,8 @@
 #include "KeyFrame.h"
 #include "Converter.h"
 #include "ORBmatcher.h"
+#include "ORBVocabulary.h"
+#include "KeyFrameDatabase.h"
 #include<mutex>
 
 namespace ORB_SLAM2
@@ -37,8 +39,7 @@ KeyFrame::KeyFrame(Frame &F, Map *pMap, KeyFrameDatabase *pKFDB):
     mvuRight(F.mvuRight), mvDepth(F.mvDepth), mDescriptors(F.mDescriptors.clone()),
     mBowVec(F.mBowVec), mFeatVec(F.mFeatVec), mnScaleLevels(F.mnScaleLevels), mfScaleFactor(F.mfScaleFactor),
     mfLogScaleFactor(F.mfLogScaleFactor), mvScaleFactors(F.mvScaleFactors), mvLevelSigma2(F.mvLevelSigma2),
-    mvInvLevelSigma2(F.mvInvLevelSigma2), mnMinX(F.mnMinX), mnMinY(F.mnMinY), mnMaxX(F.mnMaxX),
-    mnMaxY(F.mnMaxY), mvpMapPoints(F.mvpMapPoints), mpKeyFrameDB(pKFDB),
+    mvInvLevelSigma2(F.mvInvLevelSigma2), imageBounds(F.imageBounds), mvpMapPoints(F.mvpMapPoints), mpKeyFrameDB(pKFDB),
     mpORBvocabulary(F.mpORBvocabulary), mbFirstConnection(true), mpParent(NULL), mbNotErase(false),
     mbToBeErased(false), mbBad(false), mHalfBaseline(F.camera.baseline/2), mpMap(pMap)
 {
@@ -570,6 +571,9 @@ vector<size_t> KeyFrame::GetFeaturesInArea(const float &x, const float &y, const
     vector<size_t> vIndices;
     vIndices.reserve(N);
 
+	const float mnMinX = imageBounds.mnMinX;
+	const float mnMinY = imageBounds.mnMinY;
+
     const int nMinCellX = max(0,(int)floor((x-mnMinX-r)*mfGridElementWidthInv));
     if(nMinCellX>=mnGridCols)
         return vIndices;
@@ -608,7 +612,8 @@ vector<size_t> KeyFrame::GetFeaturesInArea(const float &x, const float &y, const
 
 bool KeyFrame::IsInImage(const float &x, const float &y) const
 {
-    return (x>=mnMinX && x<mnMaxX && y>=mnMinY && y<mnMaxY);
+	return imageBounds.Contains(x, y);
+    //return (x>=mnMinX && x<mnMaxX && y>=mnMinY && y<mnMaxY);
 }
 
 cv::Mat KeyFrame::UnprojectStereo(int i)

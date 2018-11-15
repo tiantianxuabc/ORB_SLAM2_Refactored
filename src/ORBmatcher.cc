@@ -1370,10 +1370,12 @@ int ORBmatcher::SearchByProjection(Frame &CurrentFrame, const Frame &LastFrame, 
                 float u = CurrentFrame.camera.fx*xc*invzc+CurrentFrame.camera.cx;
                 float v = CurrentFrame.camera.fy*yc*invzc+CurrentFrame.camera.cy;
 
-                if(u<CurrentFrame.mnMinX || u>CurrentFrame.mnMaxX)
+                /*if(u<CurrentFrame.mnMinX || u>CurrentFrame.mnMaxX)
                     continue;
                 if(v<CurrentFrame.mnMinY || v>CurrentFrame.mnMaxY)
-                    continue;
+                    continue;*/
+				if (!CurrentFrame.imageBounds.Contains(u, v))
+					continue;
 
                 int nLastOctave = LastFrame.mvKeys[i].octave;
 
@@ -1504,10 +1506,12 @@ int ORBmatcher::SearchByProjection(Frame &CurrentFrame, KeyFrame *pKF, const set
                 const float u = CurrentFrame.camera.fx*xc*invzc+CurrentFrame.camera.cx;
                 const float v = CurrentFrame.camera.fy*yc*invzc+CurrentFrame.camera.cy;
 
-                if(u<CurrentFrame.mnMinX || u>CurrentFrame.mnMaxX)
+                /*if(u<CurrentFrame.mnMinX || u>CurrentFrame.mnMaxX)
                     continue;
                 if(v<CurrentFrame.mnMinY || v>CurrentFrame.mnMaxY)
-                    continue;
+                    continue;*/
+				if (!CurrentFrame.imageBounds.Contains(u, v))
+					continue;
 
                 // Compute predicted scale level
                 cv::Mat PO = x3Dw-Ow;

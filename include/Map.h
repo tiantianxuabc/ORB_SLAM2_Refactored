@@ -21,10 +21,10 @@
 #ifndef MAP_H
 #define MAP_H
 
-#include "MapPoint.h"
-#include "KeyFrame.h"
+//#include "MapPoint.h"
+//#include "KeyFrame.h"
 #include <set>
-
+#include <vector>
 #include <mutex>
 
 
@@ -59,7 +59,7 @@ public:
 
     void clear();
 
-    vector<KeyFrame*> mvpKeyFrameOrigins;
+    std::vector<KeyFrame*> mvpKeyFrameOrigins;
 
     std::mutex mMutexMapUpdate;
 
