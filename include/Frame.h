@@ -33,9 +33,6 @@
 namespace ORB_SLAM2
 {
 
-//#define FRAME_GRID_ROWS 48
-//#define FRAME_GRID_COLS 64
-
 class MapPoint;
 class KeyFrame;
 class ORBextractor;
@@ -57,7 +54,7 @@ class FeaturesGrid
 public:
 
 	FeaturesGrid();
-	FeaturesGrid(const std::vector<cv::KeyPoint>& keypoints, const ImageBounds& roi, int nlevels);
+	FeaturesGrid(const std::vector<cv::KeyPoint>& keypoints, const ImageBounds& imageBounds, int nlevels);
 	void AssignFeatures(const std::vector<cv::KeyPoint>& keypoints, const ImageBounds& imageBounds, int nlevels);
 	std::vector<size_t> GetFeaturesInArea(float x, float y, float r, int minLevel = -1, int maxLevel = -1) const;
 
@@ -180,10 +177,7 @@ public:
 
 	// Keypoints are assigned to cells in a grid to reduce matching complexity when projecting MapPoints.
 	FeaturesGrid grid;
-	//static float mfGridElementWidthInv;
-	//static float mfGridElementHeightInv;
-	//std::vector<std::size_t> mGrid[FRAME_GRID_COLS][FRAME_GRID_ROWS];
-
+	
 	// Camera pose.
 	cv::Mat mTcw;
 

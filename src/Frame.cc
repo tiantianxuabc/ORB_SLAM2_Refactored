@@ -40,21 +40,19 @@ std::vector<cv::Mat> toDescriptorVector(const cv::Mat &Descriptors);
 
 long unsigned int Frame::nNextId = 0;
 bool Frame::mbInitialComputations = true;
-
 ImageBounds Frame::imageBounds;
-//float Frame::mfGridElementWidthInv, Frame::mfGridElementHeightInv;
 
 //////////////////////////////////////////////////////////////////////////////////
 // ImageBounds Class
 //////////////////////////////////////////////////////////////////////////////////
 float ImageBounds::Width() const
-{ 
-	return mnMaxX - mnMinX; 
+{
+	return mnMaxX - mnMinX;
 }
 
 float ImageBounds::Height() const
-{ 
-	return mnMaxY - mnMinY; 
+{
+	return mnMaxY - mnMinY;
 }
 
 bool ImageBounds::Contains(float x, float y) const
@@ -67,9 +65,9 @@ bool ImageBounds::Contains(float x, float y) const
 //////////////////////////////////////////////////////////////////////////////////
 FeaturesGrid::FeaturesGrid() {}
 
-FeaturesGrid::FeaturesGrid(const std::vector<cv::KeyPoint>& keypoints, const ImageBounds& roi, int nlevels)
+FeaturesGrid::FeaturesGrid(const std::vector<cv::KeyPoint>& keypoints, const ImageBounds& imageBounds, int nlevels)
 {
-	AssignFeatures(keypoints, roi, nlevels);
+	AssignFeatures(keypoints, imageBounds, nlevels);
 }
 
 void FeaturesGrid::AssignFeatures(const std::vector<cv::KeyPoint>& keypoints, const ImageBounds& imageBounds, int nlevels)
@@ -191,9 +189,9 @@ Frame::Frame(const Frame &frame)
 }
 
 
-Frame::Frame(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timeStamp, ORBextractor* extractorLeft, 
+Frame::Frame(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timeStamp, ORBextractor* extractorLeft,
 	ORBextractor* extractorRight, ORBVocabulary* voc, const CameraParams& camera, cv::Mat &distCoef, const float &thDepth)
-	:mpORBvocabulary(voc), mpORBextractorLeft(extractorLeft), mpORBextractorRight(extractorRight), mTimeStamp(timeStamp), 
+	:mpORBvocabulary(voc), mpORBextractorLeft(extractorLeft), mpORBextractorRight(extractorRight), mTimeStamp(timeStamp),
 	camera(camera), mDistCoef(distCoef.clone()), mThDepth(thDepth), mpReferenceKF(static_cast<KeyFrame*>(NULL))
 {
 	// Frame ID
@@ -231,15 +229,12 @@ Frame::Frame(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timeSt
 	if (mbInitialComputations)
 	{
 		ComputeImageBounds(imLeft);
-		//mfGridElementWidthInv = static_cast<float>(FRAME_GRID_COLS) / imageBounds.Width();
-		//mfGridElementHeightInv = static_cast<float>(FRAME_GRID_ROWS) / imageBounds.Height();
 		mbInitialComputations = false;
 	}
 	grid.AssignFeatures(mvKeysUn, imageBounds, static_cast<int>(mvScaleFactors.size()));
-	//AssignFeaturesToGrid();
 }
 
-Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &timeStamp, ORBextractor* extractor, 
+Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &timeStamp, ORBextractor* extractor,
 	ORBVocabulary* voc, const CameraParams& camera, cv::Mat &distCoef, const float &thDepth)
 	:mpORBvocabulary(voc), mpORBextractorLeft(extractor), mpORBextractorRight(static_cast<ORBextractor*>(NULL)),
 	mTimeStamp(timeStamp), camera(camera), mDistCoef(distCoef.clone()), mThDepth(thDepth)
@@ -275,16 +270,12 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &timeSt
 	if (mbInitialComputations)
 	{
 		ComputeImageBounds(imGray);
-		//mfGridElementWidthInv = static_cast<float>(FRAME_GRID_COLS) / imageBounds.Width();
-		//mfGridElementHeightInv = static_cast<float>(FRAME_GRID_ROWS) / imageBounds.Height();
 		mbInitialComputations = false;
 	}
 	grid.AssignFeatures(mvKeysUn, imageBounds, static_cast<int>(mvScaleFactors.size()));
-	//AssignFeaturesToGrid();
 }
 
-
-Frame::Frame(const cv::Mat &imGray, const double &timeStamp, ORBextractor* extractor, ORBVocabulary* voc, 
+Frame::Frame(const cv::Mat &imGray, const double &timeStamp, ORBextractor* extractor, ORBVocabulary* voc,
 	const CameraParams& camera, cv::Mat &distCoef, const float &thDepth)
 	:mpORBvocabulary(voc), mpORBextractorLeft(extractor), mpORBextractorRight(static_cast<ORBextractor*>(NULL)),
 	mTimeStamp(timeStamp), camera(camera), mDistCoef(distCoef.clone()), mThDepth(thDepth)
@@ -322,12 +313,9 @@ Frame::Frame(const cv::Mat &imGray, const double &timeStamp, ORBextractor* extra
 	if (mbInitialComputations)
 	{
 		ComputeImageBounds(imGray);
-		//mfGridElementWidthInv = static_cast<float>(FRAME_GRID_COLS) / imageBounds.Width();
-		//mfGridElementHeightInv = static_cast<float>(FRAME_GRID_ROWS) / imageBounds.Height();
 		mbInitialComputations = false;
 	}
 	grid.AssignFeatures(mvKeysUn, imageBounds, static_cast<int>(mvScaleFactors.size()));
-	//AssignFeaturesToGrid();
 }
 
 
@@ -376,10 +364,6 @@ bool Frame::isInFrustum(MapPoint *pMP, float viewingCosLimit)
 	const float u = camera.fx*PcX*invz + camera.cx;
 	const float v = camera.fy*PcY*invz + camera.cy;
 
-	/*if (u<mnMinX || u>mnMaxX)
-		return false;
-	if (v<mnMinY || v>mnMaxY)
-		return false;*/
 	if (!imageBounds.Contains(u, v))
 		return false;
 
