@@ -489,19 +489,19 @@ Frame::Frame(const Frame &frame)
 }
 
 
-Frame::Frame(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timeStamp, ORBextractor* extractorLeft,
-	ORBextractor* extractorRight, ORBVocabulary* voc, const CameraParams& camera, cv::Mat &distCoef, const float &thDepth)
-	: mpORBvocabulary(voc), mTimeStamp(timeStamp), camera(camera), mThDepth(thDepth), mpReferenceKF(nullptr)
+Frame::Frame(const cv::Mat& imageL, const cv::Mat& imageR, double timestamp, ORBextractor* extractorL,
+	ORBextractor* extractorR, ORBVocabulary* voc, const CameraParams& camera, const cv::Mat& distCoef, float thDepth)
+	: mpORBvocabulary(voc), mTimeStamp(timestamp), camera(camera), mThDepth(thDepth), mpReferenceKF(nullptr)
 {
 	// Frame ID
 	mnId = nNextId++;
 
 	// Scale Level Info
-	GetScalePyramidInfo(extractorLeft, pyramid);
+	GetScalePyramidInfo(extractorL, pyramid);
 	
 	// ORB extraction
-	thread threadLeft([&](){ (*extractorLeft)(imLeft, cv::Mat(), mvKeys, mDescriptors); });
-	thread threadRight([&]() { (*extractorRight)(imRight, cv::Mat(), mvKeysRight, mDescriptorsRight); });
+	thread threadLeft([&](){ (*extractorL)(imageL, cv::Mat(), mvKeys, mDescriptors); });
+	thread threadRight([&]() { (*extractorR)(imageR, cv::Mat(), mvKeysRight, mDescriptorsRight); });
 
 	threadLeft.join();
 	threadRight.join();
@@ -513,8 +513,8 @@ Frame::Frame(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timeSt
 
 	UndistortKeyPoints(mvKeys, camera.Mat(), distCoef, mvKeysUn);
 
-	ComputeStereoMatches(mvKeys, mDescriptors, extractorLeft->mvImagePyramid,
-		mvKeysRight, mDescriptorsRight, extractorRight->mvImagePyramid,
+	ComputeStereoMatches(mvKeys, mDescriptors, extractorL->mvImagePyramid,
+		mvKeysRight, mDescriptorsRight, extractorR->mvImagePyramid,
 		pyramid.mvScaleFactors, pyramid.mvInvScaleFactors, camera, mvuRight, mvDepth);
 
 	mvpMapPoints = vector<MapPoint*>(N, static_cast<MapPoint*>(NULL));
@@ -524,15 +524,15 @@ Frame::Frame(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timeSt
 	// This is done only for the first Frame (or after a change in the calibration)
 	if (mbInitialComputations)
 	{
-		imageBounds = ComputeImageBounds(imLeft, camera.Mat(), distCoef);
+		imageBounds = ComputeImageBounds(imageL, camera.Mat(), distCoef);
 		mbInitialComputations = false;
 	}
 	grid.AssignFeatures(mvKeysUn, imageBounds, pyramid.mnScaleLevels);
 }
 
-Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &timeStamp, ORBextractor* extractor,
-	ORBVocabulary* voc, const CameraParams& camera, cv::Mat &distCoef, const float &thDepth)
-	: mpORBvocabulary(voc), mTimeStamp(timeStamp), camera(camera), mThDepth(thDepth)
+Frame::Frame(const cv::Mat& image, const cv::Mat& depth, double timestamp, ORBextractor* extractor,
+	ORBVocabulary* voc, const CameraParams& camera, const cv::Mat& distCoef, float thDepth)
+	: mpORBvocabulary(voc), mTimeStamp(timestamp), camera(camera), mThDepth(thDepth)
 {
 	// Frame ID
 	mnId = nNextId++;
@@ -541,7 +541,7 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &timeSt
 	GetScalePyramidInfo(extractor, pyramid);
 	
 	// ORB extraction
-	(*extractor)(imGray, cv::Mat(), mvKeys, mDescriptors);
+	(*extractor)(image, cv::Mat(), mvKeys, mDescriptors);
 
 	N = mvKeys.size();
 
@@ -550,7 +550,7 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &timeSt
 
 	UndistortKeyPoints(mvKeys, camera.Mat(), distCoef, mvKeysUn);
 
-	ComputeStereoFromRGBD(mvKeys, mvKeysUn, imDepth, camera, mvuRight, mvDepth);
+	ComputeStereoFromRGBD(mvKeys, mvKeysUn, depth, camera, mvuRight, mvDepth);
 
 	mvpMapPoints = vector<MapPoint*>(N, static_cast<MapPoint*>(NULL));
 	mvbOutlier = vector<bool>(N, false);
@@ -558,15 +558,15 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &timeSt
 	// This is done only for the first Frame (or after a change in the calibration)
 	if (mbInitialComputations)
 	{
-		imageBounds = ComputeImageBounds(imGray, camera.Mat(), distCoef);
+		imageBounds = ComputeImageBounds(image, camera.Mat(), distCoef);
 		mbInitialComputations = false;
 	}
 	grid.AssignFeatures(mvKeysUn, imageBounds, pyramid.mnScaleLevels);
 }
 
-Frame::Frame(const cv::Mat &imGray, const double &timeStamp, ORBextractor* extractor, ORBVocabulary* voc,
-	const CameraParams& camera, cv::Mat &distCoef, const float &thDepth)
-	: mpORBvocabulary(voc), mTimeStamp(timeStamp), camera(camera), mThDepth(thDepth)
+Frame::Frame(const cv::Mat& image, double timestamp, ORBextractor* extractor, ORBVocabulary* voc,
+	const CameraParams& camera, const cv::Mat& distCoef, float thDepth)
+	: mpORBvocabulary(voc), mTimeStamp(timestamp), camera(camera), mThDepth(thDepth)
 {
 	// Frame ID
 	mnId = nNextId++;
@@ -575,7 +575,7 @@ Frame::Frame(const cv::Mat &imGray, const double &timeStamp, ORBextractor* extra
 	GetScalePyramidInfo(extractor, pyramid);
 	
 	// ORB extraction
-	(*extractor)(imGray, cv::Mat(), mvKeys, mDescriptors);
+	(*extractor)(image, cv::Mat(), mvKeys, mDescriptors);
 
 	N = mvKeys.size();
 
@@ -594,7 +594,7 @@ Frame::Frame(const cv::Mat &imGray, const double &timeStamp, ORBextractor* extra
 	// This is done only for the first Frame (or after a change in the calibration)
 	if (mbInitialComputations)
 	{
-		imageBounds = ComputeImageBounds(imGray, camera.Mat(), distCoef);
+		imageBounds = ComputeImageBounds(image, camera.Mat(), distCoef);
 		mbInitialComputations = false;
 	}
 	grid.AssignFeatures(mvKeysUn, imageBounds, pyramid.mnScaleLevels);

@@ -107,16 +107,16 @@ public:
 	Frame(const Frame &frame);
 
 	// Constructor for stereo cameras.
-	Frame(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timeStamp, ORBextractor* extractorLeft,
-		ORBextractor* extractorRight, ORBVocabulary* voc, const CameraParams& camera, cv::Mat &distCoef, const float &thDepth);
+	Frame(const cv::Mat& imageL, const cv::Mat& imageR, double timestamp, ORBextractor* extractorL, ORBextractor* extractorR,
+		ORBVocabulary* voc, const CameraParams& camera, const cv::Mat& distCoef, float thDepth);
 
 	// Constructor for RGB-D cameras.
-	Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &timeStamp, ORBextractor* extractor,
-		ORBVocabulary* voc, const CameraParams& camera, cv::Mat &distCoef, const float &thDepth);
+	Frame(const cv::Mat& image, const cv::Mat& depth, double timestamp, ORBextractor* extractor,
+		ORBVocabulary* voc, const CameraParams& camera, const cv::Mat& distCoef, float thDepth);
 
 	// Constructor for Monocular cameras.
-	Frame(const cv::Mat &imGray, const double &timeStamp, ORBextractor* extractor, ORBVocabulary* voc,
-		const CameraParams& camera, cv::Mat &distCoef, const float &thDepth);
+	Frame(const cv::Mat& image, double timestamp, ORBextractor* extractor, ORBVocabulary* voc,
+		const CameraParams& camera, const cv::Mat& distCoef, float thDepth);
 
 	// Compute Bag of Words representation.
 	void ComputeBoW();
@@ -126,7 +126,7 @@ public:
 
 	// Returns the camera center.
 	cv::Mat GetCameraCenter() const;
-	
+
 	// Check if a MapPoint is in the frustum of the camera
 	// and fill variables of the MapPoint to be used by the tracking
 	bool isInFrustum(MapPoint* pMP, float viewingCosLimit);
@@ -182,7 +182,7 @@ public:
 
 	// Keypoints are assigned to cells in a grid to reduce matching complexity when projecting MapPoints.
 	FeaturesGrid grid;
-	
+
 	// Camera pose.
 	CameraPose pose;
 	//cv::Mat mTcw;
@@ -196,10 +196,10 @@ public:
 
 	// Scale pyramid info.
 	ScalePyramidInfo pyramid;
-	
+
 	// Undistorted Image Bounds (computed once).
 	static ImageBounds imageBounds;
-	
+
 	static bool mbInitialComputations;
 };
 
