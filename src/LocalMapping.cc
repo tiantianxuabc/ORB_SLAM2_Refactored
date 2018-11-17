@@ -230,7 +230,7 @@ void LocalMapping::CreateNewMapPoints()
     const float &invfx1 = 1.f / fx1;
     const float &invfy1 = 1.f / fy1;
 
-    const float ratioFactor = 1.5f*mpCurrentKeyFrame->pyramid.mfScaleFactor;
+    const float ratioFactor = 1.5f*mpCurrentKeyFrame->pyramid.scaleFactor;
 
     int nnew=0;
 
@@ -361,7 +361,7 @@ void LocalMapping::CreateNewMapPoints()
                 continue;
 
             //Check reprojection error in first keyframe
-            const float &sigmaSquare1 = mpCurrentKeyFrame->pyramid.mvLevelSigma2[kp1.octave];
+            const float &sigmaSquare1 = mpCurrentKeyFrame->pyramid.sigmaSq[kp1.octave];
             const float x1 = Rcw1.row(0).dot(x3Dt)+tcw1.at<float>(0);
             const float y1 = Rcw1.row(1).dot(x3Dt)+tcw1.at<float>(1);
             const float invz1 = 1.0/z1;
@@ -388,7 +388,7 @@ void LocalMapping::CreateNewMapPoints()
             }
 
             //Check reprojection error in second keyframe
-            const float sigmaSquare2 = pKF2->pyramid.mvLevelSigma2[kp2.octave];
+            const float sigmaSquare2 = pKF2->pyramid.sigmaSq[kp2.octave];
             const float x2 = Rcw2.row(0).dot(x3Dt)+tcw2.at<float>(0);
             const float y2 = Rcw2.row(1).dot(x3Dt)+tcw2.at<float>(1);
             const float invz2 = 1.0/z2;
@@ -424,7 +424,7 @@ void LocalMapping::CreateNewMapPoints()
                 continue;
 
             const float ratioDist = dist2/dist1;
-            const float ratioOctave = mpCurrentKeyFrame->pyramid.mvScaleFactors[kp1.octave]/pKF2->pyramid.mvScaleFactors[kp2.octave];
+            const float ratioOctave = mpCurrentKeyFrame->pyramid.scaleFactors[kp1.octave]/pKF2->pyramid.scaleFactors[kp2.octave];
 
             /*if(fabs(ratioDist-ratioOctave)>ratioFactor)
                 continue;*/

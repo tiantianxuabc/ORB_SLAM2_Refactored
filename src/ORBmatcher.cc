@@ -66,7 +66,7 @@ int ORBmatcher::SearchByProjection(Frame &F, const vector<MapPoint*> &vpMapPoint
             r*=th;
 
         const vector<size_t> vIndices =
-                F.GetFeaturesInArea(pMP->mTrackProjX,pMP->mTrackProjY,r*F.pyramid.mvScaleFactors[nPredictedLevel],nPredictedLevel-1,nPredictedLevel);
+                F.GetFeaturesInArea(pMP->mTrackProjX,pMP->mTrackProjY,r*F.pyramid.scaleFactors[nPredictedLevel],nPredictedLevel-1,nPredictedLevel);
 
         if(vIndices.empty())
             continue;
@@ -91,7 +91,7 @@ int ORBmatcher::SearchByProjection(Frame &F, const vector<MapPoint*> &vpMapPoint
             if(F.uright[idx]>0)
             {
                 const float er = fabs(pMP->mTrackProjXR-F.uright[idx]);
-                if(er>r*F.pyramid.mvScaleFactors[nPredictedLevel])
+                if(er>r*F.pyramid.scaleFactors[nPredictedLevel])
                     continue;
             }
 
@@ -153,7 +153,7 @@ bool ORBmatcher::CheckDistEpipolarLine(const cv::KeyPoint &kp1,const cv::KeyPoin
 
     const float dsqr = num*num/den;
 
-    return dsqr<3.84*pKF2->pyramid.mvLevelSigma2[kp2.octave];
+    return dsqr<3.84*pKF2->pyramid.sigmaSq[kp2.octave];
 }
 
 int ORBmatcher::SearchByBoW(KeyFrame* pKF,Frame &F, vector<MapPoint*> &vpMapPointMatches)
@@ -357,7 +357,7 @@ int ORBmatcher::SearchByProjection(KeyFrame* pKF, cv::Mat Scw, const vector<MapP
         int nPredictedLevel = pMP->PredictScale(dist,pKF);
 
         // Search in a radius
-        const float radius = th*pKF->pyramid.mvScaleFactors[nPredictedLevel];
+        const float radius = th*pKF->pyramid.scaleFactors[nPredictedLevel];
 
         const vector<size_t> vIndices = pKF->GetFeaturesInArea(u,v,radius);
 
@@ -744,7 +744,7 @@ int ORBmatcher::SearchForTriangulation(KeyFrame *pKF1, KeyFrame *pKF2, cv::Mat F
                     {
                         const float distex = ex-kp2.pt.x;
                         const float distey = ey-kp2.pt.y;
-                        if(distex*distex+distey*distey<100*pKF2->pyramid.mvScaleFactors[kp2.octave])
+                        if(distex*distex+distey*distey<100*pKF2->pyramid.scaleFactors[kp2.octave])
                             continue;
                     }
 
@@ -887,7 +887,7 @@ int ORBmatcher::Fuse(KeyFrame *pKF, const vector<MapPoint *> &vpMapPoints, const
         int nPredictedLevel = pMP->PredictScale(dist3D,pKF);
 
         // Search in a radius
-        const float radius = th*pKF->pyramid.mvScaleFactors[nPredictedLevel];
+        const float radius = th*pKF->pyramid.scaleFactors[nPredictedLevel];
 
         const vector<size_t> vIndices = pKF->GetFeaturesInArea(u,v,radius);
 
@@ -922,7 +922,7 @@ int ORBmatcher::Fuse(KeyFrame *pKF, const vector<MapPoint *> &vpMapPoints, const
                 const float er = ur-kpr;
                 const float e2 = ex*ex+ey*ey+er*er;
 
-                if(e2*pKF->pyramid.mvInvLevelSigma2[kpLevel]>7.8)
+                if(e2*pKF->pyramid.invSigmaSq[kpLevel]>7.8)
                     continue;
             }
             else
@@ -933,7 +933,7 @@ int ORBmatcher::Fuse(KeyFrame *pKF, const vector<MapPoint *> &vpMapPoints, const
                 const float ey = v-kpy;
                 const float e2 = ex*ex+ey*ey;
 
-                if(e2*pKF->pyramid.mvInvLevelSigma2[kpLevel]>5.99)
+                if(e2*pKF->pyramid.invSigmaSq[kpLevel]>5.99)
                     continue;
             }
 
@@ -1046,7 +1046,7 @@ int ORBmatcher::Fuse(KeyFrame *pKF, cv::Mat Scw, const vector<MapPoint *> &vpPoi
         const int nPredictedLevel = pMP->PredictScale(dist3D,pKF);
 
         // Search in a radius
-        const float radius = th*pKF->pyramid.mvScaleFactors[nPredictedLevel];
+        const float radius = th*pKF->pyramid.scaleFactors[nPredictedLevel];
 
         const vector<size_t> vIndices = pKF->GetFeaturesInArea(u,v,radius);
 
@@ -1186,7 +1186,7 @@ int ORBmatcher::SearchBySim3(KeyFrame *pKF1, KeyFrame *pKF2, vector<MapPoint*> &
         const int nPredictedLevel = pMP->PredictScale(dist3D,pKF2);
 
         // Search in a radius
-        const float radius = th*pKF2->pyramid.mvScaleFactors[nPredictedLevel];
+        const float radius = th*pKF2->pyramid.scaleFactors[nPredictedLevel];
 
         const vector<size_t> vIndices = pKF2->GetFeaturesInArea(u,v,radius);
 
@@ -1266,7 +1266,7 @@ int ORBmatcher::SearchBySim3(KeyFrame *pKF1, KeyFrame *pKF2, vector<MapPoint*> &
         const int nPredictedLevel = pMP->PredictScale(dist3D,pKF1);
 
         // Search in a radius of 2.5*sigma(ScaleLevel)
-        const float radius = th*pKF1->pyramid.mvScaleFactors[nPredictedLevel];
+        const float radius = th*pKF1->pyramid.scaleFactors[nPredictedLevel];
 
         const vector<size_t> vIndices = pKF1->GetFeaturesInArea(u,v,radius);
 
@@ -1380,7 +1380,7 @@ int ORBmatcher::SearchByProjection(Frame &CurrentFrame, const Frame &LastFrame, 
                 int nLastOctave = LastFrame.keypointsL[i].octave;
 
                 // Search in a window. Size depends on scale
-                float radius = th*CurrentFrame.pyramid.mvScaleFactors[nLastOctave];
+                float radius = th*CurrentFrame.pyramid.scaleFactors[nLastOctave];
 
                 vector<size_t> vIndices2;
 
@@ -1527,7 +1527,7 @@ int ORBmatcher::SearchByProjection(Frame &CurrentFrame, KeyFrame *pKF, const set
                 int nPredictedLevel = pMP->PredictScale(dist3D,&CurrentFrame);
 
                 // Search in a window
-                const float radius = th*CurrentFrame.pyramid.mvScaleFactors[nPredictedLevel];
+                const float radius = th*CurrentFrame.pyramid.scaleFactors[nPredictedLevel];
 
                 const vector<size_t> vIndices2 = CurrentFrame.GetFeaturesInArea(u, v, radius, nPredictedLevel-1, nPredictedLevel+1);
 

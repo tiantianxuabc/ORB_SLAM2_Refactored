@@ -57,11 +57,11 @@ MapPoint::MapPoint(const cv::Mat &Pos, Map* pMap, Frame* pFrame, const int &idxF
     cv::Mat PC = Pos - Ow;
     const float dist = cv::norm(PC);
     const int level = pFrame->keypointsUn[idxF].octave;
-    const float levelScaleFactor =  pFrame->pyramid.mvScaleFactors[level];
-    const int nLevels = pFrame->pyramid.mnScaleLevels;
+    const float levelScaleFactor =  pFrame->pyramid.scaleFactors[level];
+    const int nLevels = pFrame->pyramid.nlevels;
 
     mfMaxDistance = dist*levelScaleFactor;
-    mfMinDistance = mfMaxDistance/pFrame->pyramid.mvScaleFactors[nLevels-1];
+    mfMinDistance = mfMaxDistance/pFrame->pyramid.scaleFactors[nLevels-1];
 
     pFrame->descriptorsL.row(idxF).copyTo(mDescriptor);
 
@@ -359,13 +359,13 @@ void MapPoint::UpdateNormalAndDepth()
     cv::Mat PC = Pos - pRefKF->GetCameraCenter();
     const float dist = cv::norm(PC);
     const int level = pRefKF->mvKeysUn[observations[pRefKF]].octave;
-    const float levelScaleFactor =  pRefKF->pyramid.mvScaleFactors[level];
-    const int nLevels = pRefKF->pyramid.mnScaleLevels;
+    const float levelScaleFactor =  pRefKF->pyramid.scaleFactors[level];
+    const int nLevels = pRefKF->pyramid.nlevels;
 
     {
         std::unique_lock<std::mutex> lock3(mMutexPos);
         mfMaxDistance = dist*levelScaleFactor;
-        mfMinDistance = mfMaxDistance/pRefKF->pyramid.mvScaleFactors[nLevels-1];
+        mfMinDistance = mfMaxDistance/pRefKF->pyramid.scaleFactors[nLevels-1];
         mNormalVector = normal/n;
     }
 }
@@ -390,11 +390,11 @@ int MapPoint::PredictScale(const float &currentDist, KeyFrame* pKF)
         ratio = mfMaxDistance/currentDist;
     }
 
-    int nScale = ceil(log(ratio)/pKF->pyramid.mfLogScaleFactor);
+    int nScale = ceil(log(ratio)/pKF->pyramid.logScaleFactor);
     if(nScale<0)
         nScale = 0;
-    else if(nScale>=pKF->pyramid.mnScaleLevels)
-        nScale = pKF->pyramid.mnScaleLevels-1;
+    else if(nScale>=pKF->pyramid.nlevels)
+        nScale = pKF->pyramid.nlevels-1;
 
     return nScale;
 }
@@ -407,11 +407,11 @@ int MapPoint::PredictScale(const float &currentDist, Frame* pF)
         ratio = mfMaxDistance/currentDist;
     }
 
-    int nScale = ceil(log(ratio)/pF->pyramid.mfLogScaleFactor);
+    int nScale = ceil(log(ratio)/pF->pyramid.logScaleFactor);
     if(nScale<0)
         nScale = 0;
-    else if(nScale>=pF->pyramid.mnScaleLevels)
-        nScale = pF->pyramid.mnScaleLevels-1;
+    else if(nScale>=pF->pyramid.nlevels)
+        nScale = pF->pyramid.nlevels-1;
 
     return nScale;
 }

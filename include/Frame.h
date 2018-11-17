@@ -50,13 +50,13 @@ struct ImageBounds
 
 struct ScalePyramidInfo
 {
-	int mnScaleLevels;
-	float mfScaleFactor;
-	float mfLogScaleFactor;
-	std::vector<float> mvScaleFactors;
-	std::vector<float> mvInvScaleFactors;
-	std::vector<float> mvLevelSigma2;
-	std::vector<float> mvInvLevelSigma2;
+	int nlevels;
+	float scaleFactor;
+	float logScaleFactor;
+	std::vector<float> scaleFactors;
+	std::vector<float> invScaleFactors;
+	std::vector<float> sigmaSq;
+	std::vector<float> invSigmaSq;
 };
 
 struct CameraPose

@@ -44,13 +44,13 @@ ImageBounds Frame::imageBounds;
 
 static void GetScalePyramidInfo(ORBextractor* extractor, ScalePyramidInfo& pyramid)
 {
-	pyramid.mnScaleLevels = extractor->GetLevels();
-	pyramid.mfScaleFactor = extractor->GetScaleFactor();
-	pyramid.mfLogScaleFactor = log(pyramid.mfScaleFactor);
-	pyramid.mvScaleFactors = extractor->GetScaleFactors();
-	pyramid.mvInvScaleFactors = extractor->GetInverseScaleFactors();
-	pyramid.mvLevelSigma2 = extractor->GetScaleSigmaSquares();
-	pyramid.mvInvLevelSigma2 = extractor->GetInverseScaleSigmaSquares();
+	pyramid.nlevels = extractor->GetLevels();
+	pyramid.scaleFactor = extractor->GetScaleFactor();
+	pyramid.logScaleFactor = log(pyramid.scaleFactor);
+	pyramid.scaleFactors = extractor->GetScaleFactors();
+	pyramid.invScaleFactors = extractor->GetInverseScaleFactors();
+	pyramid.sigmaSq = extractor->GetScaleSigmaSquares();
+	pyramid.invSigmaSq = extractor->GetInverseScaleSigmaSquares();
 }
 
 // Undistort keypoints given OpenCV distortion parameters.
@@ -515,7 +515,7 @@ Frame::Frame(const cv::Mat& imageL, const cv::Mat& imageR, double timestamp, ORB
 
 	ComputeStereoMatches(keypointsL, descriptorsL, extractorL->mvImagePyramid,
 		keypointsR, descriptorsR, extractorR->mvImagePyramid,
-		pyramid.mvScaleFactors, pyramid.mvInvScaleFactors, camera, uright, depth);
+		pyramid.scaleFactors, pyramid.invScaleFactors, camera, uright, depth);
 
 	mappoints.assign(N, nullptr);
 	outlier.assign(N, false);
@@ -526,7 +526,7 @@ Frame::Frame(const cv::Mat& imageL, const cv::Mat& imageR, double timestamp, ORB
 		imageBounds = ComputeImageBounds(imageL, camera.Mat(), distCoef);
 		initialComputation = false;
 	}
-	grid.AssignFeatures(keypointsUn, imageBounds, pyramid.mnScaleLevels);
+	grid.AssignFeatures(keypointsUn, imageBounds, pyramid.nlevels);
 }
 
 Frame::Frame(const cv::Mat& image, const cv::Mat& depthImage, double timestamp, ORBextractor* extractor,
@@ -560,7 +560,7 @@ Frame::Frame(const cv::Mat& image, const cv::Mat& depthImage, double timestamp, 
 		imageBounds = ComputeImageBounds(image, camera.Mat(), distCoef);
 		initialComputation = false;
 	}
-	grid.AssignFeatures(keypointsUn, imageBounds, pyramid.mnScaleLevels);
+	grid.AssignFeatures(keypointsUn, imageBounds, pyramid.nlevels);
 }
 
 Frame::Frame(const cv::Mat& image, double timestamp, ORBextractor* extractor, ORBVocabulary* voc,
@@ -596,7 +596,7 @@ Frame::Frame(const cv::Mat& image, double timestamp, ORBextractor* extractor, OR
 		imageBounds = ComputeImageBounds(image, camera.Mat(), distCoef);
 		initialComputation = false;
 	}
-	grid.AssignFeatures(keypointsUn, imageBounds, pyramid.mnScaleLevels);
+	grid.AssignFeatures(keypointsUn, imageBounds, pyramid.nlevels);
 }
 
 void Frame::SetPose(cv::Mat Tcw)
