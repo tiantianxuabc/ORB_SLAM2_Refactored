@@ -131,13 +131,6 @@ public:
 
 	std::vector<size_t> GetFeaturesInArea(const float &x, const float  &y, const float  &r, const int minLevel = -1, const int maxLevel = -1) const;
 
-	// Search a match for each keypoint in the left image to a keypoint in the right image.
-	// If there is a match, depth is computed and the right coordinate associated to the left keypoint is stored.
-	//void ComputeStereoMatches();
-
-	// Associate a "right" coordinate to a keypoint if there is valid depth in the depthmap.
-	//void ComputeStereoFromRGBD(const cv::Mat &imDepth);
-
 	// Backprojects a keypoint (if stereo/depth info available) into 3D world coordinates.
 	cv::Mat UnprojectStereo(const int &i);
 
@@ -201,32 +194,13 @@ public:
 
 	// Scale pyramid info.
 	ScalePyramidInfo pyramid;
-	/*int mnScaleLevels;
-	float mfScaleFactor;
-	float mfLogScaleFactor;
-	std::vector<float> mvScaleFactors;
-	std::vector<float> mvInvScaleFactors;
-	std::vector<float> mvLevelSigma2;
-	std::vector<float> mvInvLevelSigma2;*/
-
+	
 	// Undistorted Image Bounds (computed once).
 	static ImageBounds imageBounds;
 	
 	static bool mbInitialComputations;
 
-
 private:
-
-	// Undistort keypoints given OpenCV distortion parameters.
-	// Only for the RGB-D case. Stereo must be already rectified!
-	// (called in the constructor).
-	//void UndistortKeyPoints();
-
-	// Computes image bounds for the undistorted image (called in the constructor).
-	//void ComputeImageBounds(const cv::Mat &imLeft);
-
-	// Assign keypoints to the grid for speed up feature matching (called in the constructor).
-	//void AssignFeaturesToGrid();
 
 	// Rotation, translation and camera center
 	cv::Mat mRcw;
