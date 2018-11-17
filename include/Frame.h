@@ -122,10 +122,10 @@ public:
 
 	// Search a match for each keypoint in the left image to a keypoint in the right image.
 	// If there is a match, depth is computed and the right coordinate associated to the left keypoint is stored.
-	void ComputeStereoMatches();
+	//void ComputeStereoMatches();
 
 	// Associate a "right" coordinate to a keypoint if there is valid depth in the depthmap.
-	void ComputeStereoFromRGBD(const cv::Mat &imDepth);
+	//void ComputeStereoFromRGBD(const cv::Mat &imDepth);
 
 	// Backprojects a keypoint (if stereo/depth info available) into 3D world coordinates.
 	cv::Mat UnprojectStereo(const int &i);
