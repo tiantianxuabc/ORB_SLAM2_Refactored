@@ -500,11 +500,11 @@ Frame::Frame(const cv::Mat& imageL, const cv::Mat& imageR, double timestamp, ORB
 	GetScalePyramidInfo(extractorL, pyramid);
 	
 	// ORB extraction
-	thread threadLeft([&](){ (*extractorL)(imageL, cv::Mat(), mvKeys, mDescriptors); });
-	thread threadRight([&]() { (*extractorR)(imageR, cv::Mat(), mvKeysRight, mDescriptorsRight); });
+	std::thread threadL([&](){ (*extractorL)(imageL, cv::Mat(), mvKeys, mDescriptors); });
+	std::thread threadR([&](){ (*extractorR)(imageR, cv::Mat(), mvKeysRight, mDescriptorsRight); });
 
-	threadLeft.join();
-	threadRight.join();
+	threadL.join();
+	threadR.join();
 
 	N = mvKeys.size();
 
@@ -517,10 +517,9 @@ Frame::Frame(const cv::Mat& imageL, const cv::Mat& imageR, double timestamp, ORB
 		mvKeysRight, mDescriptorsRight, extractorR->mvImagePyramid,
 		pyramid.mvScaleFactors, pyramid.mvInvScaleFactors, camera, mvuRight, mvDepth);
 
-	mvpMapPoints = vector<MapPoint*>(N, static_cast<MapPoint*>(NULL));
-	mvbOutlier = vector<bool>(N, false);
-
-
+	mvpMapPoints.assign(N, nullptr);
+	mvbOutlier.assign(N, false);
+	
 	// This is done only for the first Frame (or after a change in the calibration)
 	if (mbInitialComputations)
 	{
@@ -552,8 +551,8 @@ Frame::Frame(const cv::Mat& image, const cv::Mat& depth, double timestamp, ORBex
 
 	ComputeStereoFromRGBD(mvKeys, mvKeysUn, depth, camera, mvuRight, mvDepth);
 
-	mvpMapPoints = vector<MapPoint*>(N, static_cast<MapPoint*>(NULL));
-	mvbOutlier = vector<bool>(N, false);
+	mvpMapPoints.assign(N, nullptr);
+	mvbOutlier.assign(N, false);
 
 	// This is done only for the first Frame (or after a change in the calibration)
 	if (mbInitialComputations)
@@ -588,8 +587,8 @@ Frame::Frame(const cv::Mat& image, double timestamp, ORBextractor* extractor, OR
 	mvuRight = vector<float>(N, -1);
 	mvDepth = vector<float>(N, -1);
 
-	mvpMapPoints = vector<MapPoint*>(N, static_cast<MapPoint*>(NULL));
-	mvbOutlier = vector<bool>(N, false);
+	mvpMapPoints.assign(N, nullptr);
+	mvbOutlier.assign(N, false);
 
 	// This is done only for the first Frame (or after a change in the calibration)
 	if (mbInitialComputations)
