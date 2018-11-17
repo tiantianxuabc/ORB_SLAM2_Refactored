@@ -23,12 +23,9 @@
 
 #include<vector>
 
-//#include "MapPoint.h"
 #include "Thirdparty/DBoW2/DBoW2/BowVector.h"
 #include "Thirdparty/DBoW2/DBoW2/FeatureVector.h"
 #include "ORBVocabulary.h"
-//#include "KeyFrame.h"
-//#include "ORBextractor.h"
 #include "CameraParameters.h"
 
 #include <opencv2/opencv.hpp>
@@ -40,7 +37,6 @@ namespace ORB_SLAM2
 
 class MapPoint;
 class KeyFrame;
-//class ORBVocabulary;
 class ORBextractor;
 
 struct ImageBounds
@@ -186,11 +182,7 @@ public:
 
 	// Undistorted Image Bounds (computed once).
 	static ImageBounds imageBounds;
-	/*static float mnMinX;
-	static float mnMaxX;
-	static float mnMinY;
-	static float mnMaxY;*/
-
+	
 	static bool mbInitialComputations;
 
 
