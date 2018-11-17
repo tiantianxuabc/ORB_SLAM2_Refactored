@@ -79,6 +79,39 @@ static void UndistortKeyPoints(const std::vector<cv::KeyPoint>& mvKeys, const cv
 	}
 }
 
+// Computes image bounds for the undistorted image (called in the constructor).
+ImageBounds ComputeImageBounds(const cv::Mat &imLeft, const cv::Mat& mK, const cv::Mat& mDistCoef)
+{
+	ImageBounds imageBounds;
+	if (mDistCoef.at<float>(0) != 0.0)
+	{
+		cv::Mat mat(4, 2, CV_32F);
+		mat.at<float>(0, 0) = 0.0; mat.at<float>(0, 1) = 0.0;
+		mat.at<float>(1, 0) = imLeft.cols; mat.at<float>(1, 1) = 0.0;
+		mat.at<float>(2, 0) = 0.0; mat.at<float>(2, 1) = imLeft.rows;
+		mat.at<float>(3, 0) = imLeft.cols; mat.at<float>(3, 1) = imLeft.rows;
+
+		// Undistort corners
+		mat = mat.reshape(2);
+		cv::undistortPoints(mat, mat, mK, mDistCoef, cv::Mat(), mK);
+		mat = mat.reshape(1);
+
+		imageBounds.mnMinX = min(mat.at<float>(0, 0), mat.at<float>(2, 0));
+		imageBounds.mnMaxX = max(mat.at<float>(1, 0), mat.at<float>(3, 0));
+		imageBounds.mnMinY = min(mat.at<float>(0, 1), mat.at<float>(1, 1));
+		imageBounds.mnMaxY = max(mat.at<float>(2, 1), mat.at<float>(3, 1));
+
+	}
+	else
+	{
+		imageBounds.mnMinX = 0.0f;
+		imageBounds.mnMaxX = imLeft.cols;
+		imageBounds.mnMinY = 0.0f;
+		imageBounds.mnMaxY = imLeft.rows;
+	}
+	return imageBounds;
+}
+
 //////////////////////////////////////////////////////////////////////////////////
 // ImageBounds Class
 //////////////////////////////////////////////////////////////////////////////////
@@ -261,7 +294,7 @@ Frame::Frame(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timeSt
 	// This is done only for the first Frame (or after a change in the calibration)
 	if (mbInitialComputations)
 	{
-		ComputeImageBounds(imLeft);
+		imageBounds = ComputeImageBounds(imLeft, camera.Mat(), distCoef);
 		mbInitialComputations = false;
 	}
 	grid.AssignFeatures(mvKeysUn, imageBounds, static_cast<int>(mvScaleFactors.size()));
@@ -302,7 +335,7 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &timeSt
 	// This is done only for the first Frame (or after a change in the calibration)
 	if (mbInitialComputations)
 	{
-		ComputeImageBounds(imGray);
+		imageBounds = ComputeImageBounds(imGray, camera.Mat(), distCoef);
 		mbInitialComputations = false;
 	}
 	grid.AssignFeatures(mvKeysUn, imageBounds, static_cast<int>(mvScaleFactors.size()));
@@ -345,7 +378,7 @@ Frame::Frame(const cv::Mat &imGray, const double &timeStamp, ORBextractor* extra
 	// This is done only for the first Frame (or after a change in the calibration)
 	if (mbInitialComputations)
 	{
-		ComputeImageBounds(imGray);
+		imageBounds = ComputeImageBounds(imGray, camera.Mat(), distCoef);
 		mbInitialComputations = false;
 	}
 	grid.AssignFeatures(mvKeysUn, imageBounds, static_cast<int>(mvScaleFactors.size()));
@@ -437,38 +470,6 @@ void Frame::ComputeBoW()
 	{
 		vector<cv::Mat> vCurrentDesc = Converter::toDescriptorVector(mDescriptors);
 		mpORBvocabulary->transform(vCurrentDesc, mBowVec, mFeatVec, 4);
-	}
-}
-
-void Frame::ComputeImageBounds(const cv::Mat &imLeft)
-{
-	if (mDistCoef.at<float>(0) != 0.0)
-	{
-		cv::Mat mat(4, 2, CV_32F);
-		mat.at<float>(0, 0) = 0.0; mat.at<float>(0, 1) = 0.0;
-		mat.at<float>(1, 0) = imLeft.cols; mat.at<float>(1, 1) = 0.0;
-		mat.at<float>(2, 0) = 0.0; mat.at<float>(2, 1) = imLeft.rows;
-		mat.at<float>(3, 0) = imLeft.cols; mat.at<float>(3, 1) = imLeft.rows;
-
-		const cv::Mat1f mK = camera.Mat();
-
-		// Undistort corners
-		mat = mat.reshape(2);
-		cv::undistortPoints(mat, mat, mK, mDistCoef, cv::Mat(), mK);
-		mat = mat.reshape(1);
-
-		imageBounds.mnMinX = min(mat.at<float>(0, 0), mat.at<float>(2, 0));
-		imageBounds.mnMaxX = max(mat.at<float>(1, 0), mat.at<float>(3, 0));
-		imageBounds.mnMinY = min(mat.at<float>(0, 1), mat.at<float>(1, 1));
-		imageBounds.mnMaxY = max(mat.at<float>(2, 1), mat.at<float>(3, 1));
-
-	}
-	else
-	{
-		imageBounds.mnMinX = 0.0f;
-		imageBounds.mnMaxX = imLeft.cols;
-		imageBounds.mnMinY = 0.0f;
-		imageBounds.mnMaxY = imLeft.rows;
 	}
 }
 

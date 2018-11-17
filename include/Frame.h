@@ -211,7 +211,7 @@ private:
 	//void UndistortKeyPoints();
 
 	// Computes image bounds for the undistorted image (called in the constructor).
-	void ComputeImageBounds(const cv::Mat &imLeft);
+	//void ComputeImageBounds(const cv::Mat &imLeft);
 
 	// Assign keypoints to the grid for speed up feature matching (called in the constructor).
 	//void AssignFeaturesToGrid();
