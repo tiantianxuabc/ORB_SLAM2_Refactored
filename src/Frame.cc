@@ -462,7 +462,7 @@ Frame::Frame()
 
 //Copy Constructor
 Frame::Frame(const Frame &frame)
-	:mpORBvocabulary(frame.mpORBvocabulary), mpORBextractorLeft(frame.mpORBextractorLeft), mpORBextractorRight(frame.mpORBextractorRight),
+	:mpORBvocabulary(frame.mpORBvocabulary),
 	mTimeStamp(frame.mTimeStamp), camera(frame.camera), mDistCoef(frame.mDistCoef.clone()),
 	mThDepth(frame.mThDepth), N(frame.N), mvKeys(frame.mvKeys),
 	mvKeysRight(frame.mvKeysRight), mvKeysUn(frame.mvKeysUn), mvuRight(frame.mvuRight),
@@ -478,18 +478,21 @@ Frame::Frame(const Frame &frame)
 
 Frame::Frame(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timeStamp, ORBextractor* extractorLeft,
 	ORBextractor* extractorRight, ORBVocabulary* voc, const CameraParams& camera, cv::Mat &distCoef, const float &thDepth)
-	:mpORBvocabulary(voc), mpORBextractorLeft(extractorLeft), mpORBextractorRight(extractorRight), mTimeStamp(timeStamp),
+	:mpORBvocabulary(voc), mTimeStamp(timeStamp),
 	camera(camera), mDistCoef(distCoef.clone()), mThDepth(thDepth), mpReferenceKF(static_cast<KeyFrame*>(NULL))
 {
 	// Frame ID
 	mnId = nNextId++;
 
 	// Scale Level Info
-	GetScalePyramidInfo(mpORBextractorLeft, pyramid);
+	GetScalePyramidInfo(extractorLeft, pyramid);
 	
 	// ORB extraction
-	thread threadLeft(&Frame::ExtractORB, this, 0, imLeft);
-	thread threadRight(&Frame::ExtractORB, this, 1, imRight);
+	//thread threadLeft(&Frame::ExtractORB, this, 0, imLeft);
+	//thread threadRight(&Frame::ExtractORB, this, 1, imRight);
+	thread threadLeft([&](){ (*extractorLeft)(imLeft, cv::Mat(), mvKeys, mDescriptors); });
+	thread threadRight([&]() { (*extractorRight)(imRight, cv::Mat(), mvKeysRight, mDescriptorsRight); });
+
 	threadLeft.join();
 	threadRight.join();
 
@@ -500,8 +503,8 @@ Frame::Frame(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timeSt
 
 	UndistortKeyPoints(mvKeys, camera.Mat(), distCoef, mvKeysUn);
 
-	ComputeStereoMatches(mvKeys, mDescriptors, mpORBextractorLeft->mvImagePyramid,
-		mvKeysRight, mDescriptorsRight, mpORBextractorRight->mvImagePyramid,
+	ComputeStereoMatches(mvKeys, mDescriptors, extractorLeft->mvImagePyramid,
+		mvKeysRight, mDescriptorsRight, extractorRight->mvImagePyramid,
 		pyramid.mvScaleFactors, pyramid.mvInvScaleFactors, camera, mvuRight, mvDepth);
 
 	mvpMapPoints = vector<MapPoint*>(N, static_cast<MapPoint*>(NULL));
@@ -519,17 +522,18 @@ Frame::Frame(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timeSt
 
 Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &timeStamp, ORBextractor* extractor,
 	ORBVocabulary* voc, const CameraParams& camera, cv::Mat &distCoef, const float &thDepth)
-	:mpORBvocabulary(voc), mpORBextractorLeft(extractor), mpORBextractorRight(static_cast<ORBextractor*>(NULL)),
+	:mpORBvocabulary(voc),
 	mTimeStamp(timeStamp), camera(camera), mDistCoef(distCoef.clone()), mThDepth(thDepth)
 {
 	// Frame ID
 	mnId = nNextId++;
 
 	// Scale Level Info
-	GetScalePyramidInfo(mpORBextractorLeft, pyramid);
+	GetScalePyramidInfo(extractor, pyramid);
 	
 	// ORB extraction
-	ExtractORB(0, imGray);
+	//ExtractORB(0, imGray);
+	(*extractor)(imGray, cv::Mat(), mvKeys, mDescriptors);
 
 	N = mvKeys.size();
 
@@ -554,17 +558,18 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &timeSt
 
 Frame::Frame(const cv::Mat &imGray, const double &timeStamp, ORBextractor* extractor, ORBVocabulary* voc,
 	const CameraParams& camera, cv::Mat &distCoef, const float &thDepth)
-	:mpORBvocabulary(voc), mpORBextractorLeft(extractor), mpORBextractorRight(static_cast<ORBextractor*>(NULL)),
+	:mpORBvocabulary(voc),
 	mTimeStamp(timeStamp), camera(camera), mDistCoef(distCoef.clone()), mThDepth(thDepth)
 {
 	// Frame ID
 	mnId = nNextId++;
 
 	// Scale Level Info
-	GetScalePyramidInfo(mpORBextractorLeft, pyramid);
+	GetScalePyramidInfo(extractor, pyramid);
 	
 	// ORB extraction
-	ExtractORB(0, imGray);
+	//ExtractORB(0, imGray);
+	(*extractor)(imGray, cv::Mat(), mvKeys, mDescriptors);
 
 	N = mvKeys.size();
 
@@ -587,16 +592,6 @@ Frame::Frame(const cv::Mat &imGray, const double &timeStamp, ORBextractor* extra
 		mbInitialComputations = false;
 	}
 	grid.AssignFeatures(mvKeysUn, imageBounds, pyramid.mnScaleLevels);
-}
-
-
-
-void Frame::ExtractORB(int flag, const cv::Mat &im)
-{
-	if (flag == 0)
-		(*mpORBextractorLeft)(im, cv::Mat(), mvKeys, mDescriptors);
-	else
-		(*mpORBextractorRight)(im, cv::Mat(), mvKeysRight, mDescriptorsRight);
 }
 
 void Frame::SetPose(cv::Mat Tcw)

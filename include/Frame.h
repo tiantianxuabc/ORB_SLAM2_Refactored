@@ -101,7 +101,7 @@ public:
 		const CameraParams& camera, cv::Mat &distCoef, const float &thDepth);
 
 	// Extract ORB on the image. 0 for left image and 1 for right image.
-	void ExtractORB(int flag, const cv::Mat &im);
+	//void ExtractORB(int flag, const cv::Mat &im);
 
 	// Compute Bag of Words representation.
 	void ComputeBoW();
@@ -139,7 +139,7 @@ public:
 	ORBVocabulary* mpORBvocabulary;
 
 	// Feature extractor. The right is used only in the stereo case.
-	ORBextractor* mpORBextractorLeft, *mpORBextractorRight;
+	//ORBextractor* mpORBextractorLeft, *mpORBextractorRight;
 
 	// Frame timestamp.
 	double mTimeStamp;
