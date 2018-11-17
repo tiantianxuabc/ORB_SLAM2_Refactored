@@ -96,10 +96,10 @@ struct LocalMap
 		std::map<KeyFrame*, int> keyframeCounter;
 		for (int i = 0; i < currFrame.N; i++)
 		{
-			if (!currFrame.mvpMapPoints[i])
+			if (!currFrame.mappoints[i])
 				continue;
 
-			MapPoint* mappoint = currFrame.mvpMapPoints[i];
+			MapPoint* mappoint = currFrame.mappoints[i];
 			if (!mappoint->isBad())
 			{
 				for (const auto& observations : mappoint->GetObservations())
@@ -107,7 +107,7 @@ struct LocalMap
 			}
 			else
 			{
-				currFrame.mvpMapPoints[i] = nullptr;
+				currFrame.mappoints[i] = nullptr;
 			}
 		}
 
@@ -213,20 +213,20 @@ static int DiscardOutliers(Frame& currFrame)
 	int ninliers = 0;
 	for (int i = 0; i < currFrame.N; i++)
 	{
-		if (!currFrame.mvpMapPoints[i])
+		if (!currFrame.mappoints[i])
 			continue;
 
-		if (currFrame.mvbOutlier[i])
+		if (currFrame.outlier[i])
 		{
-			MapPoint* mappoint = currFrame.mvpMapPoints[i];
+			MapPoint* mappoint = currFrame.mappoints[i];
 
-			currFrame.mvpMapPoints[i] = nullptr;
-			currFrame.mvbOutlier[i] = false;
+			currFrame.mappoints[i] = nullptr;
+			currFrame.outlier[i] = false;
 
 			mappoint->mbTrackInView = false;
 			mappoint->mnLastFrameSeen = currFrame.mnId;
 		}
-		else if (currFrame.mvpMapPoints[i]->Observations() > 0)
+		else if (currFrame.mappoints[i]->Observations() > 0)
 		{
 			ninliers++;
 		}
@@ -254,13 +254,13 @@ bool TrackWithMotionModel(Frame& currFrame, Frame& lastFrame, const cv::Mat& vel
 	const int minMatches = 20;
 	int nmatches = 0;
 	{
-		std::fill(std::begin(currFrame.mvpMapPoints), std::end(currFrame.mvpMapPoints), nullptr);
+		std::fill(std::begin(currFrame.mappoints), std::end(currFrame.mappoints), nullptr);
 		nmatches = matcher.SearchByProjection(currFrame, lastFrame, threshold, sensor == System::MONOCULAR);
 	}
 	if (nmatches < minMatches)
 	{
 		// If few matches, uses a wider window search
-		std::fill(std::begin(currFrame.mvpMapPoints), std::end(currFrame.mvpMapPoints), nullptr);
+		std::fill(std::begin(currFrame.mappoints), std::end(currFrame.mappoints), nullptr);
 		nmatches = matcher.SearchByProjection(currFrame, lastFrame, 2 * threshold, sensor == System::MONOCULAR);
 	}
 
@@ -295,7 +295,7 @@ static bool TrackReferenceKeyFrame(Frame& currFrame, KeyFrame* referenceKF, Fram
 	if (nmatches < minMatches)
 		return false;
 
-	currFrame.mvpMapPoints = mappoints;
+	currFrame.mappoints = mappoints;
 	currFrame.SetPose(lastFrame.pose.mTcw);
 
 	Optimizer::PoseOptimization(&currFrame);
@@ -342,9 +342,9 @@ public:
 		{
 			for (int i = 0; i < currFrame.N; i++)
 			{
-				if (currFrame.mvDepth[i] > 0 && currFrame.mvDepth[i] < param_.thDepth)
+				if (currFrame.depth[i] > 0 && currFrame.depth[i] < param_.thDepth)
 				{
-					const bool tracked = currFrame.mvpMapPoints[i] && !currFrame.mvbOutlier[i];
+					const bool tracked = currFrame.mappoints[i] && !currFrame.outlier[i];
 					const int idx = tracked ? TRACKED : NON_TRACKED;
 					count[idx]++;
 				}
@@ -408,7 +408,7 @@ static void ConvertToGray(const cv::Mat& src, cv::Mat& dst, bool RGB)
 static void SearchLocalPoints(const LocalMap& localMap, Frame& currFrame, float th)
 {
 	// Do not search map points already matched
-	for (MapPoint* mappoint : currFrame.mvpMapPoints)
+	for (MapPoint* mappoint : currFrame.mappoints)
 	{
 		if (!mappoint)
 			continue;
@@ -464,18 +464,18 @@ static int TrackLocalMap(LocalMap& localMap, Frame& currFrame, float th, bool lo
 	// Update MapPoints Statistics
 	for (int i = 0; i < currFrame.N; i++)
 	{
-		if (!currFrame.mvpMapPoints[i])
+		if (!currFrame.mappoints[i])
 			continue;
 
-		if (!currFrame.mvbOutlier[i])
+		if (!currFrame.outlier[i])
 		{
-			currFrame.mvpMapPoints[i]->IncreaseFound();
-			if (localization || (!localization && currFrame.mvpMapPoints[i]->Observations() > 0))
+			currFrame.mappoints[i]->IncreaseFound();
+			if (localization || (!localization && currFrame.mappoints[i]->Observations() > 0))
 				ninliers++;
 		}
 		else if (stereo)
 		{
-			currFrame.mvpMapPoints[i] = nullptr;
+			currFrame.mappoints[i] = nullptr;
 		}
 	}
 
@@ -493,7 +493,7 @@ void CreateMapPoints(Frame& currFrame, KeyFrame* keyframe, Map* map, float thDep
 	depthIndices.reserve(currFrame.N);
 	for (int i = 0; i < currFrame.N; i++)
 	{
-		const float Z = currFrame.mvDepth[i];
+		const float Z = currFrame.depth[i];
 		if (Z > 0)
 			depthIndices.push_back(std::make_pair(Z, i));
 	}
@@ -511,7 +511,7 @@ void CreateMapPoints(Frame& currFrame, KeyFrame* keyframe, Map* map, float thDep
 
 		bool create = false;
 
-		MapPoint* mappoint = currFrame.mvpMapPoints[i];
+		MapPoint* mappoint = currFrame.mappoints[i];
 		if (!mappoint)
 		{
 			create = true;
@@ -519,7 +519,7 @@ void CreateMapPoints(Frame& currFrame, KeyFrame* keyframe, Map* map, float thDep
 		else if (mappoint->Observations() < 1)
 		{
 			create = true;
-			currFrame.mvpMapPoints[i] = nullptr;
+			currFrame.mappoints[i] = nullptr;
 		}
 
 		if (create)
@@ -533,7 +533,7 @@ void CreateMapPoints(Frame& currFrame, KeyFrame* keyframe, Map* map, float thDep
 
 			keyframe->AddMapPoint(newpoint, i);
 			map->AddMapPoint(newpoint);
-			currFrame.mvpMapPoints[i] = newpoint;
+			currFrame.mappoints[i] = newpoint;
 		}
 
 		npoints++;
@@ -551,7 +551,7 @@ static void CreateMapPointsVO(Frame& lastFrame, list<MapPoint*>& tempPoints, Map
 	depthIndices.reserve(lastFrame.N);
 	for (int i = 0; i < lastFrame.N; i++)
 	{
-		const float Z = lastFrame.mvDepth[i];
+		const float Z = lastFrame.depth[i];
 		if (Z > 0)
 			depthIndices.push_back(std::make_pair(Z, i));
 	}
@@ -569,13 +569,13 @@ static void CreateMapPointsVO(Frame& lastFrame, list<MapPoint*>& tempPoints, Map
 		const float Z = v.first;
 		const int i = v.second;
 
-		MapPoint* mappoint = lastFrame.mvpMapPoints[i];
+		MapPoint* mappoint = lastFrame.mappoints[i];
 		if (!mappoint || mappoint->Observations() < 1)
 		{
 			const cv::Mat Xw = lastFrame.UnprojectStereo(i);
 			MapPoint* newpoint = new MapPoint(Xw, map, &lastFrame, i);
 
-			lastFrame.mvpMapPoints[i] = newpoint;
+			lastFrame.mappoints[i] = newpoint;
 			tempPoints.push_back(newpoint);
 		}
 
@@ -684,11 +684,11 @@ public:
 					{
 						if (vbInliers[j])
 						{
-							mCurrentFrame.mvpMapPoints[j] = vvpMapPointMatches[i][j];
+							mCurrentFrame.mappoints[j] = vvpMapPointMatches[i][j];
 							sFound.insert(vvpMapPointMatches[i][j]);
 						}
 						else
-							mCurrentFrame.mvpMapPoints[j] = NULL;
+							mCurrentFrame.mappoints[j] = NULL;
 					}
 
 					int nGood = Optimizer::PoseOptimization(&mCurrentFrame);
@@ -697,8 +697,8 @@ public:
 						continue;
 
 					for (int io = 0; io < mCurrentFrame.N; io++)
-						if (mCurrentFrame.mvbOutlier[io])
-							mCurrentFrame.mvpMapPoints[io] = static_cast<MapPoint*>(NULL);
+						if (mCurrentFrame.outlier[io])
+							mCurrentFrame.mappoints[io] = static_cast<MapPoint*>(NULL);
 
 					// If few inliers, search by projection in a coarse window and optimize again
 					if (nGood < 50)
@@ -715,8 +715,8 @@ public:
 							{
 								sFound.clear();
 								for (int ip = 0; ip < mCurrentFrame.N; ip++)
-									if (mCurrentFrame.mvpMapPoints[ip])
-										sFound.insert(mCurrentFrame.mvpMapPoints[ip]);
+									if (mCurrentFrame.mappoints[ip])
+										sFound.insert(mCurrentFrame.mappoints[ip]);
 								nadditional = matcher2.SearchByProjection(mCurrentFrame, vpCandidateKFs[i], sFound, 3, 64);
 
 								// Final optimization
@@ -725,8 +725,8 @@ public:
 									nGood = Optimizer::PoseOptimization(&mCurrentFrame);
 
 									for (int io = 0; io < mCurrentFrame.N; io++)
-										if (mCurrentFrame.mvbOutlier[io])
-											mCurrentFrame.mvpMapPoints[io] = NULL;
+										if (mCurrentFrame.outlier[io])
+											mCurrentFrame.mappoints[io] = NULL;
 								}
 							}
 						}
@@ -873,10 +873,10 @@ public:
 		// Local Mapping might have changed some MapPoints tracked in last frame
 		for (int i = 0; i < lastFrame.N; i++)
 		{
-			MapPoint* mappoint = lastFrame.mvpMapPoints[i];
+			MapPoint* mappoint = lastFrame.mappoints[i];
 			MapPoint* replaced = mappoint ? mappoint->GetReplaced() : nullptr;
 			if (replaced)
-				lastFrame.mvpMapPoints[i] = replaced;
+				lastFrame.mappoints[i] = replaced;
 		}
 
 		bool success = false;
@@ -942,8 +942,8 @@ public:
 					CreateMapPointsVO(lastFrame, tempPoints_, map_, thDepth_);
 
 				bOKMM = TrackWithMotionModel(currFrame, lastFrame, velocity, minInliers, sensor_, &fewMatches_);
-				vpMPsMM = currFrame.mvpMapPoints;
-				vbOutMM = currFrame.mvbOutlier;
+				vpMPsMM = currFrame.mappoints;
+				vbOutMM = currFrame.outlier;
 				TcwMM = currFrame.pose.mTcw.clone();
 			}
 			bOKReloc = relocalizer_.Relocalize(currFrame, keyFrameDB_);
@@ -951,16 +951,16 @@ public:
 			if (bOKMM && !bOKReloc)
 			{
 				currFrame.SetPose(TcwMM);
-				currFrame.mvpMapPoints = vpMPsMM;
-				currFrame.mvbOutlier = vbOutMM;
+				currFrame.mappoints = vpMPsMM;
+				currFrame.outlier = vbOutMM;
 
 				if (fewMatches_)
 				{
 					for (int i = 0; i < currFrame.N; i++)
 					{
-						if (currFrame.mvpMapPoints[i] && !currFrame.mvbOutlier[i])
+						if (currFrame.mappoints[i] && !currFrame.outlier[i])
 						{
-							currFrame.mvpMapPoints[i]->IncreaseFound();
+							currFrame.mappoints[i]->IncreaseFound();
 						}
 					}
 				}
@@ -1054,7 +1054,7 @@ public:
 		// Create MapPoints and asscoiate to KeyFrame
 		for (int i = 0; i < currFrame.N; i++)
 		{
-			const float Z = currFrame.mvDepth[i];
+			const float Z = currFrame.depth[i];
 			if (Z <= 0.f)
 				continue;
 
@@ -1067,7 +1067,7 @@ public:
 			keyframe->AddMapPoint(mappoint, i);
 			map_->AddMapPoint(mappoint);
 
-			currFrame.mvpMapPoints[i] = mappoint;
+			currFrame.mappoints[i] = mappoint;
 		}
 
 		cout << "New map created with " << map_->MapPointsInMap() << " points" << endl;
@@ -1098,13 +1098,13 @@ public:
 		if (!initializer_)
 		{
 			// Set Reference Frame
-			if (currFrame.mvKeys.size() > 100)
+			if (currFrame.keypointsL.size() > 100)
 			{
 				initFrame_ = Frame(currFrame);
 				lastFrame_ = Frame(currFrame);
-				prevMatched_.resize(currFrame.mvKeysUn.size());
-				for (size_t i = 0; i < currFrame.mvKeysUn.size(); i++)
-					prevMatched_[i] = currFrame.mvKeysUn[i].pt;
+				prevMatched_.resize(currFrame.keypointsUn.size());
+				for (size_t i = 0; i < currFrame.keypointsUn.size(); i++)
+					prevMatched_[i] = currFrame.keypointsUn[i].pt;
 
 				if (initializer_)
 					delete initializer_;
@@ -1119,7 +1119,7 @@ public:
 		else
 		{
 			// Try to initialize
-			if ((int)currFrame.mvKeys.size() <= 100)
+			if ((int)currFrame.keypointsL.size() <= 100)
 			{
 				delete initializer_;
 				initializer_ = static_cast<Initializer*>(NULL);
@@ -1200,8 +1200,8 @@ public:
 			pMP->UpdateNormalAndDepth();
 
 			//Fill Current Frame structure
-			currFrame.mvpMapPoints[iniMatches_[i]] = pMP;
-			currFrame.mvbOutlier[iniMatches_[i]] = false;
+			currFrame.mappoints[iniMatches_[i]] = pMP;
+			currFrame.outlier[iniMatches_[i]] = false;
 
 			//Add to Map
 			map_->AddMapPoint(pMP);
@@ -1357,11 +1357,11 @@ public:
 			// Clean VO matches
 			for (int i = 0; i < currFrame.N; i++)
 			{
-				MapPoint* mappoint = currFrame.mvpMapPoints[i];
+				MapPoint* mappoint = currFrame.mappoints[i];
 				if (mappoint && mappoint->Observations() < 1)
 				{
-					currFrame.mvbOutlier[i] = false;
-					currFrame.mvpMapPoints[i] = nullptr;
+					currFrame.outlier[i] = false;
+					currFrame.mappoints[i] = nullptr;
 				}
 			}
 
@@ -1394,8 +1394,8 @@ public:
 			// with those points so we discard them in the frame.
 			for (int i = 0; i < currFrame.N; i++)
 			{
-				if (currFrame.mvpMapPoints[i] && currFrame.mvbOutlier[i])
-					currFrame.mvpMapPoints[i] = nullptr;
+				if (currFrame.mappoints[i] && currFrame.outlier[i])
+					currFrame.mappoints[i] = nullptr;
 			}
 		}
 
@@ -1685,7 +1685,7 @@ public:
 		cv::FileStorage settings(settingsFile, cv::FileStorage::READ);
 		camera_ = ReadCameraParams(settings);
 		distCoeffs_ = ReadDistCoeffs(settings);
-		Frame::mbInitialComputations = true;
+		Frame::initialComputation = true;
 	}
 
 	void Reset() override

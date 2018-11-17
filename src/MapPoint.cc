@@ -56,14 +56,14 @@ MapPoint::MapPoint(const cv::Mat &Pos, Map* pMap, Frame* pFrame, const int &idxF
 
     cv::Mat PC = Pos - Ow;
     const float dist = cv::norm(PC);
-    const int level = pFrame->mvKeysUn[idxF].octave;
+    const int level = pFrame->keypointsUn[idxF].octave;
     const float levelScaleFactor =  pFrame->pyramid.mvScaleFactors[level];
     const int nLevels = pFrame->pyramid.mnScaleLevels;
 
     mfMaxDistance = dist*levelScaleFactor;
     mfMinDistance = mfMaxDistance/pFrame->pyramid.mvScaleFactors[nLevels-1];
 
-    pFrame->mDescriptors.row(idxF).copyTo(mDescriptor);
+    pFrame->descriptorsL.row(idxF).copyTo(mDescriptor);
 
     // MapPoints can be created from Tracking and Local Mapping. This mutex avoid conflicts with id.
     std::unique_lock<std::mutex> lock(mpMap->mMutexPointCreation);

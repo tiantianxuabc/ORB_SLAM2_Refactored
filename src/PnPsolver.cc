@@ -69,11 +69,11 @@ PnPsolver::PnPsolver(const Frame &F, const vector<MapPoint*> &vpMapPointMatches)
     mnIterations(0), mnBestInliers(0), N(0)
 {
     mvpMapPointMatches = vpMapPointMatches;
-    mvP2D.reserve(F.mvpMapPoints.size());
-    mvSigma2.reserve(F.mvpMapPoints.size());
-    mvP3Dw.reserve(F.mvpMapPoints.size());
-    mvKeyPointIndices.reserve(F.mvpMapPoints.size());
-    mvAllIndices.reserve(F.mvpMapPoints.size());
+    mvP2D.reserve(F.mappoints.size());
+    mvSigma2.reserve(F.mappoints.size());
+    mvP3Dw.reserve(F.mappoints.size());
+    mvKeyPointIndices.reserve(F.mappoints.size());
+    mvAllIndices.reserve(F.mappoints.size());
 
     int idx=0;
     for(size_t i=0, iend=vpMapPointMatches.size(); i<iend; i++)
@@ -84,7 +84,7 @@ PnPsolver::PnPsolver(const Frame &F, const vector<MapPoint*> &vpMapPointMatches)
         {
             if(!pMP->isBad())
             {
-                const cv::KeyPoint &kp = F.mvKeysUn[i];
+                const cv::KeyPoint &kp = F.keypointsUn[i];
 
                 mvP2D.push_back(kp.pt);
                 mvSigma2.push_back(F.pyramid.mvLevelSigma2[kp.octave]);

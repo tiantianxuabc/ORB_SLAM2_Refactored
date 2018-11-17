@@ -39,7 +39,7 @@ std::vector<cv::Mat> toDescriptorVector(const cv::Mat &Descriptors);
 } // namespace Converter
 
 long unsigned int Frame::nNextId = 0;
-bool Frame::mbInitialComputations = true;
+bool Frame::initialComputation = true;
 ImageBounds Frame::imageBounds;
 
 static void GetScalePyramidInfo(ORBextractor* extractor, ScalePyramidInfo& pyramid)
@@ -477,11 +477,11 @@ Frame::Frame()
 Frame::Frame(const Frame &frame)
 	:voc(frame.voc),
 	timestamp(frame.timestamp), camera(frame.camera),
-	thDepth(frame.thDepth), N(frame.N), mvKeys(frame.mvKeys),
-	mvKeysRight(frame.mvKeysRight), mvKeysUn(frame.mvKeysUn), mvuRight(frame.mvuRight),
-	mvDepth(frame.mvDepth), mBowVec(frame.mBowVec), mFeatVec(frame.mFeatVec),
-	mDescriptors(frame.mDescriptors.clone()), mDescriptorsRight(frame.mDescriptorsRight.clone()),
-	mvpMapPoints(frame.mvpMapPoints), mvbOutlier(frame.mvbOutlier), mnId(frame.mnId),
+	thDepth(frame.thDepth), N(frame.N), keypointsL(frame.keypointsL),
+	keypointsR(frame.keypointsR), keypointsUn(frame.keypointsUn), uright(frame.uright),
+	depth(frame.depth), mBowVec(frame.mBowVec), mFeatVec(frame.mFeatVec),
+	descriptorsL(frame.descriptorsL.clone()), descriptorsR(frame.descriptorsR.clone()),
+	mappoints(frame.mappoints), outlier(frame.outlier), mnId(frame.mnId),
 	referenceKF(frame.referenceKF), pyramid(frame.pyramid), grid(frame.grid)
 {
 	if (!frame.pose.mTcw.empty())
@@ -498,38 +498,38 @@ Frame::Frame(const cv::Mat& imageL, const cv::Mat& imageR, double timestamp, ORB
 
 	// Scale Level Info
 	GetScalePyramidInfo(extractorL, pyramid);
-	
+
 	// ORB extraction
-	std::thread threadL([&](){ (*extractorL)(imageL, cv::Mat(), mvKeys, mDescriptors); });
-	std::thread threadR([&](){ (*extractorR)(imageR, cv::Mat(), mvKeysRight, mDescriptorsRight); });
+	std::thread threadL([&]() { (*extractorL)(imageL, cv::Mat(), keypointsL, descriptorsL); });
+	std::thread threadR([&]() { (*extractorR)(imageR, cv::Mat(), keypointsR, descriptorsR); });
 
 	threadL.join();
 	threadR.join();
 
-	N = mvKeys.size();
+	N = keypointsL.size();
 
-	if (mvKeys.empty())
+	if (keypointsL.empty())
 		return;
 
-	UndistortKeyPoints(mvKeys, camera.Mat(), distCoef, mvKeysUn);
+	UndistortKeyPoints(keypointsL, camera.Mat(), distCoef, keypointsUn);
 
-	ComputeStereoMatches(mvKeys, mDescriptors, extractorL->mvImagePyramid,
-		mvKeysRight, mDescriptorsRight, extractorR->mvImagePyramid,
-		pyramid.mvScaleFactors, pyramid.mvInvScaleFactors, camera, mvuRight, mvDepth);
+	ComputeStereoMatches(keypointsL, descriptorsL, extractorL->mvImagePyramid,
+		keypointsR, descriptorsR, extractorR->mvImagePyramid,
+		pyramid.mvScaleFactors, pyramid.mvInvScaleFactors, camera, uright, depth);
 
-	mvpMapPoints.assign(N, nullptr);
-	mvbOutlier.assign(N, false);
-	
+	mappoints.assign(N, nullptr);
+	outlier.assign(N, false);
+
 	// This is done only for the first Frame (or after a change in the calibration)
-	if (mbInitialComputations)
+	if (initialComputation)
 	{
 		imageBounds = ComputeImageBounds(imageL, camera.Mat(), distCoef);
-		mbInitialComputations = false;
+		initialComputation = false;
 	}
-	grid.AssignFeatures(mvKeysUn, imageBounds, pyramid.mnScaleLevels);
+	grid.AssignFeatures(keypointsUn, imageBounds, pyramid.mnScaleLevels);
 }
 
-Frame::Frame(const cv::Mat& image, const cv::Mat& depth, double timestamp, ORBextractor* extractor,
+Frame::Frame(const cv::Mat& image, const cv::Mat& depthImage, double timestamp, ORBextractor* extractor,
 	ORBVocabulary* voc, const CameraParams& camera, const cv::Mat& distCoef, float thDepth)
 	: voc(voc), timestamp(timestamp), camera(camera), thDepth(thDepth)
 {
@@ -538,29 +538,29 @@ Frame::Frame(const cv::Mat& image, const cv::Mat& depth, double timestamp, ORBex
 
 	// Scale Level Info
 	GetScalePyramidInfo(extractor, pyramid);
-	
+
 	// ORB extraction
-	(*extractor)(image, cv::Mat(), mvKeys, mDescriptors);
+	(*extractor)(image, cv::Mat(), keypointsL, descriptorsL);
 
-	N = mvKeys.size();
+	N = keypointsL.size();
 
-	if (mvKeys.empty())
+	if (keypointsL.empty())
 		return;
 
-	UndistortKeyPoints(mvKeys, camera.Mat(), distCoef, mvKeysUn);
+	UndistortKeyPoints(keypointsL, camera.Mat(), distCoef, keypointsUn);
 
-	ComputeStereoFromRGBD(mvKeys, mvKeysUn, depth, camera, mvuRight, mvDepth);
+	ComputeStereoFromRGBD(keypointsL, keypointsUn, depthImage, camera, uright, depth);
 
-	mvpMapPoints.assign(N, nullptr);
-	mvbOutlier.assign(N, false);
+	mappoints.assign(N, nullptr);
+	outlier.assign(N, false);
 
 	// This is done only for the first Frame (or after a change in the calibration)
-	if (mbInitialComputations)
+	if (initialComputation)
 	{
 		imageBounds = ComputeImageBounds(image, camera.Mat(), distCoef);
-		mbInitialComputations = false;
+		initialComputation = false;
 	}
-	grid.AssignFeatures(mvKeysUn, imageBounds, pyramid.mnScaleLevels);
+	grid.AssignFeatures(keypointsUn, imageBounds, pyramid.mnScaleLevels);
 }
 
 Frame::Frame(const cv::Mat& image, double timestamp, ORBextractor* extractor, ORBVocabulary* voc,
@@ -572,31 +572,31 @@ Frame::Frame(const cv::Mat& image, double timestamp, ORBextractor* extractor, OR
 
 	// Scale Level Info
 	GetScalePyramidInfo(extractor, pyramid);
-	
+
 	// ORB extraction
-	(*extractor)(image, cv::Mat(), mvKeys, mDescriptors);
+	(*extractor)(image, cv::Mat(), keypointsL, descriptorsL);
 
-	N = mvKeys.size();
+	N = keypointsL.size();
 
-	if (mvKeys.empty())
+	if (keypointsL.empty())
 		return;
 
-	UndistortKeyPoints(mvKeys, camera.Mat(), distCoef, mvKeysUn);
+	UndistortKeyPoints(keypointsL, camera.Mat(), distCoef, keypointsUn);
 
 	// Set no stereo information
-	mvuRight = vector<float>(N, -1);
-	mvDepth = vector<float>(N, -1);
+	uright = vector<float>(N, -1);
+	depth = vector<float>(N, -1);
 
-	mvpMapPoints.assign(N, nullptr);
-	mvbOutlier.assign(N, false);
+	mappoints.assign(N, nullptr);
+	outlier.assign(N, false);
 
 	// This is done only for the first Frame (or after a change in the calibration)
-	if (mbInitialComputations)
+	if (initialComputation)
 	{
 		imageBounds = ComputeImageBounds(image, camera.Mat(), distCoef);
-		mbInitialComputations = false;
+		initialComputation = false;
 	}
-	grid.AssignFeatures(mvKeysUn, imageBounds, pyramid.mnScaleLevels);
+	grid.AssignFeatures(keypointsUn, imageBounds, pyramid.mnScaleLevels);
 }
 
 void Frame::SetPose(cv::Mat Tcw)
@@ -670,7 +670,7 @@ void Frame::ComputeBoW()
 {
 	if (mBowVec.empty())
 	{
-		vector<cv::Mat> vCurrentDesc = Converter::toDescriptorVector(mDescriptors);
+		vector<cv::Mat> vCurrentDesc = Converter::toDescriptorVector(descriptorsL);
 		voc->transform(vCurrentDesc, mBowVec, mFeatVec, 4);
 	}
 }
@@ -682,15 +682,15 @@ std::vector<size_t> Frame::GetFeaturesInArea(float x, float y, float r, int minL
 
 cv::Mat Frame::UnprojectStereo(const int &i)
 {
-	const float z = mvDepth[i];
+	const float z = depth[i];
 	const float invfx = 1.f / camera.fx;
 	const float invfy = 1.f / camera.fy;
 	const float cx = camera.cx;
 	const float cy = camera.cy;
 	if (z > 0)
 	{
-		const float u = mvKeysUn[i].pt.x;
-		const float v = mvKeysUn[i].pt.y;
+		const float u = keypointsUn[i].pt.x;
+		const float v = keypointsUn[i].pt.y;
 		const float x = (u - cx)*z*invfx;
 		const float y = (v - cy)*z*invfy;
 		cv::Mat x3Dc = (cv::Mat_<float>(3, 1) << x, y, z);

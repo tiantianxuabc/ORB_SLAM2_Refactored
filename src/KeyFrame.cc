@@ -34,10 +34,10 @@ KeyFrame::KeyFrame(Frame &F, Map *pMap, KeyFrameDatabase *pKFDB):
     mnFrameId(F.mnId),  mTimeStamp(F.timestamp), grid(F.grid),
     mnTrackReferenceForFrame(0), mnFuseTargetForKF(0), mnBALocalForKF(0), mnBAFixedForKF(0),
     mnLoopQuery(0), mnLoopWords(0), mnRelocQuery(0), mnRelocWords(0), mnBAGlobalForKF(0),
-	camera(F.camera), mThDepth(F.thDepth), N(F.N), mvKeys(F.mvKeys), mvKeysUn(F.mvKeysUn),
-    mvuRight(F.mvuRight), mvDepth(F.mvDepth), mDescriptors(F.mDescriptors.clone()),
+	camera(F.camera), mThDepth(F.thDepth), N(F.N), mvKeys(F.keypointsL), mvKeysUn(F.keypointsUn),
+    mvuRight(F.uright), mvDepth(F.depth), mDescriptors(F.descriptorsL.clone()),
     mBowVec(F.mBowVec), mFeatVec(F.mFeatVec), pyramid(F.pyramid), imageBounds(F.imageBounds), 
-	mvpMapPoints(F.mvpMapPoints), mpKeyFrameDB(pKFDB),
+	mvpMapPoints(F.mappoints), mpKeyFrameDB(pKFDB),
     mpORBvocabulary(F.voc), mbFirstConnection(true), mpParent(NULL), mbNotErase(false),
     mbToBeErased(false), mbBad(false), mHalfBaseline(F.camera.baseline/2), mpMap(pMap)
 {

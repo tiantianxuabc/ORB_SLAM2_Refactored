@@ -156,26 +156,26 @@ public:
 	// Vector of keypoints (original for visualization) and undistorted (actually used by the system).
 	// In the stereo case, mvKeysUn is redundant as images must be rectified.
 	// In the RGB-D case, RGB images can be distorted.
-	std::vector<cv::KeyPoint> mvKeys, mvKeysRight;
-	std::vector<cv::KeyPoint> mvKeysUn;
+	std::vector<cv::KeyPoint> keypointsL, keypointsR;
+	std::vector<cv::KeyPoint> keypointsUn;
 
 	// Corresponding stereo coordinate and depth for each keypoint.
 	// "Monocular" keypoints have a negative value.
-	std::vector<float> mvuRight;
-	std::vector<float> mvDepth;
+	std::vector<float> uright;
+	std::vector<float> depth;
 
 	// Bag of Words Vector structures.
 	DBoW2::BowVector mBowVec;
 	DBoW2::FeatureVector mFeatVec;
 
 	// ORB descriptor, each row associated to a keypoint.
-	cv::Mat mDescriptors, mDescriptorsRight;
+	cv::Mat descriptorsL, descriptorsR;
 
 	// MapPoints associated to keypoints, NULL pointer if no association.
-	std::vector<MapPoint*> mvpMapPoints;
+	std::vector<MapPoint*> mappoints;
 
 	// Flag to identify outlier associations.
-	std::vector<bool> mvbOutlier;
+	std::vector<bool> outlier;
 
 	// Keypoints are assigned to cells in a grid to reduce matching complexity when projecting MapPoints.
 	FeaturesGrid grid;
@@ -195,8 +195,7 @@ public:
 
 	// Undistorted Image Bounds (computed once).
 	static ImageBounds imageBounds;
-
-	static bool mbInitialComputations;
+	static bool initialComputation;
 };
 
 }// namespace ORB_SLAM

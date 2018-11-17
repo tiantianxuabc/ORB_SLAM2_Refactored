@@ -108,8 +108,8 @@ private:
 static void GetTracingResults(const Tracking& tracker, int& state, std::vector<MapPoint*>& mappoints, std::vector<cv::KeyPoint>& keypoints)
 {
 	state = tracker.GetState();
-	mappoints = tracker.GetCurrentFrame().mvpMapPoints;
-	keypoints = tracker.GetCurrentFrame().mvKeysUn;
+	mappoints = tracker.GetCurrentFrame().mappoints;
+	keypoints = tracker.GetCurrentFrame().keypointsUn;
 }
 
 class ResetManager

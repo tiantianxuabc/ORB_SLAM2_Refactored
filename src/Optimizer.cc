@@ -279,17 +279,17 @@ int Optimizer::PoseOptimization(Frame *pFrame)
 
     for(int i=0; i<N; i++)
     {
-        MapPoint* pMP = pFrame->mvpMapPoints[i];
+        MapPoint* pMP = pFrame->mappoints[i];
         if(pMP)
         {
             // Monocular observation
-            if(pFrame->mvuRight[i]<0)
+            if(pFrame->uright[i]<0)
             {
                 nInitialCorrespondences++;
-                pFrame->mvbOutlier[i] = false;
+                pFrame->outlier[i] = false;
 
                 Eigen::Matrix<double,2,1> obs;
-                const cv::KeyPoint &kpUn = pFrame->mvKeysUn[i];
+                const cv::KeyPoint &kpUn = pFrame->keypointsUn[i];
                 obs << kpUn.pt.x, kpUn.pt.y;
 
                 g2o::EdgeSE3ProjectXYZOnlyPose* e = new g2o::EdgeSE3ProjectXYZOnlyPose();
@@ -320,12 +320,12 @@ int Optimizer::PoseOptimization(Frame *pFrame)
             else  // Stereo observation
             {
                 nInitialCorrespondences++;
-                pFrame->mvbOutlier[i] = false;
+                pFrame->outlier[i] = false;
 
                 //SET EDGE
                 Eigen::Matrix<double,3,1> obs;
-                const cv::KeyPoint &kpUn = pFrame->mvKeysUn[i];
-                const float &kp_ur = pFrame->mvuRight[i];
+                const cv::KeyPoint &kpUn = pFrame->keypointsUn[i];
+                const float &kp_ur = pFrame->uright[i];
                 obs << kpUn.pt.x, kpUn.pt.y, kp_ur;
 
                 g2o::EdgeStereoSE3ProjectXYZOnlyPose* e = new g2o::EdgeStereoSE3ProjectXYZOnlyPose();
@@ -385,7 +385,7 @@ int Optimizer::PoseOptimization(Frame *pFrame)
 
             const size_t idx = vnIndexEdgeMono[i];
 
-            if(pFrame->mvbOutlier[idx])
+            if(pFrame->outlier[idx])
             {
                 e->computeError();
             }
@@ -394,13 +394,13 @@ int Optimizer::PoseOptimization(Frame *pFrame)
 
             if(chi2>chi2Mono[it])
             {                
-                pFrame->mvbOutlier[idx]=true;
+                pFrame->outlier[idx]=true;
                 e->setLevel(1);
                 nBad++;
             }
             else
             {
-                pFrame->mvbOutlier[idx]=false;
+                pFrame->outlier[idx]=false;
                 e->setLevel(0);
             }
 
@@ -414,7 +414,7 @@ int Optimizer::PoseOptimization(Frame *pFrame)
 
             const size_t idx = vnIndexEdgeStereo[i];
 
-            if(pFrame->mvbOutlier[idx])
+            if(pFrame->outlier[idx])
             {
                 e->computeError();
             }
@@ -423,14 +423,14 @@ int Optimizer::PoseOptimization(Frame *pFrame)
 
             if(chi2>chi2Stereo[it])
             {
-                pFrame->mvbOutlier[idx]=true;
+                pFrame->outlier[idx]=true;
                 e->setLevel(1);
                 nBad++;
             }
             else
             {                
                 e->setLevel(0);
-                pFrame->mvbOutlier[idx]=false;
+                pFrame->outlier[idx]=false;
             }
 
             if(it==2)
