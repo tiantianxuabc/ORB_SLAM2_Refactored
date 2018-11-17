@@ -129,10 +129,11 @@ public:
     const double mTimeStamp;
 
     // Grid (to speed up feature matching)
-    const int mnGridCols;
+	FeaturesGrid grid;
+    /*const int mnGridCols;
     const int mnGridRows;
     const float mfGridElementWidthInv;
-    const float mfGridElementHeightInv;
+    const float mfGridElementHeightInv;*/
 
     // Variables used by the tracking
     long unsigned int mnTrackReferenceForFrame;

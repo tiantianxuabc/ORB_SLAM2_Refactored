@@ -32,8 +32,9 @@
 
 namespace ORB_SLAM2
 {
-#define FRAME_GRID_ROWS 48
-#define FRAME_GRID_COLS 64
+
+//#define FRAME_GRID_ROWS 48
+//#define FRAME_GRID_COLS 64
 
 class MapPoint;
 class KeyFrame;
@@ -48,6 +49,27 @@ struct ImageBounds
 	float Width() const;
 	float Height() const;
 	bool Contains(float x, float y) const;
+};
+
+class FeaturesGrid
+{
+
+public:
+
+	FeaturesGrid();
+	FeaturesGrid(const std::vector<cv::KeyPoint>& keypoints, const ImageBounds& roi, int nlevels);
+	void AssignFeatures(const std::vector<cv::KeyPoint>& keypoints, const ImageBounds& imageBounds, int nlevels);
+	std::vector<size_t> GetFeaturesInArea(float x, float y, float r, int minLevel = -1, int maxLevel = -1) const;
+
+private:
+	static const int ROWS = 48;
+	static const int COLS = 64;
+	float mfGridElementWidthInv;
+	float mfGridElementHeightInv;
+	std::vector<cv::KeyPoint> keypoints_;
+	ImageBounds imageBounds_;
+	int nlevels_;
+	std::vector<std::size_t> mGrid[COLS][ROWS];
 };
 
 class Frame
@@ -97,7 +119,7 @@ public:
 	bool isInFrustum(MapPoint* pMP, float viewingCosLimit);
 
 	// Compute the cell of a keypoint (return false if outside the grid)
-	bool PosInGrid(const cv::KeyPoint &kp, int &posX, int &posY);
+	//bool PosInGrid(const cv::KeyPoint &kp, int &posX, int &posY);
 
 	std::vector<size_t> GetFeaturesInArea(const float &x, const float  &y, const float  &r, const int minLevel = -1, const int maxLevel = -1) const;
 
@@ -157,9 +179,10 @@ public:
 	std::vector<bool> mvbOutlier;
 
 	// Keypoints are assigned to cells in a grid to reduce matching complexity when projecting MapPoints.
-	static float mfGridElementWidthInv;
-	static float mfGridElementHeightInv;
-	std::vector<std::size_t> mGrid[FRAME_GRID_COLS][FRAME_GRID_ROWS];
+	FeaturesGrid grid;
+	//static float mfGridElementWidthInv;
+	//static float mfGridElementHeightInv;
+	//std::vector<std::size_t> mGrid[FRAME_GRID_COLS][FRAME_GRID_ROWS];
 
 	// Camera pose.
 	cv::Mat mTcw;
@@ -197,7 +220,7 @@ private:
 	void ComputeImageBounds(const cv::Mat &imLeft);
 
 	// Assign keypoints to the grid for speed up feature matching (called in the constructor).
-	void AssignFeaturesToGrid();
+	//void AssignFeaturesToGrid();
 
 	// Rotation, translation and camera center
 	cv::Mat mRcw;

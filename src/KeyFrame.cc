@@ -31,8 +31,7 @@ namespace ORB_SLAM2
 long unsigned int KeyFrame::nNextId=0;
 
 KeyFrame::KeyFrame(Frame &F, Map *pMap, KeyFrameDatabase *pKFDB):
-    mnFrameId(F.mnId),  mTimeStamp(F.mTimeStamp), mnGridCols(FRAME_GRID_COLS), mnGridRows(FRAME_GRID_ROWS),
-    mfGridElementWidthInv(F.mfGridElementWidthInv), mfGridElementHeightInv(F.mfGridElementHeightInv),
+    mnFrameId(F.mnId),  mTimeStamp(F.mTimeStamp), grid(F.grid),
     mnTrackReferenceForFrame(0), mnFuseTargetForKF(0), mnBALocalForKF(0), mnBAFixedForKF(0),
     mnLoopQuery(0), mnLoopWords(0), mnRelocQuery(0), mnRelocWords(0), mnBAGlobalForKF(0),
 	camera(F.camera), mThDepth(F.mThDepth), N(F.N), mvKeys(F.mvKeys), mvKeysUn(F.mvKeysUn),
@@ -45,13 +44,13 @@ KeyFrame::KeyFrame(Frame &F, Map *pMap, KeyFrameDatabase *pKFDB):
 {
     mnId=nNextId++;
 
-    mGrid.resize(mnGridCols);
+    /*mGrid.resize(mnGridCols);
     for(int i=0; i<mnGridCols;i++)
     {
         mGrid[i].resize(mnGridRows);
         for(int j=0; j<mnGridRows; j++)
             mGrid[i][j] = F.mGrid[i][j];
-    }
+    }*/
 
     SetPose(F.mTcw);    
 }
@@ -568,7 +567,8 @@ void KeyFrame::EraseConnection(KeyFrame* pKF)
 
 vector<size_t> KeyFrame::GetFeaturesInArea(const float &x, const float &y, const float &r) const
 {
-    vector<size_t> vIndices;
+	return grid.GetFeaturesInArea(x, y, r);
+    /*vector<size_t> vIndices;
     vIndices.reserve(N);
 
 	const float mnMinX = imageBounds.mnMinX;
@@ -607,7 +607,7 @@ vector<size_t> KeyFrame::GetFeaturesInArea(const float &x, const float &y, const
         }
     }
 
-    return vIndices;
+    return vIndices;*/
 }
 
 bool KeyFrame::IsInImage(const float &x, const float &y) const
