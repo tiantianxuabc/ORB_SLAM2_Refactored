@@ -457,6 +457,19 @@ std::vector<size_t> FeaturesGrid::GetFeaturesInArea(float x, float y, float r, i
 	return vIndices;
 }
 
+void CameraPose::Update()
+{
+	mRcw = mTcw.rowRange(0, 3).colRange(0, 3);
+	mRwc = mRcw.t();
+	mtcw = mTcw.rowRange(0, 3).col(3);
+	mOw = -mRcw.t()*mtcw;
+}
+
+cv::Mat CameraPose::GetRotationInverse() const
+{
+	return mRwc.clone();
+}
+
 Frame::Frame()
 {}
 
@@ -471,8 +484,8 @@ Frame::Frame(const Frame &frame)
 	mvpMapPoints(frame.mvpMapPoints), mvbOutlier(frame.mvbOutlier), mnId(frame.mnId),
 	mpReferenceKF(frame.mpReferenceKF), pyramid(frame.pyramid), grid(frame.grid)
 {
-	if (!frame.mTcw.empty())
-		SetPose(frame.mTcw);
+	if (!frame.pose.mTcw.empty())
+		SetPose(frame.pose.mTcw);
 }
 
 
@@ -589,16 +602,15 @@ Frame::Frame(const cv::Mat &imGray, const double &timeStamp, ORBextractor* extra
 
 void Frame::SetPose(cv::Mat Tcw)
 {
-	mTcw = Tcw.clone();
-	UpdatePoseMatrices();
+	//mTcw = Tcw.clone();
+	//UpdatePoseMatrices();
+	pose.mTcw = Tcw.clone();
+	pose.Update();
 }
 
-void Frame::UpdatePoseMatrices()
+cv::Mat Frame::GetCameraCenter() const
 {
-	mRcw = mTcw.rowRange(0, 3).colRange(0, 3);
-	mRwc = mRcw.t();
-	mtcw = mTcw.rowRange(0, 3).col(3);
-	mOw = -mRcw.t()*mtcw;
+	return pose.mOw.clone();
 }
 
 bool Frame::isInFrustum(MapPoint *pMP, float viewingCosLimit)
@@ -609,7 +621,7 @@ bool Frame::isInFrustum(MapPoint *pMP, float viewingCosLimit)
 	cv::Mat P = pMP->GetWorldPos();
 
 	// 3D in camera coordinates
-	const cv::Mat Pc = mRcw*P + mtcw;
+	const cv::Mat Pc = pose.mRcw*P + pose.mtcw;
 	const float &PcX = Pc.at<float>(0);
 	const float &PcY = Pc.at<float>(1);
 	const float &PcZ = Pc.at<float>(2);
@@ -629,7 +641,7 @@ bool Frame::isInFrustum(MapPoint *pMP, float viewingCosLimit)
 	// Check distance is in the scale invariance region of the MapPoint
 	const float maxDistance = pMP->GetMaxDistanceInvariance();
 	const float minDistance = pMP->GetMinDistanceInvariance();
-	const cv::Mat PO = P - mOw;
+	const cv::Mat PO = P - pose.mOw;
 	const float dist = cv::norm(PO);
 
 	if (dist<minDistance || dist>maxDistance)
@@ -685,7 +697,7 @@ cv::Mat Frame::UnprojectStereo(const int &i)
 		const float x = (u - cx)*z*invfx;
 		const float y = (v - cy)*z*invfy;
 		cv::Mat x3Dc = (cv::Mat_<float>(3, 1) << x, y, z);
-		return mRwc*x3Dc + mOw;
+		return pose.mRwc*x3Dc + pose.mOw;
 	}
 	else
 		return cv::Mat();

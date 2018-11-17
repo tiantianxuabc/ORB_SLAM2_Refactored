@@ -59,6 +59,21 @@ struct ScalePyramidInfo
 	std::vector<float> mvInvLevelSigma2;
 };
 
+struct CameraPose
+{
+	void Update();
+	cv::Mat GetRotationInverse() const;
+
+	// Camera pose.
+	cv::Mat mTcw;
+
+	// Rotation, translation and camera center
+	cv::Mat mRcw;
+	cv::Mat mtcw;
+	cv::Mat mRwc;
+	cv::Mat mOw; //==mtwc
+};
+
 class FeaturesGrid
 {
 
@@ -107,17 +122,18 @@ public:
 	void SetPose(cv::Mat Tcw);
 
 	// Computes rotation, translation and camera center matrices from the camera pose.
-	void UpdatePoseMatrices();
+	//void UpdatePoseMatrices();
 
 	// Returns the camera center.
-	inline cv::Mat GetCameraCenter() {
-		return mOw.clone();
-	}
+	cv::Mat GetCameraCenter() const;
+	//inline cv::Mat GetCameraCenter() {
+	//	return mOw.clone();
+	//}
 
-	// Returns inverse of rotation
-	inline cv::Mat GetRotationInverse() {
-		return mRwc.clone();
-	}
+	//// Returns inverse of rotation
+	//inline cv::Mat GetRotationInverse() {
+	//	return mRwc.clone();
+	//}
 
 	// Check if a MapPoint is in the frustum of the camera
 	// and fill variables of the MapPoint to be used by the tracking
@@ -176,7 +192,8 @@ public:
 	FeaturesGrid grid;
 	
 	// Camera pose.
-	cv::Mat mTcw;
+	CameraPose pose;
+	//cv::Mat mTcw;
 
 	// Current and Next Frame id.
 	static long unsigned int nNextId;
@@ -196,10 +213,10 @@ public:
 private:
 
 	// Rotation, translation and camera center
-	cv::Mat mRcw;
-	cv::Mat mtcw;
-	cv::Mat mRwc;
-	cv::Mat mOw; //==mtwc
+	//cv::Mat mRcw;
+	//cv::Mat mtcw;
+	//cv::Mat mRwc;
+	//cv::Mat mOw; //==mtwc
 };
 
 }// namespace ORB_SLAM

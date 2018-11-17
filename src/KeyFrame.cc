@@ -51,7 +51,7 @@ KeyFrame::KeyFrame(Frame &F, Map *pMap, KeyFrameDatabase *pKFDB):
             mGrid[i][j] = F.mGrid[i][j];
     }*/
 
-    SetPose(F.mTcw);    
+    SetPose(F.pose.mTcw);    
 }
 
 void KeyFrame::ComputeBoW()
