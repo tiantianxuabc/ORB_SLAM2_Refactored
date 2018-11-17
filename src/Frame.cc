@@ -42,6 +42,17 @@ long unsigned int Frame::nNextId = 0;
 bool Frame::mbInitialComputations = true;
 ImageBounds Frame::imageBounds;
 
+static void GetScalePyramidInfo(ORBextractor* extractor, ScalePyramidInfo& pyramid)
+{
+	pyramid.mnScaleLevels = extractor->GetLevels();
+	pyramid.mfScaleFactor = extractor->GetScaleFactor();
+	pyramid.mfLogScaleFactor = log(pyramid.mfScaleFactor);
+	pyramid.mvScaleFactors = extractor->GetScaleFactors();
+	pyramid.mvInvScaleFactors = extractor->GetInverseScaleFactors();
+	pyramid.mvLevelSigma2 = extractor->GetScaleSigmaSquares();
+	pyramid.mvInvLevelSigma2 = extractor->GetInverseScaleSigmaSquares();
+}
+
 // Undistort keypoints given OpenCV distortion parameters.
 // Only for the RGB-D case. Stereo must be already rectified!
 // (called in the constructor).
@@ -458,10 +469,7 @@ Frame::Frame(const Frame &frame)
 	mvDepth(frame.mvDepth), mBowVec(frame.mBowVec), mFeatVec(frame.mFeatVec),
 	mDescriptors(frame.mDescriptors.clone()), mDescriptorsRight(frame.mDescriptorsRight.clone()),
 	mvpMapPoints(frame.mvpMapPoints), mvbOutlier(frame.mvbOutlier), mnId(frame.mnId),
-	mpReferenceKF(frame.mpReferenceKF), mnScaleLevels(frame.mnScaleLevels),
-	mfScaleFactor(frame.mfScaleFactor), mfLogScaleFactor(frame.mfLogScaleFactor),
-	mvScaleFactors(frame.mvScaleFactors), mvInvScaleFactors(frame.mvInvScaleFactors),
-	mvLevelSigma2(frame.mvLevelSigma2), mvInvLevelSigma2(frame.mvInvLevelSigma2), grid(frame.grid)
+	mpReferenceKF(frame.mpReferenceKF), pyramid(frame.pyramid), grid(frame.grid)
 {
 	if (!frame.mTcw.empty())
 		SetPose(frame.mTcw);
@@ -477,14 +485,8 @@ Frame::Frame(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timeSt
 	mnId = nNextId++;
 
 	// Scale Level Info
-	mnScaleLevels = mpORBextractorLeft->GetLevels();
-	mfScaleFactor = mpORBextractorLeft->GetScaleFactor();
-	mfLogScaleFactor = log(mfScaleFactor);
-	mvScaleFactors = mpORBextractorLeft->GetScaleFactors();
-	mvInvScaleFactors = mpORBextractorLeft->GetInverseScaleFactors();
-	mvLevelSigma2 = mpORBextractorLeft->GetScaleSigmaSquares();
-	mvInvLevelSigma2 = mpORBextractorLeft->GetInverseScaleSigmaSquares();
-
+	GetScalePyramidInfo(mpORBextractorLeft, pyramid);
+	
 	// ORB extraction
 	thread threadLeft(&Frame::ExtractORB, this, 0, imLeft);
 	thread threadRight(&Frame::ExtractORB, this, 1, imRight);
@@ -500,7 +502,7 @@ Frame::Frame(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timeSt
 
 	ComputeStereoMatches(mvKeys, mDescriptors, mpORBextractorLeft->mvImagePyramid,
 		mvKeysRight, mDescriptorsRight, mpORBextractorRight->mvImagePyramid,
-		mvScaleFactors, mvInvScaleFactors, camera, mvuRight, mvDepth);
+		pyramid.mvScaleFactors, pyramid.mvInvScaleFactors, camera, mvuRight, mvDepth);
 
 	mvpMapPoints = vector<MapPoint*>(N, static_cast<MapPoint*>(NULL));
 	mvbOutlier = vector<bool>(N, false);
@@ -512,7 +514,7 @@ Frame::Frame(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timeSt
 		imageBounds = ComputeImageBounds(imLeft, camera.Mat(), distCoef);
 		mbInitialComputations = false;
 	}
-	grid.AssignFeatures(mvKeysUn, imageBounds, static_cast<int>(mvScaleFactors.size()));
+	grid.AssignFeatures(mvKeysUn, imageBounds, pyramid.mnScaleLevels);
 }
 
 Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &timeStamp, ORBextractor* extractor,
@@ -524,14 +526,8 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &timeSt
 	mnId = nNextId++;
 
 	// Scale Level Info
-	mnScaleLevels = mpORBextractorLeft->GetLevels();
-	mfScaleFactor = mpORBextractorLeft->GetScaleFactor();
-	mfLogScaleFactor = log(mfScaleFactor);
-	mvScaleFactors = mpORBextractorLeft->GetScaleFactors();
-	mvInvScaleFactors = mpORBextractorLeft->GetInverseScaleFactors();
-	mvLevelSigma2 = mpORBextractorLeft->GetScaleSigmaSquares();
-	mvInvLevelSigma2 = mpORBextractorLeft->GetInverseScaleSigmaSquares();
-
+	GetScalePyramidInfo(mpORBextractorLeft, pyramid);
+	
 	// ORB extraction
 	ExtractORB(0, imGray);
 
@@ -553,7 +549,7 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &timeSt
 		imageBounds = ComputeImageBounds(imGray, camera.Mat(), distCoef);
 		mbInitialComputations = false;
 	}
-	grid.AssignFeatures(mvKeysUn, imageBounds, static_cast<int>(mvScaleFactors.size()));
+	grid.AssignFeatures(mvKeysUn, imageBounds, pyramid.mnScaleLevels);
 }
 
 Frame::Frame(const cv::Mat &imGray, const double &timeStamp, ORBextractor* extractor, ORBVocabulary* voc,
@@ -565,14 +561,8 @@ Frame::Frame(const cv::Mat &imGray, const double &timeStamp, ORBextractor* extra
 	mnId = nNextId++;
 
 	// Scale Level Info
-	mnScaleLevels = mpORBextractorLeft->GetLevels();
-	mfScaleFactor = mpORBextractorLeft->GetScaleFactor();
-	mfLogScaleFactor = log(mfScaleFactor);
-	mvScaleFactors = mpORBextractorLeft->GetScaleFactors();
-	mvInvScaleFactors = mpORBextractorLeft->GetInverseScaleFactors();
-	mvLevelSigma2 = mpORBextractorLeft->GetScaleSigmaSquares();
-	mvInvLevelSigma2 = mpORBextractorLeft->GetInverseScaleSigmaSquares();
-
+	GetScalePyramidInfo(mpORBextractorLeft, pyramid);
+	
 	// ORB extraction
 	ExtractORB(0, imGray);
 
@@ -596,7 +586,7 @@ Frame::Frame(const cv::Mat &imGray, const double &timeStamp, ORBextractor* extra
 		imageBounds = ComputeImageBounds(imGray, camera.Mat(), distCoef);
 		mbInitialComputations = false;
 	}
-	grid.AssignFeatures(mvKeysUn, imageBounds, static_cast<int>(mvScaleFactors.size()));
+	grid.AssignFeatures(mvKeysUn, imageBounds, pyramid.mnScaleLevels);
 }
 
 

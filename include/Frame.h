@@ -48,6 +48,17 @@ struct ImageBounds
 	bool Contains(float x, float y) const;
 };
 
+struct ScalePyramidInfo
+{
+	int mnScaleLevels;
+	float mfScaleFactor;
+	float mfLogScaleFactor;
+	std::vector<float> mvScaleFactors;
+	std::vector<float> mvInvScaleFactors;
+	std::vector<float> mvLevelSigma2;
+	std::vector<float> mvInvLevelSigma2;
+};
+
 class FeaturesGrid
 {
 
@@ -189,13 +200,14 @@ public:
 	KeyFrame* mpReferenceKF;
 
 	// Scale pyramid info.
-	int mnScaleLevels;
+	ScalePyramidInfo pyramid;
+	/*int mnScaleLevels;
 	float mfScaleFactor;
 	float mfLogScaleFactor;
 	std::vector<float> mvScaleFactors;
 	std::vector<float> mvInvScaleFactors;
 	std::vector<float> mvLevelSigma2;
-	std::vector<float> mvInvLevelSigma2;
+	std::vector<float> mvInvLevelSigma2;*/
 
 	// Undistorted Image Bounds (computed once).
 	static ImageBounds imageBounds;
