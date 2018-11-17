@@ -602,8 +602,6 @@ Frame::Frame(const cv::Mat& image, double timestamp, ORBextractor* extractor, OR
 
 void Frame::SetPose(cv::Mat Tcw)
 {
-	//mTcw = Tcw.clone();
-	//UpdatePoseMatrices();
 	pose.mTcw = Tcw.clone();
 	pose.Update();
 }
