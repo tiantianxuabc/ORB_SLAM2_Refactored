@@ -42,6 +42,43 @@ long unsigned int Frame::nNextId = 0;
 bool Frame::mbInitialComputations = true;
 ImageBounds Frame::imageBounds;
 
+// Undistort keypoints given OpenCV distortion parameters.
+// Only for the RGB-D case. Stereo must be already rectified!
+// (called in the constructor).
+static void UndistortKeyPoints(const std::vector<cv::KeyPoint>& mvKeys, const cv::Mat& mK, const cv::Mat& mDistCoef,
+	std::vector<cv::KeyPoint>& mvKeysUn)
+{
+	if (mDistCoef.at<float>(0) == 0.0)
+	{
+		mvKeysUn = mvKeys;
+		return;
+	}
+
+	// Fill matrix with points
+	const int N = static_cast<int>(mvKeys.size());
+	cv::Mat mat(N, 2, CV_32F);
+	for (int i = 0; i < N; i++)
+	{
+		mat.at<float>(i, 0) = mvKeys[i].pt.x;
+		mat.at<float>(i, 1) = mvKeys[i].pt.y;
+	}
+
+	// Undistort points
+	mat = mat.reshape(2);
+	cv::undistortPoints(mat, mat, mK, mDistCoef, cv::Mat(), mK);
+	mat = mat.reshape(1);
+
+	// Fill undistorted keypoint vector
+	mvKeysUn.resize(N);
+	for (int i = 0; i < N; i++)
+	{
+		cv::KeyPoint kp = mvKeys[i];
+		kp.pt.x = mat.at<float>(i, 0);
+		kp.pt.y = mat.at<float>(i, 1);
+		mvKeysUn[i] = kp;
+	}
+}
+
 //////////////////////////////////////////////////////////////////////////////////
 // ImageBounds Class
 //////////////////////////////////////////////////////////////////////////////////
@@ -213,7 +250,7 @@ Frame::Frame(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timeSt
 	if (mvKeys.empty())
 		return;
 
-	UndistortKeyPoints();
+	UndistortKeyPoints(mvKeys, camera.Mat(), distCoef, mvKeysUn);
 
 	ComputeStereoMatches();
 
@@ -255,7 +292,7 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &timeSt
 	if (mvKeys.empty())
 		return;
 
-	UndistortKeyPoints();
+	UndistortKeyPoints(mvKeys, camera.Mat(), distCoef, mvKeysUn);
 
 	ComputeStereoFromRGBD(imDepth);
 
@@ -296,7 +333,7 @@ Frame::Frame(const cv::Mat &imGray, const double &timeStamp, ORBextractor* extra
 	if (mvKeys.empty())
 		return;
 
-	UndistortKeyPoints();
+	UndistortKeyPoints(mvKeys, camera.Mat(), distCoef, mvKeysUn);
 
 	// Set no stereo information
 	mvuRight = vector<float>(N, -1);
@@ -400,40 +437,6 @@ void Frame::ComputeBoW()
 	{
 		vector<cv::Mat> vCurrentDesc = Converter::toDescriptorVector(mDescriptors);
 		mpORBvocabulary->transform(vCurrentDesc, mBowVec, mFeatVec, 4);
-	}
-}
-
-void Frame::UndistortKeyPoints()
-{
-	if (mDistCoef.at<float>(0) == 0.0)
-	{
-		mvKeysUn = mvKeys;
-		return;
-	}
-
-	// Fill matrix with points
-	cv::Mat mat(N, 2, CV_32F);
-	for (int i = 0; i < N; i++)
-	{
-		mat.at<float>(i, 0) = mvKeys[i].pt.x;
-		mat.at<float>(i, 1) = mvKeys[i].pt.y;
-	}
-
-	const cv::Mat1f mK = camera.Mat();
-
-	// Undistort points
-	mat = mat.reshape(2);
-	cv::undistortPoints(mat, mat, mK, mDistCoef, cv::Mat(), mK);
-	mat = mat.reshape(1);
-
-	// Fill undistorted keypoint vector
-	mvKeysUn.resize(N);
-	for (int i = 0; i < N; i++)
-	{
-		cv::KeyPoint kp = mvKeys[i];
-		kp.pt.x = mat.at<float>(i, 0);
-		kp.pt.y = mat.at<float>(i, 1);
-		mvKeysUn[i] = kp;
 	}
 }
 
