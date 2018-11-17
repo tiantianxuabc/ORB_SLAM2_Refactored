@@ -463,7 +463,7 @@ Frame::Frame()
 //Copy Constructor
 Frame::Frame(const Frame &frame)
 	:mpORBvocabulary(frame.mpORBvocabulary),
-	mTimeStamp(frame.mTimeStamp), camera(frame.camera), mDistCoef(frame.mDistCoef.clone()),
+	mTimeStamp(frame.mTimeStamp), camera(frame.camera),
 	mThDepth(frame.mThDepth), N(frame.N), mvKeys(frame.mvKeys),
 	mvKeysRight(frame.mvKeysRight), mvKeysUn(frame.mvKeysUn), mvuRight(frame.mvuRight),
 	mvDepth(frame.mvDepth), mBowVec(frame.mBowVec), mFeatVec(frame.mFeatVec),
@@ -479,7 +479,7 @@ Frame::Frame(const Frame &frame)
 Frame::Frame(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timeStamp, ORBextractor* extractorLeft,
 	ORBextractor* extractorRight, ORBVocabulary* voc, const CameraParams& camera, cv::Mat &distCoef, const float &thDepth)
 	:mpORBvocabulary(voc), mTimeStamp(timeStamp),
-	camera(camera), mDistCoef(distCoef.clone()), mThDepth(thDepth), mpReferenceKF(static_cast<KeyFrame*>(NULL))
+	camera(camera), mThDepth(thDepth), mpReferenceKF(static_cast<KeyFrame*>(NULL))
 {
 	// Frame ID
 	mnId = nNextId++;
@@ -523,7 +523,7 @@ Frame::Frame(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timeSt
 Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &timeStamp, ORBextractor* extractor,
 	ORBVocabulary* voc, const CameraParams& camera, cv::Mat &distCoef, const float &thDepth)
 	:mpORBvocabulary(voc),
-	mTimeStamp(timeStamp), camera(camera), mDistCoef(distCoef.clone()), mThDepth(thDepth)
+	mTimeStamp(timeStamp), camera(camera), mThDepth(thDepth)
 {
 	// Frame ID
 	mnId = nNextId++;
@@ -559,7 +559,7 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &timeSt
 Frame::Frame(const cv::Mat &imGray, const double &timeStamp, ORBextractor* extractor, ORBVocabulary* voc,
 	const CameraParams& camera, cv::Mat &distCoef, const float &thDepth)
 	:mpORBvocabulary(voc),
-	mTimeStamp(timeStamp), camera(camera), mDistCoef(distCoef.clone()), mThDepth(thDepth)
+	mTimeStamp(timeStamp), camera(camera), mThDepth(thDepth)
 {
 	// Frame ID
 	mnId = nNextId++;

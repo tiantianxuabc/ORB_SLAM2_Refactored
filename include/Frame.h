@@ -138,9 +138,8 @@ public:
 	// Frame timestamp.
 	double mTimeStamp;
 
-	// Calibration matrix and OpenCV distortion parameters.
+	// Calibration matrix
 	CameraParams camera;
-	cv::Mat mDistCoef;
 
 	// Threshold close/far points. Close points are inserted from 1 view.
 	// Far points are inserted as in the monocular case from 2 views.
