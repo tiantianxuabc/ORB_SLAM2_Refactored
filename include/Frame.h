@@ -131,7 +131,7 @@ public:
 	// and fill variables of the MapPoint to be used by the tracking
 	bool isInFrustum(MapPoint* pMP, float viewingCosLimit);
 
-	std::vector<size_t> GetFeaturesInArea(const float &x, const float  &y, const float  &r, const int minLevel = -1, const int maxLevel = -1) const;
+	std::vector<size_t> GetFeaturesInArea(float x, float y, float r, int minLevel = -1, int maxLevel = -1) const;
 
 	// Backprojects a keypoint (if stereo/depth info available) into 3D world coordinates.
 	cv::Mat UnprojectStereo(const int &i);

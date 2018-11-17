@@ -676,7 +676,7 @@ void Frame::ComputeBoW()
 	}
 }
 
-std::vector<size_t> Frame::GetFeaturesInArea(const float &x, const float  &y, const float  &r, const int minLevel, const int maxLevel) const
+std::vector<size_t> Frame::GetFeaturesInArea(float x, float y, float r, int minLevel, int maxLevel) const
 {
 	return grid.GetFeaturesInArea(x, y, r, minLevel, maxLevel);
 }
