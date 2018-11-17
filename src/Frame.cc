@@ -478,8 +478,7 @@ Frame::Frame(const Frame &frame)
 
 Frame::Frame(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timeStamp, ORBextractor* extractorLeft,
 	ORBextractor* extractorRight, ORBVocabulary* voc, const CameraParams& camera, cv::Mat &distCoef, const float &thDepth)
-	:mpORBvocabulary(voc), mTimeStamp(timeStamp),
-	camera(camera), mThDepth(thDepth), mpReferenceKF(static_cast<KeyFrame*>(NULL))
+	: mpORBvocabulary(voc), mTimeStamp(timeStamp), camera(camera), mThDepth(thDepth), mpReferenceKF(nullptr)
 {
 	// Frame ID
 	mnId = nNextId++;
@@ -488,8 +487,6 @@ Frame::Frame(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timeSt
 	GetScalePyramidInfo(extractorLeft, pyramid);
 	
 	// ORB extraction
-	//thread threadLeft(&Frame::ExtractORB, this, 0, imLeft);
-	//thread threadRight(&Frame::ExtractORB, this, 1, imRight);
 	thread threadLeft([&](){ (*extractorLeft)(imLeft, cv::Mat(), mvKeys, mDescriptors); });
 	thread threadRight([&]() { (*extractorRight)(imRight, cv::Mat(), mvKeysRight, mDescriptorsRight); });
 
@@ -522,8 +519,7 @@ Frame::Frame(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timeSt
 
 Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &timeStamp, ORBextractor* extractor,
 	ORBVocabulary* voc, const CameraParams& camera, cv::Mat &distCoef, const float &thDepth)
-	:mpORBvocabulary(voc),
-	mTimeStamp(timeStamp), camera(camera), mThDepth(thDepth)
+	: mpORBvocabulary(voc), mTimeStamp(timeStamp), camera(camera), mThDepth(thDepth)
 {
 	// Frame ID
 	mnId = nNextId++;
@@ -532,7 +528,6 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &timeSt
 	GetScalePyramidInfo(extractor, pyramid);
 	
 	// ORB extraction
-	//ExtractORB(0, imGray);
 	(*extractor)(imGray, cv::Mat(), mvKeys, mDescriptors);
 
 	N = mvKeys.size();
@@ -558,8 +553,7 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &timeSt
 
 Frame::Frame(const cv::Mat &imGray, const double &timeStamp, ORBextractor* extractor, ORBVocabulary* voc,
 	const CameraParams& camera, cv::Mat &distCoef, const float &thDepth)
-	:mpORBvocabulary(voc),
-	mTimeStamp(timeStamp), camera(camera), mThDepth(thDepth)
+	: mpORBvocabulary(voc), mTimeStamp(timeStamp), camera(camera), mThDepth(thDepth)
 {
 	// Frame ID
 	mnId = nNextId++;
@@ -568,7 +562,6 @@ Frame::Frame(const cv::Mat &imGray, const double &timeStamp, ORBextractor* extra
 	GetScalePyramidInfo(extractor, pyramid);
 	
 	// ORB extraction
-	//ExtractORB(0, imGray);
 	(*extractor)(imGray, cv::Mat(), mvKeys, mDescriptors);
 
 	N = mvKeys.size();
