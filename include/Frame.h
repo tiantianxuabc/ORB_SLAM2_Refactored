@@ -61,7 +61,10 @@ struct ScalePyramidInfo
 
 struct CameraPose
 {
+	// Computes rotation, translation and camera center matrices from the camera pose.
 	void Update();
+
+	// Returns inverse of rotation
 	cv::Mat GetRotationInverse() const;
 
 	// Camera pose.
@@ -121,20 +124,9 @@ public:
 	// Set the camera pose.
 	void SetPose(cv::Mat Tcw);
 
-	// Computes rotation, translation and camera center matrices from the camera pose.
-	//void UpdatePoseMatrices();
-
 	// Returns the camera center.
 	cv::Mat GetCameraCenter() const;
-	//inline cv::Mat GetCameraCenter() {
-	//	return mOw.clone();
-	//}
-
-	//// Returns inverse of rotation
-	//inline cv::Mat GetRotationInverse() {
-	//	return mRwc.clone();
-	//}
-
+	
 	// Check if a MapPoint is in the frustum of the camera
 	// and fill variables of the MapPoint to be used by the tracking
 	bool isInFrustum(MapPoint* pMP, float viewingCosLimit);
@@ -209,14 +201,6 @@ public:
 	static ImageBounds imageBounds;
 	
 	static bool mbInitialComputations;
-
-private:
-
-	// Rotation, translation and camera center
-	//cv::Mat mRcw;
-	//cv::Mat mtcw;
-	//cv::Mat mRwc;
-	//cv::Mat mOw; //==mtwc
 };
 
 }// namespace ORB_SLAM
