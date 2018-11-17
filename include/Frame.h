@@ -138,17 +138,17 @@ public:
 
 public:
 	// Vocabulary used for relocalization.
-	ORBVocabulary* mpORBvocabulary;
+	ORBVocabulary* voc;
 
 	// Frame timestamp.
-	double mTimeStamp;
+	double timestamp;
 
 	// Calibration matrix
 	CameraParams camera;
 
 	// Threshold close/far points. Close points are inserted from 1 view.
 	// Far points are inserted as in the monocular case from 2 views.
-	float mThDepth;
+	float thDepth;
 
 	// Number of KeyPoints.
 	int N;
@@ -188,7 +188,7 @@ public:
 	long unsigned int mnId;
 
 	// Reference Keyframe.
-	KeyFrame* mpReferenceKF;
+	KeyFrame* referenceKF;
 
 	// Scale pyramid info.
 	ScalePyramidInfo pyramid;

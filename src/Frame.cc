@@ -475,14 +475,14 @@ Frame::Frame()
 
 //Copy Constructor
 Frame::Frame(const Frame &frame)
-	:mpORBvocabulary(frame.mpORBvocabulary),
-	mTimeStamp(frame.mTimeStamp), camera(frame.camera),
-	mThDepth(frame.mThDepth), N(frame.N), mvKeys(frame.mvKeys),
+	:voc(frame.voc),
+	timestamp(frame.timestamp), camera(frame.camera),
+	thDepth(frame.thDepth), N(frame.N), mvKeys(frame.mvKeys),
 	mvKeysRight(frame.mvKeysRight), mvKeysUn(frame.mvKeysUn), mvuRight(frame.mvuRight),
 	mvDepth(frame.mvDepth), mBowVec(frame.mBowVec), mFeatVec(frame.mFeatVec),
 	mDescriptors(frame.mDescriptors.clone()), mDescriptorsRight(frame.mDescriptorsRight.clone()),
 	mvpMapPoints(frame.mvpMapPoints), mvbOutlier(frame.mvbOutlier), mnId(frame.mnId),
-	mpReferenceKF(frame.mpReferenceKF), pyramid(frame.pyramid), grid(frame.grid)
+	referenceKF(frame.referenceKF), pyramid(frame.pyramid), grid(frame.grid)
 {
 	if (!frame.pose.mTcw.empty())
 		SetPose(frame.pose.mTcw);
@@ -491,7 +491,7 @@ Frame::Frame(const Frame &frame)
 
 Frame::Frame(const cv::Mat& imageL, const cv::Mat& imageR, double timestamp, ORBextractor* extractorL,
 	ORBextractor* extractorR, ORBVocabulary* voc, const CameraParams& camera, const cv::Mat& distCoef, float thDepth)
-	: mpORBvocabulary(voc), mTimeStamp(timestamp), camera(camera), mThDepth(thDepth), mpReferenceKF(nullptr)
+	: voc(voc), timestamp(timestamp), camera(camera), thDepth(thDepth), referenceKF(nullptr)
 {
 	// Frame ID
 	mnId = nNextId++;
@@ -531,7 +531,7 @@ Frame::Frame(const cv::Mat& imageL, const cv::Mat& imageR, double timestamp, ORB
 
 Frame::Frame(const cv::Mat& image, const cv::Mat& depth, double timestamp, ORBextractor* extractor,
 	ORBVocabulary* voc, const CameraParams& camera, const cv::Mat& distCoef, float thDepth)
-	: mpORBvocabulary(voc), mTimeStamp(timestamp), camera(camera), mThDepth(thDepth)
+	: voc(voc), timestamp(timestamp), camera(camera), thDepth(thDepth)
 {
 	// Frame ID
 	mnId = nNextId++;
@@ -565,7 +565,7 @@ Frame::Frame(const cv::Mat& image, const cv::Mat& depth, double timestamp, ORBex
 
 Frame::Frame(const cv::Mat& image, double timestamp, ORBextractor* extractor, ORBVocabulary* voc,
 	const CameraParams& camera, const cv::Mat& distCoef, float thDepth)
-	: mpORBvocabulary(voc), mTimeStamp(timestamp), camera(camera), mThDepth(thDepth)
+	: voc(voc), timestamp(timestamp), camera(camera), thDepth(thDepth)
 {
 	// Frame ID
 	mnId = nNextId++;
@@ -671,7 +671,7 @@ void Frame::ComputeBoW()
 	if (mBowVec.empty())
 	{
 		vector<cv::Mat> vCurrentDesc = Converter::toDescriptorVector(mDescriptors);
-		mpORBvocabulary->transform(vCurrentDesc, mBowVec, mFeatVec, 4);
+		voc->transform(vCurrentDesc, mBowVec, mFeatVec, 4);
 	}
 }
 

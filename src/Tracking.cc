@@ -56,9 +56,9 @@ void GlobalBundleAdjustemnt(Map* pMap, int nIterations = 5, bool *pbStopFlag = N
 }
 
 TrackPoint::TrackPoint(const Frame& frame, bool lost)
-	: referenceKF(frame.mpReferenceKF), timestamp(frame.mTimeStamp), lost(lost)
+	: referenceKF(frame.referenceKF), timestamp(frame.timestamp), lost(lost)
 {
-	Tcr = frame.pose.mTcw * frame.mpReferenceKF->GetPoseInverse();
+	Tcr = frame.pose.mTcw * frame.referenceKF->GetPoseInverse();
 }
 
 struct TrackerParameters
@@ -182,7 +182,7 @@ struct LocalMap
 		if (maxKeyFrame)
 		{
 			referenceKF = maxKeyFrame;
-			currFrame.mpReferenceKF = referenceKF;
+			currFrame.referenceKF = referenceKF;
 		}
 	}
 
@@ -237,7 +237,7 @@ static int DiscardOutliers(Frame& currFrame)
 static void UpdateLastFramePose(Frame& lastFrame, const TrackPoint& lastTrackPoint)
 {
 	// Update pose according to reference keyframe
-	KeyFrame* referenceKF = lastFrame.mpReferenceKF;
+	KeyFrame* referenceKF = lastFrame.referenceKF;
 	cv::Mat Tlr = lastTrackPoint.Tcr;
 	lastFrame.SetPose(Tlr * referenceKF->GetPose());
 }
@@ -1081,7 +1081,7 @@ public:
 		localMap_.keyframes.push_back(keyframe);
 		localMap_.mappoints = map_->GetAllMapPoints();
 		localMap_.referenceKF = keyframe;
-		currFrame.mpReferenceKF = keyframe;
+		currFrame.referenceKF = keyframe;
 
 		map_->SetReferenceMapPoints(localMap_.mappoints);
 
@@ -1254,7 +1254,7 @@ public:
 		localMap_.keyframes.push_back(pKFini);
 		localMap_.mappoints = map_->GetAllMapPoints();
 		localMap_.referenceKF = pKFcur;
-		currFrame.mpReferenceKF = pKFcur;
+		currFrame.referenceKF = pKFcur;
 
 		lastFrame_ = Frame(currFrame);
 
@@ -1312,7 +1312,7 @@ public:
 		else
 			success = trackerIni_.TrackLocalization(currFrame, lastFrame_, velocity_, state_, lastKeyFrame_->mnFrameId);
 
-		currFrame.mpReferenceKF = localMap_.referenceKF;
+		currFrame.referenceKF = localMap_.referenceKF;
 
 		// If we have an initial estimation of the camera pose and matching. Track the local map.
 		// [In Localization Mode]
@@ -1376,7 +1376,7 @@ public:
 				{
 					KeyFrame* keyframe = new KeyFrame(currFrame, map_, keyFrameDB_);
 					localMap_.referenceKF = keyframe;
-					currFrame.mpReferenceKF = keyframe;
+					currFrame.referenceKF = keyframe;
 
 					if (sensor_ != System::MONOCULAR)
 						CreateMapPoints(currFrame, keyframe, map_, param_.thDepth);
@@ -1410,12 +1410,12 @@ public:
 			}
 		}
 
-		CV_Assert(currFrame.mpReferenceKF);
+		CV_Assert(currFrame.referenceKF);
 
 		lastFrame_ = Frame(currFrame);
 
 		// Store frame pose information to retrieve the complete camera trajectory afterwards.
-		CV_Assert(currFrame.mpReferenceKF == localMap_.referenceKF);
+		CV_Assert(currFrame.referenceKF == localMap_.referenceKF);
 		const bool lost = state_ == STATE_LOST;
 		if (!currFrame.pose.mTcw.empty())
 		{
