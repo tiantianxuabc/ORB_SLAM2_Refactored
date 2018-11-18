@@ -745,38 +745,38 @@ ORBextractor::ORBextractor(int _nfeatures, float _scaleFactor, int _nlevels,
 	nfeatures(_nfeatures), scaleFactor(_scaleFactor), nlevels(_nlevels),
 	iniThFAST(_iniThFAST), minThFAST(_minThFAST)
 {
-	mvScaleFactor.resize(nlevels);
+	scaleFactors_.resize(nlevels);
 	mvLevelSigma2.resize(nlevels);
-	mvScaleFactor[0] = 1.0f;
+	scaleFactors_[0] = 1.0f;
 	mvLevelSigma2[0] = 1.0f;
 	for (int i = 1; i < nlevels; i++)
 	{
-		mvScaleFactor[i] = mvScaleFactor[i - 1] * scaleFactor;
-		mvLevelSigma2[i] = mvScaleFactor[i] * mvScaleFactor[i];
+		scaleFactors_[i] = scaleFactors_[i - 1] * scaleFactor;
+		mvLevelSigma2[i] = scaleFactors_[i] * scaleFactors_[i];
 	}
 
-	mvInvScaleFactor.resize(nlevels);
+	invScaleFactors_.resize(nlevels);
 	mvInvLevelSigma2.resize(nlevels);
 	for (int i = 0; i < nlevels; i++)
 	{
-		mvInvScaleFactor[i] = 1.0f / mvScaleFactor[i];
+		invScaleFactors_[i] = 1.0f / scaleFactors_[i];
 		mvInvLevelSigma2[i] = 1.0f / mvLevelSigma2[i];
 	}
 
-	mvImagePyramid.resize(nlevels);
+	images_.resize(nlevels);
 
-	mnFeaturesPerLevel.resize(nlevels);
-	float factor = 1.0f / scaleFactor;
+	nfeaturesPerLevel_.resize(nlevels);
+	float factor = 1.f / scaleFactor;
 	float nDesiredFeaturesPerScale = nfeatures*(1 - factor) / (1 - (float)pow((double)factor, (double)nlevels));
 
 	int sumFeatures = 0;
 	for (int level = 0; level < nlevels - 1; level++)
 	{
-		mnFeaturesPerLevel[level] = cvRound(nDesiredFeaturesPerScale);
-		sumFeatures += mnFeaturesPerLevel[level];
+		nfeaturesPerLevel_[level] = cvRound(nDesiredFeaturesPerScale);
+		sumFeatures += nfeaturesPerLevel_[level];
 		nDesiredFeaturesPerScale *= factor;
 	}
-	mnFeaturesPerLevel[nlevels - 1] = std::max(nfeatures - sumFeatures, 0);
+	nfeaturesPerLevel_[nlevels - 1] = std::max(nfeatures - sumFeatures, 0);
 
 	const int npoints = 512;
 	const Point* pattern0 = (const Point*)bit_pattern_31_;
@@ -784,20 +784,20 @@ ORBextractor::ORBextractor(int _nfeatures, float _scaleFactor, int _nlevels,
 
 	//This is for orientation
 	// pre-compute the end of a row in a circular patch
-	umax.resize(HALF_PATCH_SIZE + 1);
+	umax_.resize(HALF_PATCH_SIZE + 1);
 
 	int v, v0, vmax = cvFloor(HALF_PATCH_SIZE * sqrt(2.f) / 2 + 1);
 	int vmin = cvCeil(HALF_PATCH_SIZE * sqrt(2.f) / 2);
 	const double hp2 = HALF_PATCH_SIZE*HALF_PATCH_SIZE;
 	for (v = 0; v <= vmax; ++v)
-		umax[v] = cvRound(sqrt(hp2 - v * v));
+		umax_[v] = cvRound(sqrt(hp2 - v * v));
 
 	// Make sure we are symmetric
 	for (v = HALF_PATCH_SIZE, v0 = 0; v >= vmin; --v)
 	{
-		while (umax[v0] == umax[v0 + 1])
+		while (umax_[v0] == umax_[v0 + 1])
 			++v0;
-		umax[v] = v0;
+		umax_[v] = v0;
 		++v0;
 	}
 }
@@ -918,21 +918,24 @@ void ORBextractor::Extract(const cv::Mat& image, KeyPoints& _keypoints, cv::Mat&
 	if (image.empty())
 		return;
 
-	assert(image.type() == CV_8UC1);
+	CV_Assert(image.type() == CV_8UC1);
 
 	// Pre-compute the scale pyramid
-	ComputePyramid(image, mvImagePyramid, mvInvScaleFactor, nlevels);
+	ComputePyramid(image, images_, invScaleFactors_, nlevels);
 
-	vector < KeyPoints > allKeypoints;
-	ComputeKeyPointsOctTree(mvImagePyramid, allKeypoints, mnFeaturesPerLevel, mvScaleFactor, umax,
+	std::vector<KeyPoints> keypoints_;
+	ComputeKeyPointsOctTree(images_, keypoints_, nfeaturesPerLevel_, scaleFactors_, umax_,
 		nfeatures, nlevels, iniThFAST, minThFAST);
-	//ComputeKeyPointsOld(allKeypoints);
-
+	
 	int nkeypoints = 0;
 	for (int level = 0; level < nlevels; ++level)
-		nkeypoints += (int)allKeypoints[level].size();
+		nkeypoints += (int)keypoints_[level].size();
+
 	if (nkeypoints == 0)
+	{
 		descriptors.release();
+		return;
+	}
 	else
 	{
 		descriptors.create(nkeypoints, 32, CV_8U);
@@ -944,26 +947,26 @@ void ORBextractor::Extract(const cv::Mat& image, KeyPoints& _keypoints, cv::Mat&
 	int offset = 0;
 	for (int level = 0; level < nlevels; ++level)
 	{
-		KeyPoints& keypoints = allKeypoints[level];
+		KeyPoints& keypoints = keypoints_[level];
 		int nkeypointsLevel = (int)keypoints.size();
 
 		if (nkeypointsLevel == 0)
 			continue;
 
 		// preprocess the resized image
-		Mat workingMat = mvImagePyramid[level].clone();
-		GaussianBlur(workingMat, workingMat, Size(7, 7), 2, 2, BORDER_REFLECT_101);
+		cv::Mat blur = images_[level].clone();
+		cv::GaussianBlur(blur, blur, cv::Size(7, 7), 2, 2, cv::BORDER_REFLECT_101);
 
 		// Compute the descriptors
-		Mat desc = descriptors.rowRange(offset, offset + nkeypointsLevel);
-		computeDescriptors(workingMat, keypoints, desc, pattern);
+		cv::Mat desc = descriptors.rowRange(offset, offset + nkeypointsLevel);
+		computeDescriptors(blur, keypoints, desc, pattern);
 
 		offset += nkeypointsLevel;
 
 		// Scale keypoint coordinates
 		if (level != 0)
 		{
-			float scale = mvScaleFactor[level]; //getScale(level, firstLevel, scaleFactor);
+			float scale = scaleFactors_[level]; //getScale(level, firstLevel, scaleFactor);
 			for (KeyPoints::iterator keypoint = keypoints.begin(),
 				keypointEnd = keypoints.end(); keypoint != keypointEnd; ++keypoint)
 				keypoint->pt *= scale;
@@ -975,11 +978,11 @@ void ORBextractor::Extract(const cv::Mat& image, KeyPoints& _keypoints, cv::Mat&
 
 int ORBextractor::GetLevels() const { return nlevels; }
 float ORBextractor::GetScaleFactor() const { return scaleFactor; }
-const std::vector<float>& ORBextractor::GetScaleFactors() const { return mvScaleFactor; }
-const std::vector<float>& ORBextractor::GetInverseScaleFactors() const { return mvInvScaleFactor; }
+const std::vector<float>& ORBextractor::GetScaleFactors() const { return scaleFactors_; }
+const std::vector<float>& ORBextractor::GetInverseScaleFactors() const { return invScaleFactors_; }
 const std::vector<float>& ORBextractor::GetScaleSigmaSquares() const { return mvLevelSigma2; }
 const std::vector<float>& ORBextractor::GetInverseScaleSigmaSquares() const { return mvInvLevelSigma2; }
-const std::vector<cv::Mat>& ORBextractor::GetImagePyramid() const { return mvImagePyramid; }
+const std::vector<cv::Mat>& ORBextractor::GetImagePyramid() const { return images_; }
 
 ORBextractor::Parameters::Parameters(int nfeatures, float scaleFactor, int nlevels, int iniThFAST, int minThFAST)
 	: nfeatures(nfeatures), scaleFactor(scaleFactor), nlevels(nlevels), iniThFAST(iniThFAST), minThFAST(minThFAST)

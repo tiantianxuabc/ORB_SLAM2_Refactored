@@ -69,16 +69,16 @@ private:
 	int minThFAST;
 
 	std::vector<cv::Point> pattern;
-	std::vector<int> mnFeaturesPerLevel;
+	std::vector<int> nfeaturesPerLevel_;
 
-	std::vector<int> umax;
+	std::vector<int> umax_;
 
-	std::vector<float> mvScaleFactor;
-	std::vector<float> mvInvScaleFactor;
+	std::vector<float> scaleFactors_;
+	std::vector<float> invScaleFactors_;
 	std::vector<float> mvLevelSigma2;
 	std::vector<float> mvInvLevelSigma2;
 
-	std::vector<cv::Mat> mvImagePyramid;
+	std::vector<cv::Mat> images_;
 };
 
 } //namespace ORB_SLAM
