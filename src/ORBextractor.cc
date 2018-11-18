@@ -479,6 +479,19 @@ static void computeOrientation(const Mat& image, vector<KeyPoint>& keypoints, co
     }
 }
 
+class ExtractorNode
+{
+public:
+	ExtractorNode() :bNoMore(false) {}
+
+	void DivideNode(ExtractorNode &n1, ExtractorNode &n2, ExtractorNode &n3, ExtractorNode &n4);
+
+	std::vector<cv::KeyPoint> vKeys;
+	cv::Point2i UL, UR, BL, BR;
+	std::list<ExtractorNode>::iterator lit;
+	bool bNoMore;
+};
+
 void ExtractorNode::DivideNode(ExtractorNode &n1, ExtractorNode &n2, ExtractorNode &n3, ExtractorNode &n4)
 {
     const int halfX = ceil(static_cast<float>(UR.x-UL.x)/2);
