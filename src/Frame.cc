@@ -479,7 +479,7 @@ Frame::Frame(const cv::Mat& imageL, const cv::Mat& imageR, double timestamp, ORB
 	threadL.join();
 	threadR.join();
 
-	N = keypointsL.size();
+	N = static_cast<int>(keypointsL.size());
 
 	if (keypointsL.empty())
 		return;
@@ -515,7 +515,7 @@ Frame::Frame(const cv::Mat& image, const cv::Mat& depthImage, double timestamp, 
 	// ORB extraction
 	(*extractor)(image, cv::Mat(), keypointsL, descriptorsL);
 
-	N = keypointsL.size();
+	N = static_cast<int>(keypointsL.size());
 
 	if (keypointsL.empty())
 		return;
@@ -549,7 +549,7 @@ Frame::Frame(const cv::Mat& image, double timestamp, ORBextractor* extractor, OR
 	// ORB extraction
 	(*extractor)(image, cv::Mat(), keypointsL, descriptorsL);
 
-	N = keypointsL.size();
+	N = static_cast<int>(keypointsL.size());
 
 	if (keypointsL.empty())
 		return;
