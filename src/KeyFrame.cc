@@ -36,7 +36,7 @@ KeyFrame::KeyFrame(Frame &F, Map *pMap, KeyFrameDatabase *pKFDB):
     mnLoopQuery(0), mnLoopWords(0), mnRelocQuery(0), mnRelocWords(0), mnBAGlobalForKF(0),
 	camera(F.camera), mThDepth(F.thDepth), N(F.N), mvKeys(F.keypointsL), mvKeysUn(F.keypointsUn),
     mvuRight(F.uright), mvDepth(F.depth), mDescriptors(F.descriptorsL.clone()),
-    mBowVec(F.mBowVec), mFeatVec(F.mFeatVec), pyramid(F.pyramid), imageBounds(F.imageBounds), 
+    mBowVec(F.bowVector), mFeatVec(F.featureVector), pyramid(F.pyramid), imageBounds(F.imageBounds), 
 	mvpMapPoints(F.mappoints), mpKeyFrameDB(pKFDB),
     mpORBvocabulary(F.voc), mbFirstConnection(true), mpParent(NULL), mbNotErase(false),
     mbToBeErased(false), mbBad(false), mHalfBaseline(F.camera.baseline/2), mpMap(pMap)

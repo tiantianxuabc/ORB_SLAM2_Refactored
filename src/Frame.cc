@@ -452,7 +452,7 @@ Frame::Frame(const Frame &frame)
 	timestamp(frame.timestamp), camera(frame.camera),
 	thDepth(frame.thDepth), N(frame.N), keypointsL(frame.keypointsL),
 	keypointsR(frame.keypointsR), keypointsUn(frame.keypointsUn), uright(frame.uright),
-	depth(frame.depth), mBowVec(frame.mBowVec), mFeatVec(frame.mFeatVec),
+	depth(frame.depth), bowVector(frame.bowVector), featureVector(frame.featureVector),
 	descriptorsL(frame.descriptorsL.clone()), descriptorsR(frame.descriptorsR.clone()),
 	mappoints(frame.mappoints), outlier(frame.outlier), mnId(frame.mnId),
 	referenceKF(frame.referenceKF), pyramid(frame.pyramid), grid(frame.grid)
@@ -641,11 +641,10 @@ bool Frame::isInFrustum(MapPoint* mappoint, float viewingCosLimit)
 
 void Frame::ComputeBoW()
 {
-	if (mBowVec.empty())
-	{
-		vector<cv::Mat> vCurrentDesc = Converter::toDescriptorVector(descriptorsL);
-		voc->transform(vCurrentDesc, mBowVec, mFeatVec, 4);
-	}
+	if (!bowVector.empty())
+		return;
+
+	voc->transform(Converter::toDescriptorVector(descriptorsL), bowVector, featureVector, 4);
 }
 
 std::vector<size_t> Frame::GetFeaturesInArea(float x, float y, float r, int minLevel, int maxLevel) const

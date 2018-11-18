@@ -166,8 +166,8 @@ public:
 	std::vector<float> depth;
 
 	// Bag of Words Vector structures.
-	DBoW2::BowVector mBowVec;
-	DBoW2::FeatureVector mFeatVec;
+	DBoW2::BowVector bowVector;
+	DBoW2::FeatureVector featureVector;
 
 	// ORB descriptor, each row associated to a keypoint.
 	cv::Mat descriptorsL, descriptorsR;
