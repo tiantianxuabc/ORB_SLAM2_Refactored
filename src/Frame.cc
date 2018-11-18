@@ -102,9 +102,11 @@ ImageBounds ComputeImageBounds(const cv::Mat& image, const cv::Mat& K, const cv:
 	return imageBounds;
 }
 
+static inline int Round(float v) { return static_cast<int>(std::round(v)); }
 static inline int RoundUp(float v) { return static_cast<int>(std::ceil(v)); }
 static inline int RoundDn(float v) { return static_cast<int>(std::floor(v)); }
 static const int PATCH_RADIUS = 5;
+static const int PATCH_SIZE = 2 * PATCH_RADIUS + 1;
 static const int SEARCH_RADIUS = 5;
 
 // Search a match for each keypoint in the left image to a keypoint in the right image.
@@ -160,7 +162,7 @@ void ComputeStereoMatches(
 		const float vL = keypointL.pt.y;
 		const float uL = keypointL.pt.x;
 
-		const std::vector<int>& candidates = rowIndices[vL];
+		const std::vector<int>& candidates = rowIndices[static_cast<int>(vL)];
 
 		if (candidates.empty())
 			continue;
@@ -203,32 +205,37 @@ void ComputeStereoMatches(
 		// Subpixel match by correlation
 		if (minDist < thOrbDist)
 		{
+			const cv::Mat& imageL = pyramidL[octaveL];
+			const cv::Mat& imageR = pyramidR[octaveL];
+
 			// coordinates in image pyramid at keypoint scale
 			const float uR0 = keypointsR[bestIdxR].pt.x;
 			const float scaleFactor = invScaleFactors[octaveL];
-			const float scaleduL = round(keypointL.pt.x*scaleFactor);
-			const float scaledvL = round(keypointL.pt.y*scaleFactor);
-			const float scaleduR0 = round(uR0*scaleFactor);
+			const int scaleduL = Round(keypointL.pt.x*scaleFactor);
+			const int scaledvL = Round(keypointL.pt.y*scaleFactor);
+			const int scaleduR0 = Round(uR0*scaleFactor);
 
 			// sliding window search
-			cv::Mat IL = pyramidL[octaveL].rowRange(scaledvL - PATCH_RADIUS, scaledvL + PATCH_RADIUS + 1).colRange(scaleduL - PATCH_RADIUS, scaleduL + PATCH_RADIUS + 1);
+			const cv::Rect roiL(scaleduL - PATCH_RADIUS, scaledvL - PATCH_RADIUS, PATCH_SIZE, PATCH_SIZE);
+			cv::Mat IL = imageL(roiL);
 			IL.convertTo(IL, CV_32F);
 			IL = IL - IL.at<float>(PATCH_RADIUS, PATCH_RADIUS) *cv::Mat::ones(IL.rows, IL.cols, CV_32F);
 
 			int minDist = std::numeric_limits<int>::max();
 			int bestdxR = 0;
-			
+
 			vector<float> distances;
 			distances.resize(2 * SEARCH_RADIUS + 1);
 
 			const float iniu = scaleduR0 + SEARCH_RADIUS - PATCH_RADIUS;
 			const float endu = scaleduR0 + SEARCH_RADIUS + PATCH_RADIUS + 1;
-			if (iniu < 0 || endu >= pyramidR[octaveL].cols)
+			if (iniu < 0 || endu >= imageR.cols)
 				continue;
 
 			for (int dxR = -SEARCH_RADIUS; dxR <= +SEARCH_RADIUS; dxR++)
 			{
-				cv::Mat IR = pyramidR[octaveL].rowRange(scaledvL - PATCH_RADIUS, scaledvL + PATCH_RADIUS + 1).colRange(scaleduR0 + dxR - PATCH_RADIUS, scaleduR0 + dxR + PATCH_RADIUS + 1);
+				const cv::Rect roiR(scaleduR0 + dxR - PATCH_RADIUS, scaledvL - PATCH_RADIUS, PATCH_SIZE, PATCH_SIZE);
+				cv::Mat IR = imageR(roiR);
 				IR.convertTo(IR, CV_32F);
 				IR = IR - IR.at<float>(PATCH_RADIUS, PATCH_RADIUS) *cv::Mat::ones(IR.rows, IR.cols, CV_32F);
 
