@@ -282,7 +282,7 @@ void ComputeStereoMatches(
 	}
 
 	std::sort(std::begin(distIndices), std::end(distIndices), std::greater<std::pair<int, int>>());
-	const int m = std::max(distIndices.size() / 2 - 1, size_t(0));
+	const int m = std::max(static_cast<int>(distIndices.size()) / 2 - 1, 0);
 	const int median = distIndices[m].first;
 	const float thDist = 1.5f * 1.4f * median;
 
@@ -300,28 +300,26 @@ void ComputeStereoMatches(
 }
 
 // Associate a "right" coordinate to a keypoint if there is valid depth in the depthmap.
-static void ComputeStereoFromRGBD(const KeyPoints& mvKeys, const KeyPoints& mvKeysUn, const cv::Mat &imDepth,
-	const CameraParams& camera, std::vector<float>& mvuRight, std::vector<float>& mvDepth)
+static void ComputeStereoFromRGBD(const KeyPoints& keypoints, const KeyPoints& keypointsUn, const cv::Mat& depthImage,
+	const CameraParams& camera, std::vector<float>& uright, std::vector<float>& depth)
 {
-	const int N = static_cast<int>(mvKeys.size());
+	const int nkeypoints = static_cast<int>(keypoints.size());
 
-	mvuRight = vector<float>(N, -1);
-	mvDepth = vector<float>(N, -1);
+	uright.assign(nkeypoints, -1.f);
+	depth.assign(nkeypoints, -1.f);
 
-	for (int i = 0; i < N; i++)
+	for (int i = 0; i < nkeypoints; i++)
 	{
-		const cv::KeyPoint &kp = mvKeys[i];
-		const cv::KeyPoint &kpU = mvKeysUn[i];
+		const cv::KeyPoint& keypoint = keypoints[i];
+		const cv::KeyPoint& keypointUn = keypointsUn[i];
 
-		const float &v = kp.pt.y;
-		const float &u = kp.pt.x;
-
-		const float d = imDepth.at<float>(v, u);
-
+		const int v = static_cast<int>(keypoint.pt.y);
+		const int u = static_cast<int>(keypoint.pt.x);
+		const float d = depthImage.at<float>(v, u);
 		if (d > 0)
 		{
-			mvDepth[i] = d;
-			mvuRight[i] = kpU.pt.x - camera.bf / d;
+			depth[i] = d;
+			uright[i] = keypointUn.pt.x - camera.bf / d;
 		}
 	}
 }
