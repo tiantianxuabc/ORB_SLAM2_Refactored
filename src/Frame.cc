@@ -102,6 +102,9 @@ ImageBounds ComputeImageBounds(const cv::Mat& image, const cv::Mat& K, const cv:
 	return imageBounds;
 }
 
+static inline int RoundUp(float v) { return static_cast<int>(std::ceil(v)); }
+static inline int RoundDn(float v) { return static_cast<int>(std::floor(v)); }
+
 // Search a match for each keypoint in the left image to a keypoint in the right image.
 // If there is a match, depth is computed and the right coordinate associated to the left keypoint is stored.
 void ComputeStereoMatches(
@@ -110,58 +113,56 @@ void ComputeStereoMatches(
 	const std::vector<float>& scaleFactors, const std::vector<float>& invScaleFactors, const CameraParams& camera,
 	std::vector<float>& uright, std::vector<float>& depth)
 {
-	const int nkeypoint = static_cast<int>(keypointsL.size());
+	const int nkeypointsL = static_cast<int>(keypointsL.size());
 
-	uright = vector<float>(nkeypoint, -1.0f);
-	depth = vector<float>(nkeypoint, -1.0f);
+	uright = std::vector<float>(nkeypointsL, -1.0f);
+	depth = std::vector<float>(nkeypointsL, -1.0f);
 
 	const int thOrbDist = (ORBmatcher::TH_HIGH + ORBmatcher::TH_LOW) / 2;
 
-	const int nRows = pyramidL[0].rows;
+	const int nrows = pyramidL[0].rows;
 
 	//Assign keypoints to row table
-	vector<vector<size_t> > vRowIndices(nRows, vector<size_t>());
+	std::vector<std::vector<size_t>> rowIndices(nrows, std::vector<std::size_t>());
 
-	for (int i = 0; i < nRows; i++)
-		vRowIndices[i].reserve(200);
+	for (int i = 0; i < nrows; i++)
+		rowIndices[i].reserve(200);
 
-	const int Nr = keypointsR.size();
-
-	for (int iR = 0; iR < Nr; iR++)
+	const int nkeypointsR = static_cast<int>(keypointsR.size());
+	for (int iR = 0; iR < nkeypointsR; iR++)
 	{
-		const cv::KeyPoint &kp = keypointsR[iR];
-		const float &kpY = kp.pt.y;
-		const float r = 2.0f*scaleFactors[keypointsR[iR].octave];
-		const int maxr = ceil(kpY + r);
-		const int minr = floor(kpY - r);
-
-		for (int yi = minr; yi <= maxr; yi++)
-			vRowIndices[yi].push_back(iR);
+		const cv::KeyPoint& keypoint = keypointsR[iR];
+		const float y0 = keypoint.pt.y;
+		const float r = 2.f * scaleFactors[keypoint.octave];
+		const int miny = RoundDn(y0 - r);
+		const int maxy = RoundUp(y0 + r);
+		for (int y = miny; y <= maxy; y++)
+			rowIndices[y].push_back(iR);
 	}
 
 	// Set limits for search
 	const float minZ = camera.baseline;
-	const float minD = 0;
-	const float maxD = camera.bf / minZ;
+	const float mind = 0;
+	const float maxd = camera.bf / minZ;
 
 	// For each left keypoint search a match in the right image
-	vector<pair<int, int> > vDistIdx;
-	vDistIdx.reserve(nkeypoint);
+	std::vector<std::pair<int, int>> distIndices;
+	distIndices.reserve(nkeypointsL);
 
-	for (int iL = 0; iL < nkeypoint; iL++)
+	for (int iL = 0; iL < nkeypointsL; iL++)
 	{
 		const cv::KeyPoint &kpL = keypointsL[iL];
 		const int &levelL = kpL.octave;
 		const float &vL = kpL.pt.y;
 		const float &uL = kpL.pt.x;
 
-		const vector<size_t> &vCandidates = vRowIndices[vL];
+		const vector<size_t> &vCandidates = rowIndices[vL];
 
 		if (vCandidates.empty())
 			continue;
 
-		const float minU = uL - maxD;
-		const float maxU = uL - minD;
+		const float minU = uL - maxd;
+		const float maxU = uL - mind;
 
 		if (maxU < 0)
 			continue;
@@ -256,7 +257,7 @@ void ComputeStereoMatches(
 
 			float disparity = (uL - bestuR);
 
-			if (disparity >= minD && disparity < maxD)
+			if (disparity >= mind && disparity < maxd)
 			{
 				if (disparity <= 0)
 				{
@@ -265,23 +266,23 @@ void ComputeStereoMatches(
 				}
 				depth[iL] = camera.bf / disparity;
 				uright[iL] = bestuR;
-				vDistIdx.push_back(pair<int, int>(bestDist, iL));
+				distIndices.push_back(pair<int, int>(bestDist, iL));
 			}
 		}
 	}
 
-	sort(vDistIdx.begin(), vDistIdx.end());
-	const float median = vDistIdx[vDistIdx.size() / 2].first;
+	sort(distIndices.begin(), distIndices.end());
+	const float median = distIndices[distIndices.size() / 2].first;
 	const float thDist = 1.5f*1.4f*median;
 
-	for (int i = vDistIdx.size() - 1; i >= 0; i--)
+	for (int i = distIndices.size() - 1; i >= 0; i--)
 	{
-		if (vDistIdx[i].first < thDist)
+		if (distIndices[i].first < thDist)
 			break;
 		else
 		{
-			uright[vDistIdx[i].second] = -1;
-			depth[vDistIdx[i].second] = -1;
+			uright[distIndices[i].second] = -1;
+			depth[distIndices[i].second] = -1;
 		}
 	}
 }
