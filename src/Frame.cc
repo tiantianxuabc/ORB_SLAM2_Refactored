@@ -483,8 +483,8 @@ Frame::Frame(const cv::Mat& imageL, const cv::Mat& imageR, double timestamp, ORB
 
 	UndistortKeyPoints(keypointsL, keypointsUn, camera.Mat(), distCoef);
 
-	ComputeStereoMatches(keypointsL, descriptorsL, extractorL->mvImagePyramid,
-		keypointsR, descriptorsR, extractorR->mvImagePyramid,
+	ComputeStereoMatches(keypointsL, descriptorsL, extractorL->GetImagePyramid(),
+		keypointsR, descriptorsR, extractorR->GetImagePyramid(),
 		pyramid.scaleFactors, pyramid.invScaleFactors, camera, uright, depth);
 
 	mappoints.assign(N, nullptr);

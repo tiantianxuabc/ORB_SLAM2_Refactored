@@ -54,33 +54,15 @@ public:
 		std::vector<cv::KeyPoint>& keypoints,
 		cv::OutputArray descriptors);
 
-	int inline GetLevels() {
-		return nlevels;
-	}
+	int GetLevels() const;
+	float GetScaleFactor() const;
+	const std::vector<float>& GetScaleFactors() const;
+	const std::vector<float>& GetInverseScaleFactors() const;
+	const std::vector<float>& GetScaleSigmaSquares() const;	
+	const std::vector<float>& GetInverseScaleSigmaSquares() const;
+	const std::vector<cv::Mat>& GetImagePyramid() const;
 
-	float inline GetScaleFactor() {
-		return scaleFactor;
-	}
-
-	std::vector<float> inline GetScaleFactors() {
-		return mvScaleFactor;
-	}
-
-	std::vector<float> inline GetInverseScaleFactors() {
-		return mvInvScaleFactor;
-	}
-
-	std::vector<float> inline GetScaleSigmaSquares() {
-		return mvLevelSigma2;
-	}
-
-	std::vector<float> inline GetInverseScaleSigmaSquares() {
-		return mvInvLevelSigma2;
-	}
-
-	std::vector<cv::Mat> mvImagePyramid;
-
-protected:
+private:
 
 	void ComputePyramid(cv::Mat image);
 	void ComputeKeyPointsOctTree(std::vector<std::vector<cv::KeyPoint> >& allKeypoints);
@@ -102,6 +84,8 @@ protected:
 	std::vector<float> mvInvScaleFactor;
 	std::vector<float> mvLevelSigma2;
 	std::vector<float> mvInvLevelSigma2;
+
+	std::vector<cv::Mat> mvImagePyramid;
 };
 
 } //namespace ORB_SLAM

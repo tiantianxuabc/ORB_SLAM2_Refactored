@@ -971,6 +971,14 @@ void ORBextractor::ComputePyramid(cv::Mat image)
 
 }
 
+int ORBextractor::GetLevels() const { return nlevels; }
+float ORBextractor::GetScaleFactor() const { return scaleFactor; }
+const std::vector<float>& ORBextractor::GetScaleFactors() const { return mvScaleFactor; }
+const std::vector<float>& ORBextractor::GetInverseScaleFactors() const { return mvInvScaleFactor; }
+const std::vector<float>& ORBextractor::GetScaleSigmaSquares() const { return mvLevelSigma2; }
+const std::vector<float>& ORBextractor::GetInverseScaleSigmaSquares() const { return mvInvLevelSigma2; }
+const std::vector<cv::Mat>& ORBextractor::GetImagePyramid() const { return mvImagePyramid; }
+
 ORBextractor::Parameters::Parameters(int nfeatures, float scaleFactor, int nlevels, int iniThFAST, int minThFAST)
 	: nfeatures(nfeatures), scaleFactor(scaleFactor), nlevels(nlevels), iniThFAST(iniThFAST), minThFAST(minThFAST)
 {
