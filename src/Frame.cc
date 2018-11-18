@@ -27,6 +27,7 @@
 #include "ORBextractor.h"
 
 #include <thread>
+#include <functional>
 
 namespace ORB_SLAM2
 {
@@ -118,15 +119,11 @@ void ComputeStereoMatches(
 	std::vector<float>& uright, std::vector<float>& depth)
 {
 	const int nkeypointsL = static_cast<int>(keypointsL.size());
-
-	uright = std::vector<float>(nkeypointsL, -1.0f);
-	depth = std::vector<float>(nkeypointsL, -1.0f);
-
-	const int thOrbDist = (ORBmatcher::TH_HIGH + ORBmatcher::TH_LOW) / 2;
-
-	const int nrows = pyramidL[0].rows;
+	uright.assign(nkeypointsL, -1.f);
+	depth.assign(nkeypointsL, -1.f);
 
 	//Assign keypoints to row table
+	const int nrows = pyramidL[0].rows;
 	std::vector<std::vector<int>> rowIndices(nrows);
 
 	for (int i = 0; i < nrows; i++)
@@ -153,6 +150,7 @@ void ComputeStereoMatches(
 	std::vector<std::pair<int, int>> distIndices;
 	distIndices.reserve(nkeypointsL);
 
+	const int TH_ORB_DIST = (ORBmatcher::TH_HIGH + ORBmatcher::TH_LOW) / 2;
 	const float eps = 0.01f;
 
 	for (int iL = 0; iL < nkeypointsL; iL++)
@@ -203,7 +201,7 @@ void ComputeStereoMatches(
 		}
 
 		// Subpixel match by correlation
-		if (minDist < thOrbDist)
+		if (minDist < TH_ORB_DIST)
 		{
 			const cv::Mat& imageL = pyramidL[octaveL];
 			const cv::Mat& imageR = pyramidR[octaveL];
@@ -278,19 +276,20 @@ void ComputeStereoMatches(
 		}
 	}
 
-	std::sort(distIndices.begin(), distIndices.end());
-	const int median = distIndices[distIndices.size() / 2].first;
-	const float thDist = 1.5f*1.4f*median;
+	std::sort(std::begin(distIndices), std::end(distIndices), std::greater<std::pair<int, int>>());
+	const int median = distIndices[distIndices.size() / 2 - 1].first;
+	const float thDist = 1.5f * 1.4f * median;
 
-	for (int i = distIndices.size() - 1; i >= 0; i--)
+	for (const auto& v : distIndices)
 	{
-		if (distIndices[i].first < thDist)
+		const int dist = v.first;
+		const int idx = v.second;
+
+		if (dist < thDist)
 			break;
-		else
-		{
-			uright[distIndices[i].second] = -1;
-			depth[distIndices[i].second] = -1;
-		}
+
+		uright[idx] = -1;
+		depth[idx] = -1;
 	}
 }
 
