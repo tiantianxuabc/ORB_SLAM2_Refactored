@@ -58,7 +58,7 @@ void GlobalBundleAdjustemnt(Map* pMap, int nIterations = 5, bool *pbStopFlag = N
 TrackPoint::TrackPoint(const Frame& frame, bool lost)
 	: referenceKF(frame.referenceKF), timestamp(frame.timestamp), lost(lost)
 {
-	Tcr = frame.pose.mTcw * frame.referenceKF->GetPoseInverse();
+	Tcr = frame.pose.Tcw * frame.referenceKF->GetPoseInverse();
 }
 
 struct TrackerParameters
@@ -247,7 +247,7 @@ bool TrackWithMotionModel(Frame& currFrame, Frame& lastFrame, const cv::Mat& vel
 {
 	ORBmatcher matcher(0.9f, true);
 
-	currFrame.SetPose(velocity * lastFrame.pose.mTcw);
+	currFrame.SetPose(velocity * lastFrame.pose.Tcw);
 
 	// Project points seen in previous frame
 	const float threshold = sensor == System::STEREO ? 7.f : 15.f;
@@ -296,7 +296,7 @@ static bool TrackReferenceKeyFrame(Frame& currFrame, KeyFrame* referenceKF, Fram
 		return false;
 
 	currFrame.mappoints = mappoints;
-	currFrame.SetPose(lastFrame.pose.mTcw);
+	currFrame.SetPose(lastFrame.pose.Tcw);
 
 	Optimizer::PoseOptimization(&currFrame);
 
@@ -674,7 +674,7 @@ public:
 				// If a Camera Pose is computed, optimize
 				if (!Tcw.empty())
 				{
-					Tcw.copyTo(mCurrentFrame.pose.mTcw);
+					Tcw.copyTo(mCurrentFrame.pose.Tcw);
 
 					set<MapPoint*> sFound;
 
@@ -944,7 +944,7 @@ public:
 				bOKMM = TrackWithMotionModel(currFrame, lastFrame, velocity, minInliers, sensor_, &fewMatches_);
 				vpMPsMM = currFrame.mappoints;
 				vbOutMM = currFrame.outlier;
-				TcwMM = currFrame.pose.mTcw.clone();
+				TcwMM = currFrame.pose.Tcw.clone();
 			}
 			bOKReloc = relocalizer_.Relocalize(currFrame, keyFrameDB_);
 
@@ -1087,7 +1087,7 @@ public:
 
 		map_->mvpKeyFrameOrigins.push_back(keyframe);
 
-		mapDrawer_->SetCurrentCameraPose(currFrame.pose.mTcw);
+		mapDrawer_->SetCurrentCameraPose(currFrame.pose.Tcw);
 
 		state_ = STATE_OK;
 	}
@@ -1342,17 +1342,17 @@ public:
 		if (success)
 		{
 			// Update motion model
-			if (!lastFrame_.pose.mTcw.empty())
+			if (!lastFrame_.pose.Tcw.empty())
 			{
 				cv::Mat LastTwc = cv::Mat::eye(4, 4, CV_32F);
 				lastFrame_.pose.GetRotationInverse().copyTo(LastTwc.rowRange(0, 3).colRange(0, 3));
 				lastFrame_.GetCameraCenter().copyTo(LastTwc.rowRange(0, 3).col(3));
-				velocity_ = currFrame.pose.mTcw * LastTwc;
+				velocity_ = currFrame.pose.Tcw * LastTwc;
 			}
 			else
 				velocity_ = cv::Mat();
 
-			mapDrawer_->SetCurrentCameraPose(currFrame.pose.mTcw);
+			mapDrawer_->SetCurrentCameraPose(currFrame.pose.Tcw);
 
 			// Clean VO matches
 			for (int i = 0; i < currFrame.N; i++)
@@ -1417,7 +1417,7 @@ public:
 		// Store frame pose information to retrieve the complete camera trajectory afterwards.
 		CV_Assert(currFrame.referenceKF == localMap_.referenceKF);
 		const bool lost = state_ == STATE_LOST;
-		if (!currFrame.pose.mTcw.empty())
+		if (!currFrame.pose.Tcw.empty())
 		{
 			trajectory_.push_back(TrackPoint(currFrame, lost));
 		}
@@ -1628,7 +1628,7 @@ public:
 
 		tracker_->Update(currFrame_);
 
-		return currFrame_.pose.mTcw.clone();
+		return currFrame_.pose.Tcw.clone();
 	}
 
 	cv::Mat GrabImageRGBD(const cv::Mat& image, const cv::Mat& depth, double timestamp) override
@@ -1641,7 +1641,7 @@ public:
 
 		tracker_->Update(currFrame_);
 
-		return currFrame_.pose.mTcw.clone();
+		return currFrame_.pose.Tcw.clone();
 	}
 
 	cv::Mat GrabImageMonocular(const cv::Mat& image, double timestamp) override
@@ -1657,7 +1657,7 @@ public:
 
 		tracker_->Update(currFrame_);
 
-		return currFrame_.pose.mTcw.clone();
+		return currFrame_.pose.Tcw.clone();
 	}
 
 	void SetLocalMapper(LocalMapping* localMapper) override

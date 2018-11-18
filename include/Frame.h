@@ -69,13 +69,13 @@ struct CameraPose
 	cv::Mat GetRotationInverse() const;
 
 	// Camera pose.
-	cv::Mat mTcw;
+	cv::Mat Tcw;
 
 	// Rotation, translation and camera center
-	cv::Mat mRcw;
-	cv::Mat mtcw;
-	cv::Mat mRwc;
-	cv::Mat mOw; //==mtwc
+	cv::Mat Rcw;
+	cv::Mat tcw;
+	cv::Mat Rwc;
+	cv::Mat Ow; //==mtwc
 };
 
 class FeaturesGrid

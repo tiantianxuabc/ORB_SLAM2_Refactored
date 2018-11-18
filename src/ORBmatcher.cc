@@ -1335,13 +1335,13 @@ int ORBmatcher::SearchByProjection(Frame &CurrentFrame, const Frame &LastFrame, 
         rotHist[i].reserve(500);
     const float factor = 1.0f/HISTO_LENGTH;
 
-    const cv::Mat Rcw = CurrentFrame.pose.mTcw.rowRange(0,3).colRange(0,3);
-    const cv::Mat tcw = CurrentFrame.pose.mTcw.rowRange(0,3).col(3);
+    const cv::Mat Rcw = CurrentFrame.pose.Tcw.rowRange(0,3).colRange(0,3);
+    const cv::Mat tcw = CurrentFrame.pose.Tcw.rowRange(0,3).col(3);
 
     const cv::Mat twc = -Rcw.t()*tcw;
 
-    const cv::Mat Rlw = LastFrame.pose.mTcw.rowRange(0,3).colRange(0,3);
-    const cv::Mat tlw = LastFrame.pose.mTcw.rowRange(0,3).col(3);
+    const cv::Mat Rlw = LastFrame.pose.Tcw.rowRange(0,3).colRange(0,3);
+    const cv::Mat tlw = LastFrame.pose.Tcw.rowRange(0,3).col(3);
 
     const cv::Mat tlc = Rlw*twc+tlw;
 
@@ -1475,8 +1475,8 @@ int ORBmatcher::SearchByProjection(Frame &CurrentFrame, KeyFrame *pKF, const set
 {
     int nmatches = 0;
 
-    const cv::Mat Rcw = CurrentFrame.pose.mTcw.rowRange(0,3).colRange(0,3);
-    const cv::Mat tcw = CurrentFrame.pose.mTcw.rowRange(0,3).col(3);
+    const cv::Mat Rcw = CurrentFrame.pose.Tcw.rowRange(0,3).colRange(0,3);
+    const cv::Mat tcw = CurrentFrame.pose.Tcw.rowRange(0,3).col(3);
     const cv::Mat Ow = -Rcw.t()*tcw;
 
     // Rotation Histogram (to check rotation consistency)
