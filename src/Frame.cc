@@ -57,36 +57,26 @@ static void GetScalePyramidInfo(ORBextractor* extractor, ScalePyramidInfo& pyram
 // Only for the RGB-D case. Stereo must be already rectified!
 // (called in the constructor).
 static void UndistortKeyPoints(const std::vector<cv::KeyPoint>& src, std::vector<cv::KeyPoint>& dst,
-	const cv::Mat& K, const cv::Mat& distCoef)
+	const cv::Mat& K, const cv::Mat1f& distCoeffs)
 {
-	if (distCoef.at<float>(0) == 0.0)
+	if (distCoeffs(0) == 0.f)
 	{
 		dst = src;
 		return;
 	}
 
-	// Fill matrix with points
-	const int N = static_cast<int>(src.size());
-	cv::Mat mat(N, 2, CV_32F);
-	for (int i = 0; i < N; i++)
-	{
-		mat.at<float>(i, 0) = src[i].pt.x;
-		mat.at<float>(i, 1) = src[i].pt.y;
-	}
+	std::vector<cv::Point2f> points(src.size());
+	for (size_t i = 0; i < src.size(); i++)
+		points[i] = src[i].pt;
 
-	// Undistort points
-	mat = mat.reshape(2);
-	cv::undistortPoints(mat, mat, K, distCoef, cv::Mat(), K);
-	mat = mat.reshape(1);
+	cv::undistortPoints(points, points, K, distCoeffs, cv::Mat(), K);
 
-	// Fill undistorted keypoint vector
-	dst.resize(N);
-	for (int i = 0; i < N; i++)
+	dst.resize(src.size());
+	for (size_t i = 0; i < src.size(); i++)
 	{
-		cv::KeyPoint kp = src[i];
-		kp.pt.x = mat.at<float>(i, 0);
-		kp.pt.y = mat.at<float>(i, 1);
-		dst[i] = kp;
+		cv::KeyPoint keypoint = src[i];
+		keypoint.pt = points[i];
+		dst[i] = keypoint;
 	}
 }
 
