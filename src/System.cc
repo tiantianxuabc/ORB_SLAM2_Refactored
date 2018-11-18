@@ -50,59 +50,59 @@ std::vector<float> toQuaternion(const cv::Mat &M);
 } // namespace Converter
 
 #define LOCK_MUTEX_RESET() unique_lock<mutex> lock1(mMutexReset);
-#define LOCK_MUTEX_MODE()  unique_lock<mutex> lock2(mMutexMode);
+#define LOCK_MUTEX_MODE()  unique_lock<mutex> lock2(mutexMode_);
 #define LOCK_MUTEX_STATE() unique_lock<mutex> lock3(mMutexState);
 
 class ModeManager
 {
 public:
 
-	ModeManager(const std::shared_ptr<Tracking>& pTracker, const std::shared_ptr<LocalMapping>& pLocalMapper)
-		: mpTracker(pTracker), mpLocalMapper(pLocalMapper), mbActivateLocalizationMode(false), mbDeactivateLocalizationMode(false) {}
+	ModeManager(const std::shared_ptr<Tracking>& tracker, const std::shared_ptr<LocalMapping>& localMapper)
+		: tracker_(tracker), localMapper_(localMapper), activateLocalizationMode_(false), deactivateLocalizationMode_(false) {}
 
 	void Update()
 	{
 		LOCK_MUTEX_MODE();
-		if (mbActivateLocalizationMode)
+		if (activateLocalizationMode_)
 		{
-			mpLocalMapper->RequestStop();
+			localMapper_->RequestStop();
 
 			// Wait until Local Mapping has effectively stopped
-			while (!mpLocalMapper->isStopped())
+			while (!localMapper_->isStopped())
 			{
 				usleep(1000);
 			}
 
-			mpTracker->InformOnlyTracking(true);
-			mbActivateLocalizationMode = false;
+			tracker_->InformOnlyTracking(true);
+			activateLocalizationMode_ = false;
 		}
-		if (mbDeactivateLocalizationMode)
+		if (deactivateLocalizationMode_)
 		{
-			mpTracker->InformOnlyTracking(false);
-			mpLocalMapper->Release();
-			mbDeactivateLocalizationMode = false;
+			tracker_->InformOnlyTracking(false);
+			localMapper_->Release();
+			deactivateLocalizationMode_ = false;
 		}
 	}
 
 	void ActivateLocalizationMode()
 	{
 		LOCK_MUTEX_MODE();
-		mbActivateLocalizationMode = true;
+		activateLocalizationMode_ = true;
 	}
 
 	void DeactivateLocalizationMode()
 	{
 		LOCK_MUTEX_MODE();
-		mbDeactivateLocalizationMode = true;
+		deactivateLocalizationMode_ = true;
 	}
 
 private:
-	std::shared_ptr<Tracking> mpTracker;
-	std::shared_ptr<LocalMapping> mpLocalMapper;
+	std::shared_ptr<Tracking> tracker_;
+	std::shared_ptr<LocalMapping> localMapper_;
 	// Change mode flags
-	mutable std::mutex mMutexMode;
-	bool mbActivateLocalizationMode;
-	bool mbDeactivateLocalizationMode;
+	mutable std::mutex mutexMode_;
+	bool activateLocalizationMode_;
+	bool deactivateLocalizationMode_;
 };
 
 static void GetTracingResults(const Tracking& tracker, int& state, std::vector<MapPoint*>& mappoints, std::vector<cv::KeyPoint>& keypoints)
