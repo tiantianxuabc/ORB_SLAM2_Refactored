@@ -49,7 +49,7 @@ std::vector<float> toQuaternion(const cv::Mat &M);
 
 #define LOCK_MUTEX_RESET() unique_lock<mutex> lock1(mutexReset_);
 #define LOCK_MUTEX_MODE()  unique_lock<mutex> lock2(mutexMode_);
-#define LOCK_MUTEX_STATE() unique_lock<mutex> lock3(mMutexState);
+#define LOCK_MUTEX_STATE() unique_lock<mutex> lock3(mutexState_);
 
 class ModeManager
 {
@@ -585,7 +585,7 @@ private:
 	int trackingState_;
 	std::vector<MapPoint*> trackedMapPoints_;
 	std::vector<cv::KeyPoint> trackedKeyPointsUn_;
-	mutable std::mutex mMutexState;
+	mutable std::mutex mutexState_;
 };
 
 System::Pointer System::Create(const Path& vocabularyFile, const Path& settingsFile, Sensor sensor, bool useViewer)
