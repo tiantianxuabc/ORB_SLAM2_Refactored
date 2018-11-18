@@ -854,23 +854,14 @@ static float ReadFps(const cv::FileStorage& fs)
 	return fps == 0 ? 30 : fps;
 }
 
-struct ORBExtractorParams
+static ORBextractor::Parameters ReadExtractorParams(const cv::FileStorage& fs)
 {
-	int nfeatures;
-	float scaleFactor;
-	int nlevels;
-	int initTh;
-	int minTh;
-};
-
-static ORBExtractorParams ReadExtractorParams(const cv::FileStorage& fs)
-{
-	ORBExtractorParams param;
+	ORBextractor::Parameters param;
 	param.nfeatures = fs["ORBextractor.nFeatures"];
 	param.scaleFactor = fs["ORBextractor.scaleFactor"];
 	param.nlevels = fs["ORBextractor.nLevels"];
-	param.initTh = fs["ORBextractor.iniThFAST"];
-	param.minTh = fs["ORBextractor.minThFAST"];
+	param.iniThFAST = fs["ORBextractor.iniThFAST"];
+	param.minThFAST = fs["ORBextractor.minThFAST"];
 	return param;
 }
 
@@ -881,7 +872,7 @@ static float ReadDepthFactor(const cv::FileStorage& fs)
 }
 
 static void PrintSettings(const CameraParams& camera, const cv::Mat1f& distCoeffs,
-	float fps, bool rgb, const ORBExtractorParams& param, float thDepth, int sensor)
+	float fps, bool rgb, const ORBextractor::Parameters& param, float thDepth, int sensor)
 {
 	cout << endl << "Camera Parameters: " << endl;
 	cout << "- fx: " << camera.fx << endl;
@@ -902,8 +893,8 @@ static void PrintSettings(const CameraParams& camera, const cv::Mat1f& distCoeff
 	cout << "- Number of Features: " << param.nfeatures << endl;
 	cout << "- Scale Levels: " << param.nlevels << endl;
 	cout << "- Scale Factor: " << param.scaleFactor << endl;
-	cout << "- Initial Fast Threshold: " << param.initTh << endl;
-	cout << "- Minimum Fast Threshold: " << param.minTh << endl;
+	cout << "- Initial Fast Threshold: " << param.iniThFAST << endl;
+	cout << "- Minimum Fast Threshold: " << param.minThFAST << endl;
 
 	if (sensor == System::STEREO || sensor == System::RGBD)
 		cout << endl << "Depth Threshold (Close/Far Points): " << thDepth << endl;
@@ -1651,7 +1642,7 @@ public:
 		RGB_ = static_cast<int>(settings["Camera.RGB"]) != 0;
 
 		// Load ORB parameters
-		const ORBExtractorParams extractorParams = ReadExtractorParams(settings);
+		ORBextractor::Parameters extractorParams = ReadExtractorParams(settings);
 
 		// Load depth threshold
 		const float thDepth = settings["ThDepth"];
@@ -1664,15 +1655,14 @@ public:
 		PrintSettings(camera_, distCoeffs_, fps, RGB_, extractorParams, thDepth_, sensor);
 
 		// Initialize ORB extractors
-		const int nfeatures = extractorParams.nfeatures;
-		const float scaleFactor = extractorParams.scaleFactor;
-		const int nlevels = extractorParams.nlevels;
-		const int initTh = extractorParams.initTh;
-		const int minTh = extractorParams.minTh;
+		extractorL_ = std::make_unique<ORBextractor>(extractorParams);
+		extractorR_ = std::make_unique<ORBextractor>(extractorParams);
 
-		extractorL_ = std::make_unique<ORBextractor>(nfeatures, scaleFactor, nlevels, initTh, minTh);
-		extractorR_ = std::make_unique<ORBextractor>(nfeatures, scaleFactor, nlevels, initTh, minTh);
-		extractorIni_ = std::make_unique<ORBextractor>(2 * nfeatures, scaleFactor, nlevels, initTh, minTh);
+		if (sensor == System::MONOCULAR)
+		{
+			extractorParams.nfeatures *= 2;
+			extractorIni_ = std::make_unique<ORBextractor>(extractorParams);
+		}
 
 		// Initialize tracker core
 		tracker_ = std::make_unique<TrackerCore>(this, system, frameDrawer, mapDrawer, map, keyframeDB, sensor,

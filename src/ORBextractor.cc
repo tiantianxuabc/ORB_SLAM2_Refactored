@@ -408,6 +408,11 @@ static int bit_pattern_31_[256*4] =
     -1,-6, 0,-11/*mean (0.127148), correlation (0.547401)*/
 };
 
+ORBextractor::ORBextractor(const Parameters& param)
+	: ORBextractor(param.nfeatures, param.scaleFactor, param.nlevels, param.iniThFAST, param.minThFAST)
+{
+}
+
 ORBextractor::ORBextractor(int _nfeatures, float _scaleFactor, int _nlevels,
          int _iniThFAST, int _minThFAST):
     nfeatures(_nfeatures), scaleFactor(_scaleFactor), nlevels(_nlevels),
@@ -964,6 +969,11 @@ void ORBextractor::ComputePyramid(cv::Mat image)
         }
     }
 
+}
+
+ORBextractor::Parameters::Parameters(int nfeatures, float scaleFactor, int nlevels, int iniThFAST, int minThFAST)
+	: nfeatures(nfeatures), scaleFactor(scaleFactor), nlevels(nlevels), iniThFAST(iniThFAST), minThFAST(minThFAST)
+{
 }
 
 } //namespace ORB_SLAM

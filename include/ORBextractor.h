@@ -32,7 +32,19 @@ class ORBextractor
 {
 public:
 
+	struct Parameters
+	{
+		int nfeatures;
+		float scaleFactor;
+		int nlevels;
+		int iniThFAST;
+		int minThFAST;
+
+		Parameters(int nfeatures = 2000, float scaleFactor = 1.2f, int nlevels = 8, int iniThFAST = 20, int minThFAST = 7);
+	};
+
     ORBextractor(int nfeatures, float scaleFactor, int nlevels, int iniThFAST, int minThFAST);
+	ORBextractor(const Parameters& param);
     ~ORBextractor(){}
 
     // Compute the ORB features and descriptors on an image.
