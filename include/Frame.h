@@ -91,12 +91,12 @@ public:
 private:
 	static const int ROWS = 48;
 	static const int COLS = 64;
-	float mfGridElementWidthInv;
-	float mfGridElementHeightInv;
+	float invW_;
+	float invH_;
 	std::vector<cv::KeyPoint> keypoints_;
 	ImageBounds imageBounds_;
 	int nlevels_;
-	std::vector<std::size_t> mGrid[COLS][ROWS];
+	std::vector<std::size_t> grid_[COLS][ROWS];
 };
 
 class Frame

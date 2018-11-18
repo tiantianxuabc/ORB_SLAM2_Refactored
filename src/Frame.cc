@@ -327,8 +327,7 @@ static void ComputeStereoFromRGBD(const KeyPoints& keypoints, const KeyPoints& k
 //////////////////////////////////////////////////////////////////////////////////
 // ImageBounds Class
 //////////////////////////////////////////////////////////////////////////////////
-ImageBounds::ImageBounds(float minx, float maxx, float miny, float maxy)
-	: minx(minx), maxx(maxx), miny(miny), maxy(maxy) {}
+ImageBounds::ImageBounds(float minx, float maxx, float miny, float maxy) : minx(minx), maxx(maxx), miny(miny), maxy(maxy) {}
 
 float ImageBounds::Width() const
 {
@@ -357,34 +356,32 @@ FeaturesGrid::FeaturesGrid(const std::vector<cv::KeyPoint>& keypoints, const Ima
 
 void FeaturesGrid::AssignFeatures(const std::vector<cv::KeyPoint>& keypoints, const ImageBounds& imageBounds, int nlevels)
 {
-	mfGridElementWidthInv = COLS / imageBounds.Width();
-	mfGridElementHeightInv = ROWS / imageBounds.Height();
+	invW_ = COLS / imageBounds.Width();
+	invH_ = ROWS / imageBounds.Height();
 
 	keypoints_ = keypoints;
 	imageBounds_ = imageBounds;
 	nlevels_ = nlevels;
 
-	const int N = static_cast<int>(keypoints.size());
+	const int nkeypoints = static_cast<int>(keypoints.size());
 
-	int nReserve = 0.5f*N / (COLS*ROWS);
+	const int nreserve = nkeypoints / (COLS * ROWS) / 2;
 	for (unsigned int i = 0; i < COLS; i++)
 		for (unsigned int j = 0; j < ROWS; j++)
-			mGrid[i][j].reserve(nReserve);
+			grid_[i][j].reserve(nreserve);
 
-	for (int i = 0; i < N; i++)
+	for (int i = 0; i < nkeypoints; i++)
 	{
-		const cv::KeyPoint &kp = keypoints[i];
+		const cv::KeyPoint& keypoint = keypoints[i];
 
-		int posX, posY;
+		const int cx = Round(invW_ * (keypoint.pt.x - imageBounds.minx));
+		const int cy = Round(invH_ * (keypoint.pt.y - imageBounds.miny));
 
-		posX = (int)round((kp.pt.x - imageBounds.minx)*mfGridElementWidthInv);
-		posY = (int)round((kp.pt.y - imageBounds.miny)*mfGridElementHeightInv);
-
-		//Keypoint's coordinates are undistorted, which could cause to go out of the image
-		if (posX < 0 || posX >= COLS || posY < 0 || posY >= ROWS)
+		// Keypoint's coordinates are undistorted, which could cause to go out of the image
+		if (cx < 0 || cx >= COLS || cy < 0 || cy >= ROWS)
 			continue;
 
-		mGrid[posX][posY].push_back(i);
+		grid_[cx][cy].push_back(i);
 	}
 }
 
@@ -398,19 +395,19 @@ std::vector<size_t> FeaturesGrid::GetFeaturesInArea(float x, float y, float r, i
 	const float mnMinX = imageBounds_.minx;
 	const float mnMinY = imageBounds_.miny;
 
-	const int nMinCellX = max(0, (int)floor((x - mnMinX - r)*mfGridElementWidthInv));
+	const int nMinCellX = max(0, (int)floor((x - mnMinX - r)*invW_));
 	if (nMinCellX >= COLS)
 		return vIndices;
 
-	const int nMaxCellX = min((int)COLS - 1, (int)ceil((x - mnMinX + r)*mfGridElementWidthInv));
+	const int nMaxCellX = min((int)COLS - 1, (int)ceil((x - mnMinX + r)*invW_));
 	if (nMaxCellX < 0)
 		return vIndices;
 
-	const int nMinCellY = max(0, (int)floor((y - mnMinY - r)*mfGridElementHeightInv));
+	const int nMinCellY = max(0, (int)floor((y - mnMinY - r)*invH_));
 	if (nMinCellY >= ROWS)
 		return vIndices;
 
-	const int nMaxCellY = min((int)ROWS - 1, (int)ceil((y - mnMinY + r)*mfGridElementHeightInv));
+	const int nMaxCellY = min((int)ROWS - 1, (int)ceil((y - mnMinY + r)*invH_));
 	if (nMaxCellY < 0)
 		return vIndices;
 
@@ -420,7 +417,7 @@ std::vector<size_t> FeaturesGrid::GetFeaturesInArea(float x, float y, float r, i
 	{
 		for (int iy = nMinCellY; iy <= nMaxCellY; iy++)
 		{
-			const vector<size_t> vCell = mGrid[ix][iy];
+			const vector<size_t> vCell = grid_[ix][iy];
 			if (vCell.empty())
 				continue;
 
