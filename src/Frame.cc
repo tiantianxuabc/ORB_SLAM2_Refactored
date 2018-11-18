@@ -615,4 +615,9 @@ cv::Mat Frame::UnprojectStereo(int i) const
 	return pose.Rwc * x3Dc + pose.Ow;
 }
 
+int Frame::PassedFrom(int from) const
+{
+	return id - from;
+}
+
 } //namespace ORB_SLAM

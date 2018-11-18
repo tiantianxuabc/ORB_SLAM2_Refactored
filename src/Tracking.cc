@@ -325,7 +325,7 @@ public:
 		const int nkeyframes = map_->KeyFramesInMap();
 
 		// Do not insert keyframes if not enough frames have passed from last relocalisation
-		if ((int)currFrame.id < lastRelocFrameId + param_.maxFrames && nkeyframes > param_.maxFrames)
+		if (currFrame.PassedFrom(lastRelocFrameId) < param_.maxFrames && nkeyframes > param_.maxFrames)
 			return false;
 
 		// Tracked MapPoints in the reference keyframe
@@ -357,9 +357,9 @@ public:
 		const float refRatio = sensor_ == System::MONOCULAR ? 0.9f : (nkeyframes < 2 ? 0.4f : 0.75f);
 
 		// Condition 1a: More than "MaxFrames" have passed from last keyframe insertion
-		const bool c1a = (int)currFrame.id >= lastKeyFrameId + param_.maxFrames;
+		const bool c1a = currFrame.PassedFrom(lastKeyFrameId) >= param_.maxFrames;
 		// Condition 1b: More than "MinFrames" have passed and Local Mapping is idle
-		const bool c1b = ((int)currFrame.id >= lastKeyFrameId + param_.minFrames && acceptKeyFrames);
+		const bool c1b = currFrame.PassedFrom(lastKeyFrameId) >= param_.minFrames && acceptKeyFrames;
 		//Condition 1c: tracking is weak
 		const bool c1c = sensor_ != System::MONOCULAR && (matchesInliers < refMatches * 0.25 || needToInsertClose);
 		// Condition 2: Few tracked points compared to reference keyframe. Lots of visual odometry compared to map matches.
@@ -1382,15 +1382,16 @@ public:
 		// the camera we will use the local map again.
 		if (success && (!localization_ || (localization_ && !trackerIni_.FewMatches())))
 		{
+			const int lastRelocFrameId = relocalizer_.GetLastRelocFrameId();
 			// If the camera has been relocalised recently, perform a coarser search
-			const bool relocalizedRecently = (int)currFrame.id < relocalizer_.GetLastRelocFrameId() + 2;
+			const bool relocalizedRecently = currFrame.PassedFrom(lastRelocFrameId) < 2;
 			const float th = relocalizedRecently ? 5.f : (sensor_ == System::RGBD ? 3.f : 1.f);
 
 			matchesInliers_ = TrackLocalMap(localMap_, currFrame, th, localization_, sensor_ == System::STEREO);
 
 			// Decide if the tracking was succesful
 			// More restrictive if there was a relocalization recently
-			const int minInliers = ((int)currFrame.id < relocalizer_.GetLastRelocFrameId() + param_.maxFrames) ? 50 : 30;
+			const int minInliers = currFrame.PassedFrom(lastRelocFrameId) < param_.maxFrames ? 50 : 30;
 			success = matchesInliers_ >= minInliers;
 		}
 

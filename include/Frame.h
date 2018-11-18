@@ -130,6 +130,8 @@ public:
 	// Backprojects a keypoint (if stereo/depth info available) into 3D world coordinates.
 	cv::Mat UnprojectStereo(int i) const;
 
+	int PassedFrom(int from) const;
+
 public:
 	// Vocabulary used for relocalization.
 	ORBVocabulary* voc;
