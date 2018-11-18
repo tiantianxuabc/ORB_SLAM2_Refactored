@@ -42,7 +42,7 @@ std::vector<cv::Mat> toDescriptorVector(const cv::Mat &Descriptors);
 
 } // namespace Converter
 
-long unsigned int Frame::nNextId = 0;
+int Frame::nextId = 0;
 bool Frame::initialComputation = true;
 ImageBounds Frame::imageBounds;
 
@@ -454,7 +454,7 @@ Frame::Frame(const Frame &frame)
 	keypointsR(frame.keypointsR), keypointsUn(frame.keypointsUn), uright(frame.uright),
 	depth(frame.depth), bowVector(frame.bowVector), featureVector(frame.featureVector),
 	descriptorsL(frame.descriptorsL.clone()), descriptorsR(frame.descriptorsR.clone()),
-	mappoints(frame.mappoints), outlier(frame.outlier), mnId(frame.mnId),
+	mappoints(frame.mappoints), outlier(frame.outlier), id(frame.id),
 	referenceKF(frame.referenceKF), pyramid(frame.pyramid), grid(frame.grid)
 {
 	if (!frame.pose.Tcw.empty())
@@ -467,7 +467,7 @@ Frame::Frame(const cv::Mat& imageL, const cv::Mat& imageR, double timestamp, ORB
 	: voc(voc), timestamp(timestamp), camera(camera), thDepth(thDepth), referenceKF(nullptr)
 {
 	// Frame ID
-	mnId = nNextId++;
+	id = nextId++;
 
 	// Scale Level Info
 	GetScalePyramidInfo(extractorL, pyramid);
@@ -507,7 +507,7 @@ Frame::Frame(const cv::Mat& image, const cv::Mat& depthImage, double timestamp, 
 	: voc(voc), timestamp(timestamp), camera(camera), thDepth(thDepth)
 {
 	// Frame ID
-	mnId = nNextId++;
+	id = nextId++;
 
 	// Scale Level Info
 	GetScalePyramidInfo(extractor, pyramid);
@@ -541,7 +541,7 @@ Frame::Frame(const cv::Mat& image, double timestamp, ORBextractor* extractor, OR
 	: voc(voc), timestamp(timestamp), camera(camera), thDepth(thDepth)
 {
 	// Frame ID
-	mnId = nNextId++;
+	id = nextId++;
 
 	// Scale Level Info
 	GetScalePyramidInfo(extractor, pyramid);

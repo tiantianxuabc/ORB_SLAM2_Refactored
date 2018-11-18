@@ -178,8 +178,8 @@ public:
 	CameraPose pose;
 
 	// Current and Next Frame id.
-	static long unsigned int nNextId;
-	long unsigned int mnId;
+	static int nextId;
+	int id;
 
 	// Reference Keyframe.
 	KeyFrame* referenceKF;

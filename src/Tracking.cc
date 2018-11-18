@@ -136,7 +136,7 @@ struct LocalMap
 			}
 
 			keyframes.push_back(keyframe);
-			keyframe->mnTrackReferenceForFrame = currFrame.mnId;
+			keyframe->mnTrackReferenceForFrame = currFrame.id;
 		}
 
 		// Include also some not-already-included keyframes that are neighbors to already-included keyframes
@@ -148,20 +148,20 @@ struct LocalMap
 
 			for (KeyFrame* neighborKF : keyframe->GetBestCovisibilityKeyFrames(10))
 			{
-				if (!neighborKF->isBad() && neighborKF->mnTrackReferenceForFrame != currFrame.mnId)
+				if (!neighborKF->isBad() && neighborKF->mnTrackReferenceForFrame != currFrame.id)
 				{
 					keyframes.push_back(neighborKF);
-					neighborKF->mnTrackReferenceForFrame = currFrame.mnId;
+					neighborKF->mnTrackReferenceForFrame = currFrame.id;
 					break;
 				}
 			}
 
 			for (KeyFrame* childKF : keyframe->GetChilds())
 			{
-				if (!childKF->isBad() && childKF->mnTrackReferenceForFrame != currFrame.mnId)
+				if (!childKF->isBad() && childKF->mnTrackReferenceForFrame != currFrame.id)
 				{
 					keyframes.push_back(childKF);
-					childKF->mnTrackReferenceForFrame = currFrame.mnId;
+					childKF->mnTrackReferenceForFrame = currFrame.id;
 					break;
 				}
 			}
@@ -169,10 +169,10 @@ struct LocalMap
 			KeyFrame* parentKF = keyframe->GetParent();
 			if (parentKF)
 			{
-				if (parentKF->mnTrackReferenceForFrame != currFrame.mnId)
+				if (parentKF->mnTrackReferenceForFrame != currFrame.id)
 				{
 					keyframes.push_back(parentKF);
-					parentKF->mnTrackReferenceForFrame = currFrame.mnId;
+					parentKF->mnTrackReferenceForFrame = currFrame.id;
 					break;
 				}
 			}
@@ -193,11 +193,11 @@ struct LocalMap
 		{
 			for (MapPoint* mappoint : keyframe->GetMapPointMatches())
 			{
-				if (!mappoint || mappoint->mnTrackReferenceForFrame == currFrame.mnId || mappoint->isBad())
+				if (!mappoint || mappoint->mnTrackReferenceForFrame == currFrame.id || mappoint->isBad())
 					continue;
 
 				mappoints.push_back(mappoint);
-				mappoint->mnTrackReferenceForFrame = currFrame.mnId;
+				mappoint->mnTrackReferenceForFrame = currFrame.id;
 			}
 		}
 	}
@@ -224,7 +224,7 @@ static int DiscardOutliers(Frame& currFrame)
 			currFrame.outlier[i] = false;
 
 			mappoint->mbTrackInView = false;
-			mappoint->mnLastFrameSeen = currFrame.mnId;
+			mappoint->mnLastFrameSeen = currFrame.id;
 		}
 		else if (currFrame.mappoints[i]->Observations() > 0)
 		{
@@ -325,7 +325,7 @@ public:
 		const int nkeyframes = map_->KeyFramesInMap();
 
 		// Do not insert keyframes if not enough frames have passed from last relocalisation
-		if ((int)currFrame.mnId < lastRelocFrameId + param_.maxFrames && nkeyframes > param_.maxFrames)
+		if ((int)currFrame.id < lastRelocFrameId + param_.maxFrames && nkeyframes > param_.maxFrames)
 			return false;
 
 		// Tracked MapPoints in the reference keyframe
@@ -357,9 +357,9 @@ public:
 		const float refRatio = sensor_ == System::MONOCULAR ? 0.9f : (nkeyframes < 2 ? 0.4f : 0.75f);
 
 		// Condition 1a: More than "MaxFrames" have passed from last keyframe insertion
-		const bool c1a = (int)currFrame.mnId >= lastKeyFrameId + param_.maxFrames;
+		const bool c1a = (int)currFrame.id >= lastKeyFrameId + param_.maxFrames;
 		// Condition 1b: More than "MinFrames" have passed and Local Mapping is idle
-		const bool c1b = ((int)currFrame.mnId >= lastKeyFrameId + param_.minFrames && acceptKeyFrames);
+		const bool c1b = ((int)currFrame.id >= lastKeyFrameId + param_.minFrames && acceptKeyFrames);
 		//Condition 1c: tracking is weak
 		const bool c1c = sensor_ != System::MONOCULAR && (matchesInliers < refMatches * 0.25 || needToInsertClose);
 		// Condition 2: Few tracked points compared to reference keyframe. Lots of visual odometry compared to map matches.
@@ -481,7 +481,7 @@ static void SearchLocalPoints(const LocalMap& localMap, Frame& currFrame, float 
 		else
 		{
 			mappoint->IncreaseVisible();
-			mappoint->mnLastFrameSeen = currFrame.mnId;
+			mappoint->mnLastFrameSeen = currFrame.id;
 			mappoint->mbTrackInView = false;
 		}
 	}
@@ -491,7 +491,7 @@ static void SearchLocalPoints(const LocalMap& localMap, Frame& currFrame, float 
 	// Project points in frame and check its visibility
 	for (MapPoint* mappoint : localMap.mappoints)
 	{
-		if (mappoint->mnLastFrameSeen == currFrame.mnId || mappoint->isBad())
+		if (mappoint->mnLastFrameSeen == currFrame.id || mappoint->isBad())
 			continue;
 
 		// Project (this fills MapPoint variables for matching)
@@ -810,7 +810,7 @@ public:
 		}
 		else
 		{
-			mnLastRelocFrameId = mCurrentFrame.mnId;
+			mnLastRelocFrameId = mCurrentFrame.id;
 			return true;
 		}
 	}
@@ -941,7 +941,7 @@ public:
 		}
 
 		bool success = false;
-		const bool withMotionModel = !velocity.empty() && (int)currFrame.mnId >= relocalizer_.GetLastRelocFrameId() + 2;
+		const bool withMotionModel = !velocity.empty() && (int)currFrame.id >= relocalizer_.GetLastRelocFrameId() + 2;
 		if (withMotionModel)
 		{
 			UpdateLastFramePose(lastFrame, trajectory_.back());
@@ -963,7 +963,7 @@ public:
 			return relocalizer_.Relocalize(currFrame, keyFrameDB_);
 
 		const int minInliers = 21;
-		const bool createPoints = sensor_ != System::MONOCULAR && lastFrame.mnId != lastKeyFrameId;
+		const bool createPoints = sensor_ != System::MONOCULAR && lastFrame.id != lastKeyFrameId;
 		bool success = false;
 
 		if (!fewMatches_)
@@ -1137,7 +1137,7 @@ public:
 
 		lastFrame_ = Frame(currFrame);
 		lastKeyFrame_ = keyframe;
-		CV_Assert(lastKeyFrame_->mnFrameId == currFrame.mnId);
+		CV_Assert(lastKeyFrame_->mnFrameId == currFrame.id);
 
 		localMap_.keyframes.push_back(keyframe);
 		localMap_.mappoints = map_->GetAllMapPoints();
@@ -1309,7 +1309,7 @@ public:
 
 		currFrame.SetPose(pKFcur->GetPose());
 		lastKeyFrame_ = pKFcur;
-		CV_Assert(lastKeyFrame_->mnFrameId == currFrame.mnId);
+		CV_Assert(lastKeyFrame_->mnFrameId == currFrame.id);
 
 		localMap_.keyframes.push_back(pKFcur);
 		localMap_.keyframes.push_back(pKFini);
@@ -1383,14 +1383,14 @@ public:
 		if (success && (!localization_ || (localization_ && !trackerIni_.FewMatches())))
 		{
 			// If the camera has been relocalised recently, perform a coarser search
-			const bool relocalizedRecently = (int)currFrame.mnId < relocalizer_.GetLastRelocFrameId() + 2;
+			const bool relocalizedRecently = (int)currFrame.id < relocalizer_.GetLastRelocFrameId() + 2;
 			const float th = relocalizedRecently ? 5.f : (sensor_ == System::RGBD ? 3.f : 1.f);
 
 			matchesInliers_ = TrackLocalMap(localMap_, currFrame, th, localization_, sensor_ == System::STEREO);
 
 			// Decide if the tracking was succesful
 			// More restrictive if there was a relocalization recently
-			const int minInliers = ((int)currFrame.mnId < relocalizer_.GetLastRelocFrameId() + param_.maxFrames) ? 50 : 30;
+			const int minInliers = ((int)currFrame.id < relocalizer_.GetLastRelocFrameId() + param_.maxFrames) ? 50 : 30;
 			success = matchesInliers_ >= minInliers;
 		}
 
@@ -1445,7 +1445,7 @@ public:
 					localMapper_->InsertKeyFrame(keyframe);
 					localMapper_->SetNotStop(false);
 					lastKeyFrame_ = keyframe;
-					CV_Assert(lastKeyFrame_->mnFrameId == currFrame.mnId);
+					CV_Assert(lastKeyFrame_->mnFrameId == currFrame.id);
 				}
 			}
 
@@ -1778,7 +1778,7 @@ public:
 		map_->clear();
 
 		KeyFrame::nNextId = 0;
-		Frame::nNextId = 0;
+		Frame::nextId = 0;
 
 		tracker_->Clear();
 
