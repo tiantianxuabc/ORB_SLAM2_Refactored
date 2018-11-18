@@ -470,16 +470,15 @@ public:
 			return;
 		}
 
-		vector<KeyFrame*> vpKFs = map_->GetAllKeyFrames();
-		sort(vpKFs.begin(), vpKFs.end(), KeyFrame::lId);
+		std::vector<KeyFrame*> keyframes = map_->GetAllKeyFrames();
+		std::sort(std::begin(keyframes), std::end(keyframes), KeyFrame::lId);
 
 		// Transform all keyframes so that the first keyframe is at the origin.
 		// After a loop closure the first keyframe might not be at the origin.
-		cv::Mat Two = vpKFs[0]->GetPoseInverse();
+		const cv::Mat Two = keyframes.front()->GetPoseInverse();
 
-		ofstream f;
-		f.open(filename.c_str());
-		f << fixed;
+		std::ofstream ofs(filename);
+		ofs << std::fixed;
 
 		// Frame pose is stored relative to its reference keyframe (which is optimized by BA and pose graph).
 		// We need to get first the keyframe pose and then concatenate the relative transformation.
@@ -489,28 +488,29 @@ public:
 		// which is true when tracking failed.
 		for (const auto& track : tracker_->GetTrajectory())
 		{
-			ORB_SLAM2::KeyFrame* pKF = (KeyFrame*)track.referenceKF;
+			ORB_SLAM2::KeyFrame* keyframe = (KeyFrame*)track.referenceKF;
 
 			cv::Mat Trw = cv::Mat::eye(4, 4, CV_32F);
 
-			while (pKF->isBad())
+			while (keyframe->isBad())
 			{
 				//  std::cout << "bad parent" << std::endl;
-				Trw = Trw*pKF->mTcp;
-				pKF = pKF->GetParent();
+				Trw = Trw * keyframe->mTcp;
+				keyframe = keyframe->GetParent();
 			}
 
-			Trw = Trw*pKF->GetPose()*Two;
+			Trw = Trw * keyframe->GetPose() * Two;
 
-			cv::Mat Tcw = track.Tcr * Trw;
-			cv::Mat Rwc = Tcw.rowRange(0, 3).colRange(0, 3).t();
-			cv::Mat twc = -Rwc*Tcw.rowRange(0, 3).col(3);
+			const cv::Mat1f Tcw = track.Tcr * Trw;
+			const cv::Mat1f Rwc = Tcw.rowRange(0, 3).colRange(0, 3).t();
+			const cv::Mat1f twc = -Rwc * Tcw.rowRange(0, 3).col(3);
 
-			f << setprecision(9) << Rwc.at<float>(0, 0) << " " << Rwc.at<float>(0, 1) << " " << Rwc.at<float>(0, 2) << " " << twc.at<float>(0) << " " <<
-				Rwc.at<float>(1, 0) << " " << Rwc.at<float>(1, 1) << " " << Rwc.at<float>(1, 2) << " " << twc.at<float>(1) << " " <<
-				Rwc.at<float>(2, 0) << " " << Rwc.at<float>(2, 1) << " " << Rwc.at<float>(2, 2) << " " << twc.at<float>(2) << std::endl;
+			ofs << std::setprecision(9) <<
+				Rwc(0, 0) << " " << Rwc(0, 1) << " " << Rwc(0, 2) << " " << twc(0) << " " <<
+				Rwc(1, 0) << " " << Rwc(1, 1) << " " << Rwc(1, 2) << " " << twc(1) << " " <<
+				Rwc(2, 0) << " " << Rwc(2, 1) << " " << Rwc(2, 2) << " " << twc(2) << std::endl;
 		}
-		f.close();
+
 		std::cout << std::endl << "trajectory saved!" << std::endl;
 	}
 
