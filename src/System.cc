@@ -246,7 +246,7 @@ public:
 		// Check reset
 		resetManager_->Update();
 
-		cv::Mat Tcw = tracker_->GrabImageStereo(imageL, imageR, timestamp);
+		const cv::Mat Tcw = tracker_->GrabImageStereo(imageL, imageR, timestamp);
 
 		LOCK_MUTEX_STATE();
 		GetTracingResults(*tracker_, trackingState_, trackedMapPoints_, trackedKeyPointsUn_);
@@ -272,7 +272,7 @@ public:
 		// Check reset
 		resetManager_->Update();
 
-		cv::Mat Tcw = tracker_->GrabImageRGBD(image, depth, timestamp);
+		const cv::Mat Tcw = tracker_->GrabImageRGBD(image, depth, timestamp);
 
 		LOCK_MUTEX_STATE();
 		GetTracingResults(*tracker_, trackingState_, trackedMapPoints_, trackedKeyPointsUn_);
@@ -297,7 +297,7 @@ public:
 		// Check reset
 		resetManager_->Update();
 
-		cv::Mat Tcw = tracker_->GrabImageMonocular(image, timestamp);
+		const cv::Mat Tcw = tracker_->GrabImageMonocular(image, timestamp);
 
 		LOCK_MUTEX_STATE();
 		GetTracingResults(*tracker_, trackingState_, trackedMapPoints_, trackedKeyPointsUn_);
