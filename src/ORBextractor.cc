@@ -408,6 +408,33 @@ static int bit_pattern_31_[256 * 4] =
 	-1,-6, 0,-11/*mean (0.127148), correlation (0.547401)*/
 };
 
+static void ComputePyramid(const cv::Mat& image, std::vector<cv::Mat>& mvImagePyramid,
+	const std::vector<float>& mvInvScaleFactor, int nlevels)
+{
+	for (int level = 0; level < nlevels; ++level)
+	{
+		float scale = mvInvScaleFactor[level];
+		Size sz(cvRound((float)image.cols*scale), cvRound((float)image.rows*scale));
+		Size wholeSize(sz.width + EDGE_THRESHOLD * 2, sz.height + EDGE_THRESHOLD * 2);
+		Mat temp(wholeSize, image.type()), masktemp;
+		mvImagePyramid[level] = temp(Rect(EDGE_THRESHOLD, EDGE_THRESHOLD, sz.width, sz.height));
+
+		// Compute the resized image
+		if (level != 0)
+		{
+			resize(mvImagePyramid[level - 1], mvImagePyramid[level], sz, 0, 0, INTER_LINEAR);
+
+			copyMakeBorder(mvImagePyramid[level], temp, EDGE_THRESHOLD, EDGE_THRESHOLD, EDGE_THRESHOLD, EDGE_THRESHOLD,
+				BORDER_REFLECT_101 + BORDER_ISOLATED);
+		}
+		else
+		{
+			copyMakeBorder(image, temp, EDGE_THRESHOLD, EDGE_THRESHOLD, EDGE_THRESHOLD, EDGE_THRESHOLD,
+				BORDER_REFLECT_101);
+		}
+	}
+}
+
 ORBextractor::ORBextractor(const Parameters& param)
 	: ORBextractor(param.nfeatures, param.scaleFactor, param.nlevels, param.iniThFAST, param.minThFAST)
 {
@@ -890,7 +917,7 @@ void ORBextractor::operator()(InputArray _image, InputArray _mask, vector<KeyPoi
 	assert(image.type() == CV_8UC1);
 
 	// Pre-compute the scale pyramid
-	ComputePyramid(image);
+	ComputePyramid(image, mvImagePyramid, mvInvScaleFactor, nlevels);
 
 	vector < vector<KeyPoint> > allKeypoints;
 	ComputeKeyPointsOctTree(allKeypoints);
@@ -942,33 +969,6 @@ void ORBextractor::operator()(InputArray _image, InputArray _mask, vector<KeyPoi
 		// And add the keypoints to the output
 		_keypoints.insert(_keypoints.end(), keypoints.begin(), keypoints.end());
 	}
-}
-
-void ORBextractor::ComputePyramid(cv::Mat image)
-{
-	for (int level = 0; level < nlevels; ++level)
-	{
-		float scale = mvInvScaleFactor[level];
-		Size sz(cvRound((float)image.cols*scale), cvRound((float)image.rows*scale));
-		Size wholeSize(sz.width + EDGE_THRESHOLD * 2, sz.height + EDGE_THRESHOLD * 2);
-		Mat temp(wholeSize, image.type()), masktemp;
-		mvImagePyramid[level] = temp(Rect(EDGE_THRESHOLD, EDGE_THRESHOLD, sz.width, sz.height));
-
-		// Compute the resized image
-		if (level != 0)
-		{
-			resize(mvImagePyramid[level - 1], mvImagePyramid[level], sz, 0, 0, INTER_LINEAR);
-
-			copyMakeBorder(mvImagePyramid[level], temp, EDGE_THRESHOLD, EDGE_THRESHOLD, EDGE_THRESHOLD, EDGE_THRESHOLD,
-				BORDER_REFLECT_101 + BORDER_ISOLATED);
-		}
-		else
-		{
-			copyMakeBorder(image, temp, EDGE_THRESHOLD, EDGE_THRESHOLD, EDGE_THRESHOLD, EDGE_THRESHOLD,
-				BORDER_REFLECT_101);
-		}
-	}
-
 }
 
 int ORBextractor::GetLevels() const { return nlevels; }
