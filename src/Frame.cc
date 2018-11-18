@@ -387,62 +387,47 @@ void FeaturesGrid::AssignFeatures(const std::vector<cv::KeyPoint>& keypoints, co
 
 std::vector<size_t> FeaturesGrid::GetFeaturesInArea(float x, float y, float r, int minLevel, int maxLevel) const
 {
-	const int N = static_cast<int>(keypoints_.size());
+	const int nkeypoints = static_cast<int>(keypoints_.size());
 
-	vector<size_t> vIndices;
-	vIndices.reserve(N);
+	std::vector<size_t> indices;
+	indices.reserve(nkeypoints);
 
-	const float mnMinX = imageBounds_.minx;
-	const float mnMinY = imageBounds_.miny;
+	const float minx = imageBounds_.minx;
+	const float miny = imageBounds_.miny;
 
-	const int nMinCellX = max(0, (int)floor((x - mnMinX - r)*invW_));
-	if (nMinCellX >= COLS)
-		return vIndices;
+	const int mincx = std::max(RoundDn(invW_ * (x - r - minx)), 0);
+	const int maxcx = std::min(RoundUp(invW_ * (x + r - minx)), COLS - 1);
+	const int mincy = std::max(RoundDn(invH_ * (y - r - miny)), 0);
+	const int maxcy = std::min(RoundUp(invH_ * (y + r - miny)), ROWS - 1);
 
-	const int nMaxCellX = min((int)COLS - 1, (int)ceil((x - mnMinX + r)*invW_));
-	if (nMaxCellX < 0)
-		return vIndices;
+	if (mincx >= COLS || maxcx < 0 || mincy >= ROWS || maxcy < 0)
+		return indices;
 
-	const int nMinCellY = max(0, (int)floor((y - mnMinY - r)*invH_));
-	if (nMinCellY >= ROWS)
-		return vIndices;
+	const bool checkLevels = (minLevel > 0) || (maxLevel >= 0);
+	if (maxLevel < 0)
+		maxLevel = nlevels_;
 
-	const int nMaxCellY = min((int)ROWS - 1, (int)ceil((y - mnMinY + r)*invH_));
-	if (nMaxCellY < 0)
-		return vIndices;
-
-	const bool bCheckLevels = (minLevel > 0) || (maxLevel >= 0);
-
-	for (int ix = nMinCellX; ix <= nMaxCellX; ix++)
+	for (int cx = mincx; cx <= maxcx; cx++)
 	{
-		for (int iy = nMinCellY; iy <= nMaxCellY; iy++)
+		for (int cy = mincy; cy <= maxcy; cy++)
 		{
-			const vector<size_t> vCell = grid_[ix][iy];
-			if (vCell.empty())
-				continue;
-
-			for (size_t j = 0, jend = vCell.size(); j < jend; j++)
+			for (size_t idx : grid_[cx][cy])
 			{
-				const cv::KeyPoint &kpUn = keypoints_[vCell[j]];
-				if (bCheckLevels)
-				{
-					if (kpUn.octave < minLevel)
-						continue;
-					if (maxLevel >= 0)
-						if (kpUn.octave > maxLevel)
-							continue;
-				}
+				const cv::KeyPoint& keypoint = keypoints_[idx];
+				const int level = keypoint.octave;
+				if (checkLevels && (level < minLevel || level > maxLevel))
+					continue;
 
-				const float distx = kpUn.pt.x - x;
-				const float disty = kpUn.pt.y - y;
+				const float distx = keypoint.pt.x - x;
+				const float disty = keypoint.pt.y - y;
 
-				if (fabs(distx) < r && fabs(disty) < r)
-					vIndices.push_back(vCell[j]);
+				if (fabsf(distx) < r && fabsf(disty) < r)
+					indices.push_back(idx);
 			}
 		}
 	}
 
-	return vIndices;
+	return indices;
 }
 
 void CameraPose::Update()
