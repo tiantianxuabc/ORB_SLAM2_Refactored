@@ -588,22 +588,22 @@ bool Frame::isInFrustum(MapPoint *pMP, float viewingCosLimit)
 	pMP->mbTrackInView = false;
 
 	// 3D in absolute coordinates
-	cv::Mat P = pMP->GetWorldPos();
+	cv::Mat Xw = pMP->GetWorldPos();
 
 	// 3D in camera coordinates
-	const cv::Mat Pc = pose.Rcw*P + pose.tcw;
-	const float &PcX = Pc.at<float>(0);
-	const float &PcY = Pc.at<float>(1);
-	const float &PcZ = Pc.at<float>(2);
+	const cv::Mat Xc = pose.Rcw * Xw + pose.tcw;
+	const float PcX = Xc.at<float>(0);
+	const float PcY = Xc.at<float>(1);
+	const float PcZ = Xc.at<float>(2);
 
 	// Check positive depth
-	if (PcZ < 0.0f)
+	if (PcZ < 0.f)
 		return false;
 
 	// Project in image and check it is not outside
-	const float invz = 1.0f / PcZ;
-	const float u = camera.fx*PcX*invz + camera.cx;
-	const float v = camera.fy*PcY*invz + camera.cy;
+	const float invZ = 1.f / PcZ;
+	const float u = camera.fx * PcX * invZ + camera.cx;
+	const float v = camera.fy * PcY * invZ + camera.cy;
 
 	if (!imageBounds.Contains(u, v))
 		return false;
@@ -611,29 +611,29 @@ bool Frame::isInFrustum(MapPoint *pMP, float viewingCosLimit)
 	// Check distance is in the scale invariance region of the MapPoint
 	const float maxDistance = pMP->GetMaxDistanceInvariance();
 	const float minDistance = pMP->GetMinDistanceInvariance();
-	const cv::Mat PO = P - pose.Ow;
-	const float dist = cv::norm(PO);
+	const cv::Mat PO = Xw - pose.Ow;
+	const float dist = static_cast<float>(cv::norm(PO));
 
-	if (dist<minDistance || dist>maxDistance)
+	if (dist < minDistance || dist > maxDistance)
 		return false;
 
 	// Check viewing angle
-	cv::Mat Pn = pMP->GetNormal();
+	const cv::Mat Pn = pMP->GetNormal();
 
-	const float viewCos = PO.dot(Pn) / dist;
+	const float viewCos = static_cast<float>(PO.dot(Pn) / dist);
 
 	if (viewCos < viewingCosLimit)
 		return false;
 
 	// Predict scale in the image
-	const int nPredictedLevel = pMP->PredictScale(dist, this);
+	const int scale = pMP->PredictScale(dist, this);
 
 	// Data used by the tracking
 	pMP->mbTrackInView = true;
 	pMP->mTrackProjX = u;
-	pMP->mTrackProjXR = u - camera.bf*invz;
+	pMP->mTrackProjXR = u - camera.bf * invZ;
 	pMP->mTrackProjY = v;
-	pMP->mnTrackScaleLevel = nPredictedLevel;
+	pMP->mnTrackScaleLevel = scale;
 	pMP->mTrackViewCos = viewCos;
 
 	return true;
