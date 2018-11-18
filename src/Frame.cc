@@ -209,14 +209,13 @@ void ComputeStereoMatches(
 			const cv::Mat& imageR = pyramidR[octaveL];
 
 			// coordinates in image pyramid at keypoint scale
-			const float uR0 = keypointsR[bestIdxR].pt.x;
 			const float scaleFactor = invScaleFactors[octaveL];
-			const int scaleduL = Round(keypointL.pt.x*scaleFactor);
-			const int scaledvL = Round(keypointL.pt.y*scaleFactor);
-			const int scaleduR0 = Round(uR0*scaleFactor);
+			const int suL = Round(scaleFactor * keypointL.pt.x);
+			const int svL = Round(scaleFactor * keypointL.pt.y);
+			const int suR = Round(scaleFactor * keypointsR[bestIdxR].pt.x);
 
 			// sliding window search
-			const cv::Rect roiL(scaleduL - PATCH_RADIUS, scaledvL - PATCH_RADIUS, PATCH_SIZE, PATCH_SIZE);
+			const cv::Rect roiL(suL - PATCH_RADIUS, svL - PATCH_RADIUS, PATCH_SIZE, PATCH_SIZE);
 			cv::Mat IL = imageL(roiL);
 			IL.convertTo(IL, CV_32F);
 			IL = IL - IL.at<float>(PATCH_RADIUS, PATCH_RADIUS) *cv::Mat::ones(IL.rows, IL.cols, CV_32F);
@@ -224,17 +223,15 @@ void ComputeStereoMatches(
 			int minDist = std::numeric_limits<int>::max();
 			int bestdxR = 0;
 
-			vector<float> distances;
+			vector<int> distances;
 			distances.resize(2 * SEARCH_RADIUS + 1);
 
-			const float iniu = scaleduR0 + SEARCH_RADIUS - PATCH_RADIUS;
-			const float endu = scaleduR0 + SEARCH_RADIUS + PATCH_RADIUS + 1;
-			if (iniu < 0 || endu >= imageR.cols)
+			if (suR + SEARCH_RADIUS - PATCH_RADIUS < 0 || suR + SEARCH_RADIUS + PATCH_RADIUS + 1 >= imageR.cols)
 				continue;
 
-			for (int dxR = -SEARCH_RADIUS; dxR <= +SEARCH_RADIUS; dxR++)
+			for (int dxR = -SEARCH_RADIUS; dxR <= SEARCH_RADIUS; dxR++)
 			{
-				const cv::Rect roiR(scaleduR0 + dxR - PATCH_RADIUS, scaledvL - PATCH_RADIUS, PATCH_SIZE, PATCH_SIZE);
+				const cv::Rect roiR(suR + dxR - PATCH_RADIUS, svL - PATCH_RADIUS, PATCH_SIZE, PATCH_SIZE);
 				cv::Mat IR = imageR(roiR);
 				IR.convertTo(IR, CV_32F);
 				IR = IR - IR.at<float>(PATCH_RADIUS, PATCH_RADIUS) *cv::Mat::ones(IR.rows, IR.cols, CV_32F);
@@ -253,9 +250,9 @@ void ComputeStereoMatches(
 				continue;
 
 			// Sub-pixel match (Parabola fitting)
-			const float dist1 = distances[SEARCH_RADIUS + bestdxR - 1];
-			const float dist2 = distances[SEARCH_RADIUS + bestdxR];
-			const float dist3 = distances[SEARCH_RADIUS + bestdxR + 1];
+			const int dist1 = distances[SEARCH_RADIUS + bestdxR - 1];
+			const int dist2 = distances[SEARCH_RADIUS + bestdxR];
+			const int dist3 = distances[SEARCH_RADIUS + bestdxR + 1];
 
 			const float deltaR = (dist1 - dist3) / (2.f * (dist1 + dist3 - 2.f * dist2));
 
@@ -263,7 +260,7 @@ void ComputeStereoMatches(
 				continue;
 
 			// Re-scaled coordinate
-			float bestuR = scaleFactors[octaveL] * (scaleduR0 + bestdxR + deltaR);
+			float bestuR = scaleFactors[octaveL] * (suR + bestdxR + deltaR);
 
 			float disparity = (uL - bestuR);
 
@@ -282,7 +279,7 @@ void ComputeStereoMatches(
 	}
 
 	std::sort(distIndices.begin(), distIndices.end());
-	const float median = distIndices[distIndices.size() / 2].first;
+	const int median = distIndices[distIndices.size() / 2].first;
 	const float thDist = 1.5f*1.4f*median;
 
 	for (int i = distIndices.size() - 1; i >= 0; i--)
