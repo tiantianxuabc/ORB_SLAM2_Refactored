@@ -128,10 +128,6 @@ public:
 	// Returns the camera center.
 	cv::Mat GetCameraCenter() const;
 
-	// Check if a MapPoint is in the frustum of the camera
-	// and fill variables of the MapPoint to be used by the tracking
-	bool isInFrustum(MapPoint* pMP, float viewingCosLimit);
-
 	std::vector<size_t> GetFeaturesInArea(float x, float y, float r, int minLevel = -1, int maxLevel = -1) const;
 
 	// Backprojects a keypoint (if stereo/depth info available) into 3D world coordinates.
