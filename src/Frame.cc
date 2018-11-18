@@ -652,24 +652,23 @@ std::vector<size_t> Frame::GetFeaturesInArea(float x, float y, float r, int minL
 	return grid.GetFeaturesInArea(x, y, r, minLevel, maxLevel);
 }
 
-cv::Mat Frame::UnprojectStereo(const int &i)
+cv::Mat Frame::UnprojectStereo(int i) const
 {
-	const float z = depth[i];
+	const float Zc = depth[i];
+	if (Zc <= 0.f)
+		return cv::Mat();
+
 	const float invfx = 1.f / camera.fx;
 	const float invfy = 1.f / camera.fy;
-	const float cx = camera.cx;
-	const float cy = camera.cy;
-	if (z > 0)
-	{
-		const float u = keypointsUn[i].pt.x;
-		const float v = keypointsUn[i].pt.y;
-		const float x = (u - cx)*z*invfx;
-		const float y = (v - cy)*z*invfy;
-		cv::Mat x3Dc = (cv::Mat_<float>(3, 1) << x, y, z);
-		return pose.Rwc*x3Dc + pose.Ow;
-	}
-	else
-		return cv::Mat();
+
+	const float u = keypointsUn[i].pt.x;
+	const float v = keypointsUn[i].pt.y;
+
+	const float Xc = (u - camera.cx) * Zc * invfx;
+	const float Yc = (v - camera.cy) * Zc * invfy;
+
+	cv::Mat x3Dc = (cv::Mat_<float>(3, 1) << Xc, Yc, Zc);
+	return pose.Rwc * x3Dc + pose.Ow;
 }
 
 } //namespace ORB_SLAM
