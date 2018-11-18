@@ -104,15 +104,16 @@ ImageBounds ComputeImageBounds(const cv::Mat& image, const cv::Mat& K, const cv:
 
 // Search a match for each keypoint in the left image to a keypoint in the right image.
 // If there is a match, depth is computed and the right coordinate associated to the left keypoint is stored.
-void ComputeStereoMatches(const KeyPoints& mvKeys, const cv::Mat& mDescriptors, const Pyramid& pyramidL,
-	const KeyPoints& mvKeysRight, const cv::Mat& mDescriptorsRight, const Pyramid& pyramidR,
-	const std::vector<float>& mvScaleFactors, const std::vector<float>& mvInvScaleFactors, const CameraParams& camera,
-	std::vector<float>& mvuRight, std::vector<float>& mvDepth)
+void ComputeStereoMatches(
+	const KeyPoints& keypointsL, const cv::Mat& descriptorsL, const Pyramid& pyramidL,
+	const KeyPoints& keypointsR, const cv::Mat& descriptorsR, const Pyramid& pyramidR,
+	const std::vector<float>& scaleFactors, const std::vector<float>& invScaleFactors, const CameraParams& camera,
+	std::vector<float>& uright, std::vector<float>& depth)
 {
-	const int N = static_cast<int>(mvKeys.size());
+	const int nkeypoint = static_cast<int>(keypointsL.size());
 
-	mvuRight = vector<float>(N, -1.0f);
-	mvDepth = vector<float>(N, -1.0f);
+	uright = vector<float>(nkeypoint, -1.0f);
+	depth = vector<float>(nkeypoint, -1.0f);
 
 	const int thOrbDist = (ORBmatcher::TH_HIGH + ORBmatcher::TH_LOW) / 2;
 
@@ -124,13 +125,13 @@ void ComputeStereoMatches(const KeyPoints& mvKeys, const cv::Mat& mDescriptors, 
 	for (int i = 0; i < nRows; i++)
 		vRowIndices[i].reserve(200);
 
-	const int Nr = mvKeysRight.size();
+	const int Nr = keypointsR.size();
 
 	for (int iR = 0; iR < Nr; iR++)
 	{
-		const cv::KeyPoint &kp = mvKeysRight[iR];
+		const cv::KeyPoint &kp = keypointsR[iR];
 		const float &kpY = kp.pt.y;
-		const float r = 2.0f*mvScaleFactors[mvKeysRight[iR].octave];
+		const float r = 2.0f*scaleFactors[keypointsR[iR].octave];
 		const int maxr = ceil(kpY + r);
 		const int minr = floor(kpY - r);
 
@@ -145,11 +146,11 @@ void ComputeStereoMatches(const KeyPoints& mvKeys, const cv::Mat& mDescriptors, 
 
 	// For each left keypoint search a match in the right image
 	vector<pair<int, int> > vDistIdx;
-	vDistIdx.reserve(N);
+	vDistIdx.reserve(nkeypoint);
 
-	for (int iL = 0; iL < N; iL++)
+	for (int iL = 0; iL < nkeypoint; iL++)
 	{
-		const cv::KeyPoint &kpL = mvKeys[iL];
+		const cv::KeyPoint &kpL = keypointsL[iL];
 		const int &levelL = kpL.octave;
 		const float &vL = kpL.pt.y;
 		const float &uL = kpL.pt.x;
@@ -168,13 +169,13 @@ void ComputeStereoMatches(const KeyPoints& mvKeys, const cv::Mat& mDescriptors, 
 		int bestDist = ORBmatcher::TH_HIGH;
 		size_t bestIdxR = 0;
 
-		const cv::Mat &dL = mDescriptors.row(iL);
+		const cv::Mat &dL = descriptorsL.row(iL);
 
 		// Compare descriptor to right keypoints
 		for (size_t iC = 0; iC < vCandidates.size(); iC++)
 		{
 			const size_t iR = vCandidates[iC];
-			const cv::KeyPoint &kpR = mvKeysRight[iR];
+			const cv::KeyPoint &kpR = keypointsR[iR];
 
 			if (kpR.octave<levelL - 1 || kpR.octave>levelL + 1)
 				continue;
@@ -183,7 +184,7 @@ void ComputeStereoMatches(const KeyPoints& mvKeys, const cv::Mat& mDescriptors, 
 
 			if (uR >= minU && uR <= maxU)
 			{
-				const cv::Mat &dR = mDescriptorsRight.row(iR);
+				const cv::Mat &dR = descriptorsR.row(iR);
 				const int dist = ORBmatcher::DescriptorDistance(dL, dR);
 
 				if (dist < bestDist)
@@ -198,8 +199,8 @@ void ComputeStereoMatches(const KeyPoints& mvKeys, const cv::Mat& mDescriptors, 
 		if (bestDist < thOrbDist)
 		{
 			// coordinates in image pyramid at keypoint scale
-			const float uR0 = mvKeysRight[bestIdxR].pt.x;
-			const float scaleFactor = mvInvScaleFactors[kpL.octave];
+			const float uR0 = keypointsR[bestIdxR].pt.x;
+			const float scaleFactor = invScaleFactors[kpL.octave];
 			const float scaleduL = round(kpL.pt.x*scaleFactor);
 			const float scaledvL = round(kpL.pt.y*scaleFactor);
 			const float scaleduR0 = round(uR0*scaleFactor);
@@ -251,7 +252,7 @@ void ComputeStereoMatches(const KeyPoints& mvKeys, const cv::Mat& mDescriptors, 
 				continue;
 
 			// Re-scaled coordinate
-			float bestuR = mvScaleFactors[kpL.octave] * ((float)scaleduR0 + (float)bestincR + deltaR);
+			float bestuR = scaleFactors[kpL.octave] * ((float)scaleduR0 + (float)bestincR + deltaR);
 
 			float disparity = (uL - bestuR);
 
@@ -262,8 +263,8 @@ void ComputeStereoMatches(const KeyPoints& mvKeys, const cv::Mat& mDescriptors, 
 					disparity = 0.01;
 					bestuR = uL - 0.01;
 				}
-				mvDepth[iL] = camera.bf / disparity;
-				mvuRight[iL] = bestuR;
+				depth[iL] = camera.bf / disparity;
+				uright[iL] = bestuR;
 				vDistIdx.push_back(pair<int, int>(bestDist, iL));
 			}
 		}
@@ -279,8 +280,8 @@ void ComputeStereoMatches(const KeyPoints& mvKeys, const cv::Mat& mDescriptors, 
 			break;
 		else
 		{
-			mvuRight[vDistIdx[i].second] = -1;
-			mvDepth[vDistIdx[i].second] = -1;
+			uright[vDistIdx[i].second] = -1;
+			depth[vDistIdx[i].second] = -1;
 		}
 	}
 }
