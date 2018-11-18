@@ -160,6 +160,8 @@ void ComputeStereoMatches(
 	std::vector<std::pair<int, int>> distIndices;
 	distIndices.reserve(nkeypointsL);
 
+	std::vector<int> distances(2 * SEARCH_RADIUS + 1);
+
 	const int TH_ORB_DIST = (ORBmatcher::TH_HIGH + ORBmatcher::TH_LOW) / 2;
 	const float eps = 0.01f;
 
@@ -225,14 +227,9 @@ void ComputeStereoMatches(
 			// sliding window search
 			const cv::Rect roiL(suL - PATCH_RADIUS, svL - PATCH_RADIUS, PATCH_SIZE, PATCH_SIZE);
 			cv::Mat IL = imageL(roiL);
-			//IL.convertTo(IL, CV_32F);
-			//IL = IL - IL.at<float>(PATCH_RADIUS, PATCH_RADIUS) *cv::Mat::ones(IL.rows, IL.cols, CV_32F);
 
 			int minDist = std::numeric_limits<int>::max();
 			int bestdxR = 0;
-
-			vector<int> distances;
-			distances.resize(2 * SEARCH_RADIUS + 1);
 
 			if (suR + SEARCH_RADIUS - PATCH_RADIUS < 0 || suR + SEARCH_RADIUS + PATCH_RADIUS + 1 >= imageR.cols)
 				continue;
@@ -241,11 +238,8 @@ void ComputeStereoMatches(
 			{
 				const cv::Rect roiR(suR + dxR - PATCH_RADIUS, svL - PATCH_RADIUS, PATCH_SIZE, PATCH_SIZE);
 				cv::Mat IR = imageR(roiR);
-				//IR.convertTo(IR, CV_32F);
-				//IR = IR - IR.at<float>(PATCH_RADIUS, PATCH_RADIUS) *cv::Mat::ones(IR.rows, IR.cols, CV_32F);
 
-				//int dist = (int)cv::norm(IL, IR, cv::NORM_L1);
-				int dist = PatchDistance(IL, IR);
+				const int dist = PatchDistance(IL, IR);
 				if (dist < minDist)
 				{
 					minDist = dist;
