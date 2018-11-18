@@ -149,7 +149,7 @@ public:
 
 	// Initialize the SLAM system. It launches the Local Mapping, Loop Closing and Viewer threads.
 	SystemImpl(const Path& vocabularyFile, const Path& settingsFile, Sensor sensor, bool useViewer)
-		: mSensor(sensor), mpViewer(nullptr)
+		: sensor_(sensor), mpViewer(nullptr)
 	{
 		// Output welcome message
 		cout << endl <<
@@ -161,7 +161,7 @@ public:
 		cout << "Input sensor was set to: ";
 
 		const char* sensors[3] = { "Monocular", "Stereo", "RGB-D" };
-		cout << sensors[mSensor] << endl;
+		cout << sensors[sensor_] << endl;
 
 		//Check settings file
 		cv::FileStorage settings(settingsFile.c_str(), cv::FileStorage::READ);
@@ -196,37 +196,37 @@ public:
 
 		//Initialize the Tracking thread
 		//(it will live in the main thread of execution, the one that called this constructor)
-		mpTracker = Tracking::Create(this, mpVocabulary.get(), mpFrameDrawer.get(), mpMapDrawer.get(),
-			mpMap.get(), mpKeyFrameDatabase.get(), settingsFile, mSensor);
+		tracker_ = Tracking::Create(this, mpVocabulary.get(), mpFrameDrawer.get(), mpMapDrawer.get(),
+			mpMap.get(), mpKeyFrameDatabase.get(), settingsFile, sensor_);
 
 		//Initialize the Local Mapping thread and launch
-		mpLocalMapper = std::make_shared<LocalMapping>(mpMap.get(), mSensor == MONOCULAR);
+		mpLocalMapper = std::make_shared<LocalMapping>(mpMap.get(), sensor_ == MONOCULAR);
 		threads_[THREAD_LOCAL_MAPPING] = thread(&ORB_SLAM2::LocalMapping::Run, mpLocalMapper);
 
 		//Initialize the Loop Closing thread and launch
-		mpLoopCloser = LoopClosing::Create(mpMap.get(), mpKeyFrameDatabase.get(), mpVocabulary.get(), mSensor != MONOCULAR);
+		mpLoopCloser = LoopClosing::Create(mpMap.get(), mpKeyFrameDatabase.get(), mpVocabulary.get(), sensor_ != MONOCULAR);
 		threads_[THREAD_LOOP_CLOSING] = thread(&ORB_SLAM2::LoopClosing::Run, mpLoopCloser);
 
 		//Initialize the Viewer thread and launch
 		if (useViewer)
 		{
-			mpViewer = std::make_shared<Viewer>(this, mpFrameDrawer.get(), mpMapDrawer.get(), mpTracker.get(), settingsFile);
+			mpViewer = std::make_shared<Viewer>(this, mpFrameDrawer.get(), mpMapDrawer.get(), tracker_.get(), settingsFile);
 			threads_[THREAD_VIEWER] = thread(&Viewer::Run, mpViewer.get());
-			mpTracker->SetViewer(mpViewer.get());
+			tracker_->SetViewer(mpViewer.get());
 		}
 
 		//Set pointers between threads
-		mpTracker->SetLocalMapper(mpLocalMapper.get());
-		mpTracker->SetLoopClosing(mpLoopCloser.get());
+		tracker_->SetLocalMapper(mpLocalMapper.get());
+		tracker_->SetLoopClosing(mpLoopCloser.get());
 
-		mpLocalMapper->SetTracker(mpTracker.get());
+		mpLocalMapper->SetTracker(tracker_.get());
 		mpLocalMapper->SetLoopCloser(mpLoopCloser.get());
 
-		mpLoopCloser->SetTracker(mpTracker.get());
+		mpLoopCloser->SetTracker(tracker_.get());
 		mpLoopCloser->SetLocalMapper(mpLocalMapper.get());
 
-		resetManager_ = std::make_shared<ResetManager>(mpTracker);
-		modeManager_ = std::make_shared<ModeManager>(mpTracker, mpLocalMapper);
+		resetManager_ = std::make_shared<ResetManager>(tracker_);
+		modeManager_ = std::make_shared<ModeManager>(tracker_, mpLocalMapper);
 	}
 
 	// Proccess the given stereo frame. Images must be synchronized and rectified.
@@ -234,7 +234,7 @@ public:
 	// Returns the camera pose (empty if tracking fails).
 	cv::Mat TrackStereo(const cv::Mat& imageL, const cv::Mat& imageR, double timestamp) override
 	{
-		if (mSensor != STEREO)
+		if (sensor_ != STEREO)
 		{
 			cerr << "ERROR: you called TrackStereo but input sensor was not set to STEREO." << endl;
 			exit(-1);
@@ -246,10 +246,10 @@ public:
 		// Check reset
 		resetManager_->Update();
 
-		cv::Mat Tcw = mpTracker->GrabImageStereo(imageL, imageR, timestamp);
+		cv::Mat Tcw = tracker_->GrabImageStereo(imageL, imageR, timestamp);
 
 		LOCK_MUTEX_STATE();
-		GetTracingResults(*mpTracker, mTrackingState, mTrackedMapPoints, mTrackedKeyPointsUn);
+		GetTracingResults(*tracker_, trackingState_, trackedMapPoints_, trackedKeyPointsUn_);
 
 		return Tcw;
 	}
@@ -260,7 +260,7 @@ public:
 	// Returns the camera pose (empty if tracking fails).
 	cv::Mat TrackRGBD(const cv::Mat& image, const cv::Mat& depth, double timestamp) override
 	{
-		if (mSensor != RGBD)
+		if (sensor_ != RGBD)
 		{
 			cerr << "ERROR: you called TrackRGBD but input sensor was not set to RGBD." << endl;
 			exit(-1);
@@ -272,10 +272,10 @@ public:
 		// Check reset
 		resetManager_->Update();
 
-		cv::Mat Tcw = mpTracker->GrabImageRGBD(image, depth, timestamp);
+		cv::Mat Tcw = tracker_->GrabImageRGBD(image, depth, timestamp);
 
 		LOCK_MUTEX_STATE();
-		GetTracingResults(*mpTracker, mTrackingState, mTrackedMapPoints, mTrackedKeyPointsUn);
+		GetTracingResults(*tracker_, trackingState_, trackedMapPoints_, trackedKeyPointsUn_);
 
 		return Tcw;
 	}
@@ -285,7 +285,7 @@ public:
 	// Returns the camera pose (empty if tracking fails).
 	cv::Mat TrackMonocular(const cv::Mat& image, double timestamp) override
 	{
-		if (mSensor != MONOCULAR)
+		if (sensor_ != MONOCULAR)
 		{
 			cerr << "ERROR: you called TrackMonocular but input sensor was not set to Monocular." << endl;
 			exit(-1);
@@ -297,10 +297,10 @@ public:
 		// Check reset
 		resetManager_->Update();
 
-		cv::Mat Tcw = mpTracker->GrabImageMonocular(image, timestamp);
+		cv::Mat Tcw = tracker_->GrabImageMonocular(image, timestamp);
 
 		LOCK_MUTEX_STATE();
-		GetTracingResults(*mpTracker, mTrackingState, mTrackedMapPoints, mTrackedKeyPointsUn);
+		GetTracingResults(*tracker_, trackingState_, trackedMapPoints_, trackedKeyPointsUn_);
 
 		return Tcw;
 	}
@@ -369,7 +369,7 @@ public:
 	void SaveTrajectoryTUM(const Path& filename) const override
 	{
 		cout << endl << "Saving camera trajectory to " << filename << " ..." << endl;
-		if (mSensor == MONOCULAR)
+		if (sensor_ == MONOCULAR)
 		{
 			cerr << "ERROR: SaveTrajectoryTUM cannot be used for monocular." << endl;
 			return;
@@ -392,7 +392,7 @@ public:
 
 		// For each frame we have a reference keyframe, the timestamp and a flag
 		// which is true when tracking failed.
-		for (const auto& track : mpTracker->GetTrajectory())
+		for (const auto& track : tracker_->GetTrajectory())
 		{
 			if (track.lost)
 				continue;
@@ -469,7 +469,7 @@ public:
 	void SaveTrajectoryKITTI(const Path& filename) const override
 	{
 		cout << endl << "Saving camera trajectory to " << filename << " ..." << endl;
-		if (mSensor == MONOCULAR)
+		if (sensor_ == MONOCULAR)
 		{
 			cerr << "ERROR: SaveTrajectoryKITTI cannot be used for monocular." << endl;
 			return;
@@ -492,7 +492,7 @@ public:
 
 		// For each frame we have a reference keyframe, the timestamp and a flag
 		// which is true when tracking failed.
-		for (const auto& track : mpTracker->GetTrajectory())
+		for (const auto& track : tracker_->GetTrajectory())
 		{
 			ORB_SLAM2::KeyFrame* pKF = (KeyFrame*)track.referenceKF;
 
@@ -528,25 +528,25 @@ public:
 	int GetTrackingState() const override
 	{
 		LOCK_MUTEX_STATE();
-		return mTrackingState;
+		return trackingState_;
 	}
 
 	vector<MapPoint*> GetTrackedMapPoints() const override
 	{
 		LOCK_MUTEX_STATE();
-		return mTrackedMapPoints;
+		return trackedMapPoints_;
 	}
 
 	vector<cv::KeyPoint> GetTrackedKeyPointsUn() const override
 	{
 		LOCK_MUTEX_STATE();
-		return mTrackedKeyPointsUn;
+		return trackedKeyPointsUn_;
 	}
 
 private:
 
 	// Input sensor
-	Sensor mSensor;
+	Sensor sensor_;
 
 	// ORB vocabulary used for place recognition and feature matching.
 	std::shared_ptr<ORBVocabulary> mpVocabulary;
@@ -560,7 +560,7 @@ private:
 	// Tracker. It receives a frame and computes the associated camera pose.
 	// It also decides when to insert a new keyframe, create some new MapPoints and
 	// performs relocalization if tracking fails.
-	std::shared_ptr<Tracking> mpTracker;
+	std::shared_ptr<Tracking> tracker_;
 
 	// Local Mapper. It manages the local map and performs local bundle adjustment.
 	std::shared_ptr<LocalMapping> mpLocalMapper;
@@ -587,9 +587,9 @@ private:
 	std::shared_ptr<ModeManager> modeManager_;
 
 	// Tracking state
-	int mTrackingState;
-	std::vector<MapPoint*> mTrackedMapPoints;
-	std::vector<cv::KeyPoint> mTrackedKeyPointsUn;
+	int trackingState_;
+	std::vector<MapPoint*> trackedMapPoints_;
+	std::vector<cv::KeyPoint> trackedKeyPointsUn_;
 	mutable std::mutex mMutexState;
 };
 
