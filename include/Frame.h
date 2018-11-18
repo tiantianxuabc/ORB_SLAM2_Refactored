@@ -39,10 +39,11 @@ class ORBextractor;
 
 struct ImageBounds
 {
-	float mnMinX;
-	float mnMaxX;
-	float mnMinY;
-	float mnMaxY;
+	float minx;
+	float maxx;
+	float miny;
+	float maxy;
+	ImageBounds(float minx = 0.f, float maxx = 0.f, float miny = 0.f, float maxy = 0.f);
 	float Width() const;
 	float Height() const;
 	bool Contains(float x, float y) const;

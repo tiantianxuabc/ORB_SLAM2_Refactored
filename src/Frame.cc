@@ -86,30 +86,17 @@ ImageBounds ComputeImageBounds(const cv::Mat& image, const cv::Mat& K, const cv:
 	const float h = static_cast<float>(image.rows);
 	const float w = static_cast<float>(image.cols);
 
+	if (distCoeffs(0) == 0.f)
+		return ImageBounds(0.f, w, 0.f, h);
+
+	std::vector<cv::Point2f> corners = { { 0, 0 }, { w, 0 }, { 0, h }, { w, h } };
+	cv::undistortPoints(corners, corners, K, distCoeffs, cv::Mat(), K);
+
 	ImageBounds imageBounds;
-	if (distCoeffs(0) != 0.f)
-	{
-		std::vector<cv::Point2f> corners(4);
-		corners[0] = cv::Point2f(0, 0);
-		corners[1] = cv::Point2f(w, 0);
-		corners[2] = cv::Point2f(0, h);
-		corners[3] = cv::Point2f(w, h);
-
-		cv::undistortPoints(corners, corners, K, distCoeffs, cv::Mat(), K);
-
-		imageBounds.mnMinX = std::min(corners[0].x, corners[2].x);
-		imageBounds.mnMaxX = std::max(corners[1].x, corners[3].x);
-		imageBounds.mnMinY = std::min(corners[0].y, corners[1].y);
-		imageBounds.mnMaxY = std::max(corners[2].y, corners[3].y);
-
-	}
-	else
-	{
-		imageBounds.mnMinX = 0.f;
-		imageBounds.mnMaxX = w;
-		imageBounds.mnMinY = 0.f;
-		imageBounds.mnMaxY = h;
-	}
+	imageBounds.minx = std::min(corners[0].x, corners[2].x);
+	imageBounds.maxx = std::max(corners[1].x, corners[3].x);
+	imageBounds.miny = std::min(corners[0].y, corners[1].y);
+	imageBounds.maxy = std::max(corners[2].y, corners[3].y);
 	return imageBounds;
 }
 
@@ -329,19 +316,22 @@ static void ComputeStereoFromRGBD(const KeyPoints& mvKeys, const KeyPoints& mvKe
 //////////////////////////////////////////////////////////////////////////////////
 // ImageBounds Class
 //////////////////////////////////////////////////////////////////////////////////
+ImageBounds::ImageBounds(float minx, float maxx, float miny, float maxy)
+	: minx(minx), maxx(maxx), miny(miny), maxy(maxy) {}
+
 float ImageBounds::Width() const
 {
-	return mnMaxX - mnMinX;
+	return maxx - minx;
 }
 
 float ImageBounds::Height() const
 {
-	return mnMaxY - mnMinY;
+	return maxy - miny;
 }
 
 bool ImageBounds::Contains(float x, float y) const
 {
-	return x >= mnMinX && x < mnMaxX && y >= mnMinY && y < mnMaxY;
+	return x >= minx && x < maxx && y >= miny && y < maxy;
 }
 
 //////////////////////////////////////////////////////////////////////////////////
@@ -376,8 +366,8 @@ void FeaturesGrid::AssignFeatures(const std::vector<cv::KeyPoint>& keypoints, co
 
 		int posX, posY;
 
-		posX = (int)round((kp.pt.x - imageBounds.mnMinX)*mfGridElementWidthInv);
-		posY = (int)round((kp.pt.y - imageBounds.mnMinY)*mfGridElementHeightInv);
+		posX = (int)round((kp.pt.x - imageBounds.minx)*mfGridElementWidthInv);
+		posY = (int)round((kp.pt.y - imageBounds.miny)*mfGridElementHeightInv);
 
 		//Keypoint's coordinates are undistorted, which could cause to go out of the image
 		if (posX < 0 || posX >= COLS || posY < 0 || posY >= ROWS)
@@ -394,8 +384,8 @@ std::vector<size_t> FeaturesGrid::GetFeaturesInArea(float x, float y, float r, i
 	vector<size_t> vIndices;
 	vIndices.reserve(N);
 
-	const float mnMinX = imageBounds_.mnMinX;
-	const float mnMinY = imageBounds_.mnMinY;
+	const float mnMinX = imageBounds_.minx;
+	const float mnMinY = imageBounds_.miny;
 
 	const int nMinCellX = max(0, (int)floor((x - mnMinX - r)*mfGridElementWidthInv));
 	if (nMinCellX >= COLS)
