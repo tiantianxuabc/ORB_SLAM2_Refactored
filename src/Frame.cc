@@ -31,6 +31,9 @@
 namespace ORB_SLAM2
 {
 
+using KeyPoints = std::vector<cv::KeyPoint>;
+using Pyramid = std::vector<cv::Mat>;
+
 namespace Converter
 {
 
@@ -56,8 +59,7 @@ static void GetScalePyramidInfo(ORBextractor* extractor, ScalePyramidInfo& pyram
 // Undistort keypoints given OpenCV distortion parameters.
 // Only for the RGB-D case. Stereo must be already rectified!
 // (called in the constructor).
-static void UndistortKeyPoints(const std::vector<cv::KeyPoint>& src, std::vector<cv::KeyPoint>& dst,
-	const cv::Mat& K, const cv::Mat1f& distCoeffs)
+static void UndistortKeyPoints(const KeyPoints& src, KeyPoints& dst, const cv::Mat& K, const cv::Mat1f& distCoeffs)
 {
 	if (distCoeffs(0) == 0.f)
 	{
@@ -99,9 +101,6 @@ ImageBounds ComputeImageBounds(const cv::Mat& image, const cv::Mat& K, const cv:
 	imageBounds.maxy = std::max(corners[2].y, corners[3].y);
 	return imageBounds;
 }
-
-using KeyPoints = std::vector<cv::KeyPoint>;
-using Pyramid = std::vector<cv::Mat>;
 
 // Search a match for each keypoint in the left image to a keypoint in the right image.
 // If there is a match, depth is computed and the right coordinate associated to the left keypoint is stored.
