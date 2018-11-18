@@ -125,7 +125,7 @@ void ComputeStereoMatches(
 	const int nrows = pyramidL[0].rows;
 
 	//Assign keypoints to row table
-	std::vector<std::vector<size_t>> rowIndices(nrows, std::vector<std::size_t>());
+	std::vector<std::vector<int>> rowIndices(nrows);
 
 	for (int i = 0; i < nrows; i++)
 		rowIndices[i].reserve(200);
@@ -160,7 +160,7 @@ void ComputeStereoMatches(
 		const float vL = keypointL.pt.y;
 		const float uL = keypointL.pt.x;
 
-		const std::vector<size_t>& candidates = rowIndices[vL];
+		const std::vector<int>& candidates = rowIndices[vL];
 
 		if (candidates.empty())
 			continue;
@@ -172,12 +172,12 @@ void ComputeStereoMatches(
 			continue;
 
 		int minDist = ORBmatcher::TH_HIGH;
-		size_t bestIdxR = 0;
+		int bestIdxR = 0;
 
 		const cv::Mat& descL = descriptorsL.row(iL);
 
 		// Compare descriptor to right keypoints
-		for (size_t iR : candidates)
+		for (int iR : candidates)
 		{
 			const cv::KeyPoint& keypointR = keypointsR[iR];
 			const int octaveR = keypointR.octave;
