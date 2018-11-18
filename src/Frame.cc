@@ -583,12 +583,12 @@ cv::Mat Frame::GetCameraCenter() const
 	return pose.Ow.clone();
 }
 
-bool Frame::isInFrustum(MapPoint *pMP, float viewingCosLimit)
+bool Frame::isInFrustum(MapPoint* mappoint, float viewingCosLimit)
 {
-	pMP->mbTrackInView = false;
+	mappoint->mbTrackInView = false;
 
 	// 3D in absolute coordinates
-	cv::Mat Xw = pMP->GetWorldPos();
+	cv::Mat Xw = mappoint->GetWorldPos();
 
 	// 3D in camera coordinates
 	const cv::Mat Xc = pose.Rcw * Xw + pose.tcw;
@@ -609,8 +609,8 @@ bool Frame::isInFrustum(MapPoint *pMP, float viewingCosLimit)
 		return false;
 
 	// Check distance is in the scale invariance region of the MapPoint
-	const float maxDistance = pMP->GetMaxDistanceInvariance();
-	const float minDistance = pMP->GetMinDistanceInvariance();
+	const float maxDistance = mappoint->GetMaxDistanceInvariance();
+	const float minDistance = mappoint->GetMinDistanceInvariance();
 	const cv::Mat PO = Xw - pose.Ow;
 	const float dist = static_cast<float>(cv::norm(PO));
 
@@ -618,7 +618,7 @@ bool Frame::isInFrustum(MapPoint *pMP, float viewingCosLimit)
 		return false;
 
 	// Check viewing angle
-	const cv::Mat Pn = pMP->GetNormal();
+	const cv::Mat Pn = mappoint->GetNormal();
 
 	const float viewCos = static_cast<float>(PO.dot(Pn) / dist);
 
@@ -626,15 +626,15 @@ bool Frame::isInFrustum(MapPoint *pMP, float viewingCosLimit)
 		return false;
 
 	// Predict scale in the image
-	const int scale = pMP->PredictScale(dist, this);
+	const int scale = mappoint->PredictScale(dist, this);
 
 	// Data used by the tracking
-	pMP->mbTrackInView = true;
-	pMP->mTrackProjX = u;
-	pMP->mTrackProjXR = u - camera.bf * invZ;
-	pMP->mTrackProjY = v;
-	pMP->mnTrackScaleLevel = scale;
-	pMP->mTrackViewCos = viewCos;
+	mappoint->mbTrackInView = true;
+	mappoint->mTrackProjX = u;
+	mappoint->mTrackProjXR = u - camera.bf * invZ;
+	mappoint->mTrackProjY = v;
+	mappoint->mnTrackScaleLevel = scale;
+	mappoint->mTrackViewCos = viewCos;
 
 	return true;
 }
