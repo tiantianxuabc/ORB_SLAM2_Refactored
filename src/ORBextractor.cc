@@ -808,7 +808,10 @@ static void computeOrientation(const Mat& image, vector<KeyPoint>& keypoints, co
 	}
 }
 
-void ORBextractor::ComputeKeyPointsOctTree(vector<vector<KeyPoint> >& allKeypoints)
+static void ComputeKeyPointsOctTree(const std::vector<cv::Mat>& mvImagePyramid,
+	vector<vector<KeyPoint> >& allKeypoints,
+	const std::vector<int>& mnFeaturesPerLevel, const std::vector<float>& mvScaleFactor, const std::vector<int>& umax,
+	int nfeatures, int nlevels, int iniThFAST, int minThFAST)
 {
 	allKeypoints.resize(nlevels);
 
@@ -907,33 +910,29 @@ static void computeDescriptors(const Mat& image, vector<KeyPoint>& keypoints, Ma
 		computeOrbDescriptor(keypoints[i], image, &pattern[0], descriptors.ptr((int)i));
 }
 
-void ORBextractor::operator()(InputArray _image, InputArray _mask, vector<KeyPoint>& _keypoints,
-	OutputArray _descriptors)
+void ORBextractor::Extract(const cv::Mat& image, vector<KeyPoint>& _keypoints, cv::Mat& descriptors)
 {
-	if (_image.empty())
+	if (image.empty())
 		return;
 
-	Mat image = _image.getMat();
 	assert(image.type() == CV_8UC1);
 
 	// Pre-compute the scale pyramid
 	ComputePyramid(image, mvImagePyramid, mvInvScaleFactor, nlevels);
 
 	vector < vector<KeyPoint> > allKeypoints;
-	ComputeKeyPointsOctTree(allKeypoints);
+	ComputeKeyPointsOctTree(mvImagePyramid, allKeypoints, mnFeaturesPerLevel, mvScaleFactor, umax,
+		nfeatures, nlevels, iniThFAST, minThFAST);
 	//ComputeKeyPointsOld(allKeypoints);
-
-	Mat descriptors;
 
 	int nkeypoints = 0;
 	for (int level = 0; level < nlevels; ++level)
 		nkeypoints += (int)allKeypoints[level].size();
 	if (nkeypoints == 0)
-		_descriptors.release();
+		descriptors.release();
 	else
 	{
-		_descriptors.create(nkeypoints, 32, CV_8U);
-		descriptors = _descriptors.getMat();
+		descriptors.create(nkeypoints, 32, CV_8U);
 	}
 
 	_keypoints.clear();

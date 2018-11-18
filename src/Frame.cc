@@ -470,8 +470,8 @@ Frame::Frame(const cv::Mat& imageL, const cv::Mat& imageR, double timestamp, ORB
 	GetScalePyramidInfo(extractorL, pyramid);
 
 	// ORB extraction
-	std::thread threadL([&]() { (*extractorL)(imageL, cv::Mat(), keypointsL, descriptorsL); });
-	std::thread threadR([&]() { (*extractorR)(imageR, cv::Mat(), keypointsR, descriptorsR); });
+	std::thread threadL([&]() { extractorL->Extract(imageL, keypointsL, descriptorsL); });
+	std::thread threadR([&]() { extractorR->Extract(imageR, keypointsR, descriptorsR); });
 
 	threadL.join();
 	threadR.join();
@@ -510,7 +510,7 @@ Frame::Frame(const cv::Mat& image, const cv::Mat& depthImage, double timestamp, 
 	GetScalePyramidInfo(extractor, pyramid);
 
 	// ORB extraction
-	(*extractor)(image, cv::Mat(), keypointsL, descriptorsL);
+	extractor->Extract(image, keypointsL, descriptorsL);
 
 	N = static_cast<int>(keypointsL.size());
 
@@ -544,7 +544,7 @@ Frame::Frame(const cv::Mat& image, double timestamp, ORBextractor* extractor, OR
 	GetScalePyramidInfo(extractor, pyramid);
 
 	// ORB extraction
-	(*extractor)(image, cv::Mat(), keypointsL, descriptorsL);
+	extractor->Extract(image, keypointsL, descriptorsL);
 
 	N = static_cast<int>(keypointsL.size());
 
