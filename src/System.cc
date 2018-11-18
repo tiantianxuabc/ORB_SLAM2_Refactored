@@ -319,7 +319,7 @@ public:
 	bool MapChanged() const override
 	{
 		static int n = 0;
-		int curn = map_->GetLastBigChangeIdx();
+		const int curn = map_->GetLastBigChangeIdx();
 		if (n < curn)
 		{
 			n = curn;
