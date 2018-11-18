@@ -49,7 +49,7 @@ std::vector<float> toQuaternion(const cv::Mat &M);
 
 } // namespace Converter
 
-#define LOCK_MUTEX_RESET() unique_lock<mutex> lock1(mMutexReset);
+#define LOCK_MUTEX_RESET() unique_lock<mutex> lock1(mutexReset_);
 #define LOCK_MUTEX_MODE()  unique_lock<mutex> lock2(mutexMode_);
 #define LOCK_MUTEX_STATE() unique_lock<mutex> lock3(mMutexState);
 
@@ -116,29 +116,29 @@ class ResetManager
 {
 public:
 
-	ResetManager(const std::shared_ptr<Tracking>& pTracker) : mpTracker(pTracker), mbReset(false) {}
+	ResetManager(const std::shared_ptr<Tracking>& tracker) : tracker_(tracker), reset_(false) {}
 
 	void Update()
 	{
 		LOCK_MUTEX_RESET();
-		if (mbReset)
+		if (reset_)
 		{
-			mpTracker->Reset();
-			mbReset = false;
+			tracker_->Reset();
+			reset_ = false;
 		}
 	}
 
 	void Reset()
 	{
 		LOCK_MUTEX_RESET();
-		mbReset = true;
+		reset_ = true;
 	}
 
 private:
-	std::shared_ptr<Tracking> mpTracker;
+	std::shared_ptr<Tracking> tracker_;
 	// Reset flag
-	mutable std::mutex mMutexReset;
-	bool mbReset;
+	mutable std::mutex mutexReset_;
+	bool reset_;
 };
 
 class SystemImpl : public System
