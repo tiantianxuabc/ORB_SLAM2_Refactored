@@ -104,6 +104,8 @@ ImageBounds ComputeImageBounds(const cv::Mat& image, const cv::Mat& K, const cv:
 
 static inline int RoundUp(float v) { return static_cast<int>(std::ceil(v)); }
 static inline int RoundDn(float v) { return static_cast<int>(std::floor(v)); }
+static const int PATCH_RADIUS = 5;
+static const int SEARCH_RADIUS = 5;
 
 // Search a match for each keypoint in the left image to a keypoint in the right image.
 // If there is a match, depth is computed and the right coordinate associated to the left keypoint is stored.
@@ -149,111 +151,112 @@ void ComputeStereoMatches(
 	std::vector<std::pair<int, int>> distIndices;
 	distIndices.reserve(nkeypointsL);
 
+	const float eps = 0.01f;
+
 	for (int iL = 0; iL < nkeypointsL; iL++)
 	{
-		const cv::KeyPoint &kpL = keypointsL[iL];
-		const int &levelL = kpL.octave;
-		const float &vL = kpL.pt.y;
-		const float &uL = kpL.pt.x;
+		const cv::KeyPoint& keypointL = keypointsL[iL];
+		const int octaveL = keypointL.octave;
+		const float vL = keypointL.pt.y;
+		const float uL = keypointL.pt.x;
 
-		const vector<size_t> &vCandidates = rowIndices[vL];
+		const std::vector<size_t>& candidates = rowIndices[vL];
 
-		if (vCandidates.empty())
+		if (candidates.empty())
 			continue;
 
-		const float minU = uL - maxd;
-		const float maxU = uL - mind;
+		const float minu = uL - maxd;
+		const float maxu = uL - mind;
 
-		if (maxU < 0)
+		if (maxu < 0)
 			continue;
 
-		int bestDist = ORBmatcher::TH_HIGH;
+		int minDist = ORBmatcher::TH_HIGH;
 		size_t bestIdxR = 0;
 
-		const cv::Mat &dL = descriptorsL.row(iL);
+		const cv::Mat& descL = descriptorsL.row(iL);
 
 		// Compare descriptor to right keypoints
-		for (size_t iC = 0; iC < vCandidates.size(); iC++)
+		for (size_t iR : candidates)
 		{
-			const size_t iR = vCandidates[iC];
-			const cv::KeyPoint &kpR = keypointsR[iR];
+			const cv::KeyPoint& keypointR = keypointsR[iR];
+			const int octaveR = keypointR.octave;
 
-			if (kpR.octave<levelL - 1 || kpR.octave>levelL + 1)
+			if (octaveR < octaveL - 1 || octaveR > octaveL + 1)
 				continue;
 
-			const float &uR = kpR.pt.x;
+			const float uR = keypointR.pt.x;
 
-			if (uR >= minU && uR <= maxU)
+			if (uR >= minu && uR <= maxu)
 			{
-				const cv::Mat &dR = descriptorsR.row(iR);
-				const int dist = ORBmatcher::DescriptorDistance(dL, dR);
+				const cv::Mat& descR = descriptorsR.row(iR);
+				const int dist = ORBmatcher::DescriptorDistance(descL, descR);
 
-				if (dist < bestDist)
+				if (dist < minDist)
 				{
-					bestDist = dist;
+					minDist = dist;
 					bestIdxR = iR;
 				}
 			}
 		}
 
 		// Subpixel match by correlation
-		if (bestDist < thOrbDist)
+		if (minDist < thOrbDist)
 		{
 			// coordinates in image pyramid at keypoint scale
 			const float uR0 = keypointsR[bestIdxR].pt.x;
-			const float scaleFactor = invScaleFactors[kpL.octave];
-			const float scaleduL = round(kpL.pt.x*scaleFactor);
-			const float scaledvL = round(kpL.pt.y*scaleFactor);
+			const float scaleFactor = invScaleFactors[octaveL];
+			const float scaleduL = round(keypointL.pt.x*scaleFactor);
+			const float scaledvL = round(keypointL.pt.y*scaleFactor);
 			const float scaleduR0 = round(uR0*scaleFactor);
 
 			// sliding window search
-			const int w = 5;
-			cv::Mat IL = pyramidL[kpL.octave].rowRange(scaledvL - w, scaledvL + w + 1).colRange(scaleduL - w, scaleduL + w + 1);
+			cv::Mat IL = pyramidL[octaveL].rowRange(scaledvL - PATCH_RADIUS, scaledvL + PATCH_RADIUS + 1).colRange(scaleduL - PATCH_RADIUS, scaleduL + PATCH_RADIUS + 1);
 			IL.convertTo(IL, CV_32F);
-			IL = IL - IL.at<float>(w, w) *cv::Mat::ones(IL.rows, IL.cols, CV_32F);
+			IL = IL - IL.at<float>(PATCH_RADIUS, PATCH_RADIUS) *cv::Mat::ones(IL.rows, IL.cols, CV_32F);
 
-			int bestDist = INT_MAX;
-			int bestincR = 0;
-			const int L = 5;
-			vector<float> vDists;
-			vDists.resize(2 * L + 1);
+			int minDist = std::numeric_limits<int>::max();
+			int bestdxR = 0;
+			
+			vector<float> distances;
+			distances.resize(2 * SEARCH_RADIUS + 1);
 
-			const float iniu = scaleduR0 + L - w;
-			const float endu = scaleduR0 + L + w + 1;
-			if (iniu < 0 || endu >= pyramidR[kpL.octave].cols)
+			const float iniu = scaleduR0 + SEARCH_RADIUS - PATCH_RADIUS;
+			const float endu = scaleduR0 + SEARCH_RADIUS + PATCH_RADIUS + 1;
+			if (iniu < 0 || endu >= pyramidR[octaveL].cols)
 				continue;
 
-			for (int incR = -L; incR <= +L; incR++)
+			for (int dxR = -SEARCH_RADIUS; dxR <= +SEARCH_RADIUS; dxR++)
 			{
-				cv::Mat IR = pyramidR[kpL.octave].rowRange(scaledvL - w, scaledvL + w + 1).colRange(scaleduR0 + incR - w, scaleduR0 + incR + w + 1);
+				cv::Mat IR = pyramidR[octaveL].rowRange(scaledvL - PATCH_RADIUS, scaledvL + PATCH_RADIUS + 1).colRange(scaleduR0 + dxR - PATCH_RADIUS, scaleduR0 + dxR + PATCH_RADIUS + 1);
 				IR.convertTo(IR, CV_32F);
-				IR = IR - IR.at<float>(w, w) *cv::Mat::ones(IR.rows, IR.cols, CV_32F);
+				IR = IR - IR.at<float>(PATCH_RADIUS, PATCH_RADIUS) *cv::Mat::ones(IR.rows, IR.cols, CV_32F);
 
-				float dist = cv::norm(IL, IR, cv::NORM_L1);
-				if (dist < bestDist)
+				int dist = (int)cv::norm(IL, IR, cv::NORM_L1);
+				if (dist < minDist)
 				{
-					bestDist = dist;
-					bestincR = incR;
+					minDist = dist;
+					bestdxR = dxR;
 				}
 
-				vDists[L + incR] = dist;
+				distances[SEARCH_RADIUS + dxR] = dist;
 			}
 
-			if (bestincR == -L || bestincR == L)
+			if (bestdxR == -SEARCH_RADIUS || bestdxR == SEARCH_RADIUS)
 				continue;
 
 			// Sub-pixel match (Parabola fitting)
-			const float dist1 = vDists[L + bestincR - 1];
-			const float dist2 = vDists[L + bestincR];
-			const float dist3 = vDists[L + bestincR + 1];
+			const float dist1 = distances[SEARCH_RADIUS + bestdxR - 1];
+			const float dist2 = distances[SEARCH_RADIUS + bestdxR];
+			const float dist3 = distances[SEARCH_RADIUS + bestdxR + 1];
 
-			const float deltaR = (dist1 - dist3) / (2.0f*(dist1 + dist3 - 2.0f*dist2));
+			const float deltaR = (dist1 - dist3) / (2.f * (dist1 + dist3 - 2.f * dist2));
 
-			if (deltaR < -1 || deltaR>1)
+			if (deltaR < -1 || deltaR > 1)
 				continue;
 
 			// Re-scaled coordinate
-			float bestuR = scaleFactors[kpL.octave] * ((float)scaleduR0 + (float)bestincR + deltaR);
+			float bestuR = scaleFactors[octaveL] * (scaleduR0 + bestdxR + deltaR);
 
 			float disparity = (uL - bestuR);
 
@@ -261,17 +264,17 @@ void ComputeStereoMatches(
 			{
 				if (disparity <= 0)
 				{
-					disparity = 0.01;
-					bestuR = uL - 0.01;
+					disparity = eps;
+					bestuR = uL - eps;
 				}
 				depth[iL] = camera.bf / disparity;
 				uright[iL] = bestuR;
-				distIndices.push_back(pair<int, int>(bestDist, iL));
+				distIndices.push_back(std::make_pair(minDist, iL));
 			}
 		}
 	}
 
-	sort(distIndices.begin(), distIndices.end());
+	std::sort(distIndices.begin(), distIndices.end());
 	const float median = distIndices[distIndices.size() / 2].first;
 	const float thDist = 1.5f*1.4f*median;
 
