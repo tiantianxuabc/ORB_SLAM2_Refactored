@@ -81,34 +81,34 @@ static void UndistortKeyPoints(const std::vector<cv::KeyPoint>& src, std::vector
 }
 
 // Computes image bounds for the undistorted image (called in the constructor).
-ImageBounds ComputeImageBounds(const cv::Mat &imLeft, const cv::Mat& mK, const cv::Mat& mDistCoef)
+ImageBounds ComputeImageBounds(const cv::Mat& image, const cv::Mat& K, const cv::Mat1f& distCoeffs)
 {
+	const float h = static_cast<float>(image.rows);
+	const float w = static_cast<float>(image.cols);
+
 	ImageBounds imageBounds;
-	if (mDistCoef.at<float>(0) != 0.0)
+	if (distCoeffs(0) != 0.f)
 	{
-		cv::Mat mat(4, 2, CV_32F);
-		mat.at<float>(0, 0) = 0.0; mat.at<float>(0, 1) = 0.0;
-		mat.at<float>(1, 0) = imLeft.cols; mat.at<float>(1, 1) = 0.0;
-		mat.at<float>(2, 0) = 0.0; mat.at<float>(2, 1) = imLeft.rows;
-		mat.at<float>(3, 0) = imLeft.cols; mat.at<float>(3, 1) = imLeft.rows;
+		std::vector<cv::Point2f> corners(4);
+		corners[0] = cv::Point2f(0, 0);
+		corners[1] = cv::Point2f(w, 0);
+		corners[2] = cv::Point2f(0, h);
+		corners[3] = cv::Point2f(w, h);
 
-		// Undistort corners
-		mat = mat.reshape(2);
-		cv::undistortPoints(mat, mat, mK, mDistCoef, cv::Mat(), mK);
-		mat = mat.reshape(1);
+		cv::undistortPoints(corners, corners, K, distCoeffs, cv::Mat(), K);
 
-		imageBounds.mnMinX = min(mat.at<float>(0, 0), mat.at<float>(2, 0));
-		imageBounds.mnMaxX = max(mat.at<float>(1, 0), mat.at<float>(3, 0));
-		imageBounds.mnMinY = min(mat.at<float>(0, 1), mat.at<float>(1, 1));
-		imageBounds.mnMaxY = max(mat.at<float>(2, 1), mat.at<float>(3, 1));
+		imageBounds.mnMinX = std::min(corners[0].x, corners[2].x);
+		imageBounds.mnMaxX = std::max(corners[1].x, corners[3].x);
+		imageBounds.mnMinY = std::min(corners[0].y, corners[1].y);
+		imageBounds.mnMaxY = std::max(corners[2].y, corners[3].y);
 
 	}
 	else
 	{
-		imageBounds.mnMinX = 0.0f;
-		imageBounds.mnMaxX = imLeft.cols;
-		imageBounds.mnMinY = 0.0f;
-		imageBounds.mnMaxY = imLeft.rows;
+		imageBounds.mnMinX = 0.f;
+		imageBounds.mnMaxX = w;
+		imageBounds.mnMinY = 0.f;
+		imageBounds.mnMaxY = h;
 	}
 	return imageBounds;
 }
