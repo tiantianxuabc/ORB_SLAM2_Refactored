@@ -40,8 +40,6 @@
 namespace ORB_SLAM2
 {
 
-using namespace std;
-
 namespace Converter
 {
 
@@ -152,36 +150,36 @@ public:
 		: sensor_(sensor), viewer_(nullptr)
 	{
 		// Output welcome message
-		cout << endl <<
-			"ORB-SLAM2 Copyright (C) 2014-2016 Raul Mur-Artal, University of Zaragoza." << endl <<
-			"This program comes with ABSOLUTELY NO WARRANTY;" << endl <<
-			"This is free software, and you are welcome to redistribute it" << endl <<
-			"under certain conditions. See LICENSE.txt." << endl << endl;
+		std::cout << std::endl <<
+			"ORB-SLAM2 Copyright (C) 2014-2016 Raul Mur-Artal, University of Zaragoza." << std::endl <<
+			"This program comes with ABSOLUTELY NO WARRANTY;" << std::endl <<
+			"This is free software, and you are welcome to redistribute it" << std::endl <<
+			"under certain conditions. See LICENSE.txt." << std::endl << std::endl;
 
-		cout << "Input sensor was set to: ";
+		std::cout << "Input sensor was set to: ";
 
 		const char* sensors[3] = { "Monocular", "Stereo", "RGB-D" };
-		cout << sensors[sensor_] << endl;
+		std::cout << sensors[sensor_] << std::endl;
 
 		//Check settings file
 		cv::FileStorage settings(settingsFile.c_str(), cv::FileStorage::READ);
 		if (!settings.isOpened())
 		{
-			cerr << "Failed to open settings file at: " << settingsFile << endl;
-			exit(-1);
+			cerr << "Failed to open settings file at: " << settingsFile << std::endl;
+			std::exit(-1);
 		}
 
 		//Load ORB Vocabulary
-		cout << endl << "Loading ORB Vocabulary. This could take a while..." << endl;
+		std::cout << std::endl << "Loading ORB Vocabulary. This could take a while..." << std::endl;
 
 		vocabulary_ = std::make_shared<ORBVocabulary>();
 		if (!vocabulary_->loadFromTextFile(vocabularyFile))
 		{
-			cerr << "Wrong path to vocabulary. " << endl;
-			cerr << "Falied to open at: " << vocabularyFile << endl;
-			exit(-1);
+			cerr << "Wrong path to vocabulary. " << std::endl;
+			cerr << "Falied to open at: " << vocabularyFile << std::endl;
+			std::exit(-1);
 		}
-		cout << "Vocabulary loaded!" << endl << endl;
+		std::cout << "Vocabulary loaded!" << std::endl << std::endl;
 
 		//Create KeyFrame Database
 		keyFrameDB_ = std::make_shared<KeyFrameDatabase>(*vocabulary_);
@@ -235,8 +233,8 @@ public:
 	{
 		if (sensor_ != STEREO)
 		{
-			cerr << "ERROR: you called TrackStereo but input sensor was not set to STEREO." << endl;
-			exit(-1);
+			cerr << "ERROR: you called TrackStereo but input sensor was not set to STEREO." << std::endl;
+			std::exit(-1);
 		}
 
 		// Check mode change
@@ -261,8 +259,8 @@ public:
 	{
 		if (sensor_ != RGBD)
 		{
-			cerr << "ERROR: you called TrackRGBD but input sensor was not set to RGBD." << endl;
-			exit(-1);
+			cerr << "ERROR: you called TrackRGBD but input sensor was not set to RGBD." << std::endl;
+			std::exit(-1);
 		}
 
 		// Check mode change
@@ -286,8 +284,8 @@ public:
 	{
 		if (sensor_ != MONOCULAR)
 		{
-			cerr << "ERROR: you called TrackMonocular but input sensor was not set to Monocular." << endl;
-			exit(-1);
+			cerr << "ERROR: you called TrackMonocular but input sensor was not set to Monocular." << std::endl;
+			std::exit(-1);
 		}
 
 		// Check mode change
@@ -367,10 +365,10 @@ public:
 	// See format details at: http://vision.in.tum.de/data/datasets/rgbd-dataset
 	void SaveTrajectoryTUM(const Path& filename) const override
 	{
-		cout << endl << "Saving camera trajectory to " << filename << " ..." << endl;
+		std::cout << std::endl << "Saving camera trajectory to " << filename << " ..." << std::endl;
 		if (sensor_ == MONOCULAR)
 		{
-			cerr << "ERROR: SaveTrajectoryTUM cannot be used for monocular." << endl;
+			cerr << "ERROR: SaveTrajectoryTUM cannot be used for monocular." << std::endl;
 			return;
 		}
 
@@ -415,10 +413,10 @@ public:
 
 			vector<float> q = Converter::toQuaternion(Rwc);
 
-			f << setprecision(6) << track.timestamp << " " << setprecision(9) << twc.at<float>(0) << " " << twc.at<float>(1) << " " << twc.at<float>(2) << " " << q[0] << " " << q[1] << " " << q[2] << " " << q[3] << endl;
+			f << setprecision(6) << track.timestamp << " " << setprecision(9) << twc.at<float>(0) << " " << twc.at<float>(1) << " " << twc.at<float>(2) << " " << q[0] << " " << q[1] << " " << q[2] << " " << q[3] << std::endl;
 		}
 		f.close();
-		cout << endl << "trajectory saved!" << endl;
+		std::cout << std::endl << "trajectory saved!" << std::endl;
 	}
 
 	// Save keyframe poses in the TUM RGB-D dataset format.
@@ -427,7 +425,7 @@ public:
 	// See format details at: http://vision.in.tum.de/data/datasets/rgbd-dataset
 	void SaveKeyFrameTrajectoryTUM(const Path& filename) const override
 	{
-		cout << endl << "Saving keyframe trajectory to " << filename << " ..." << endl;
+		std::cout << std::endl << "Saving keyframe trajectory to " << filename << " ..." << std::endl;
 
 		vector<KeyFrame*> vpKFs = map_->GetAllKeyFrames();
 		sort(vpKFs.begin(), vpKFs.end(), KeyFrame::lId);
@@ -453,12 +451,12 @@ public:
 			vector<float> q = Converter::toQuaternion(R);
 			cv::Mat t = pKF->GetCameraCenter();
 			f << setprecision(6) << pKF->mTimeStamp << setprecision(7) << " " << t.at<float>(0) << " " << t.at<float>(1) << " " << t.at<float>(2)
-				<< " " << q[0] << " " << q[1] << " " << q[2] << " " << q[3] << endl;
+				<< " " << q[0] << " " << q[1] << " " << q[2] << " " << q[3] << std::endl;
 
 		}
 
 		f.close();
-		cout << endl << "trajectory saved!" << endl;
+		std::cout << std::endl << "trajectory saved!" << std::endl;
 	}
 
 	// Save camera trajectory in the KITTI dataset format.
@@ -467,10 +465,10 @@ public:
 	// See format details at: http://www.cvlibs.net/datasets/kitti/eval_odometry.php
 	void SaveTrajectoryKITTI(const Path& filename) const override
 	{
-		cout << endl << "Saving camera trajectory to " << filename << " ..." << endl;
+		std::cout << std::endl << "Saving camera trajectory to " << filename << " ..." << std::endl;
 		if (sensor_ == MONOCULAR)
 		{
-			cerr << "ERROR: SaveTrajectoryKITTI cannot be used for monocular." << endl;
+			cerr << "ERROR: SaveTrajectoryKITTI cannot be used for monocular." << std::endl;
 			return;
 		}
 
@@ -499,7 +497,7 @@ public:
 
 			while (pKF->isBad())
 			{
-				//  cout << "bad parent" << endl;
+				//  std::cout << "bad parent" << std::endl;
 				Trw = Trw*pKF->mTcp;
 				pKF = pKF->GetParent();
 			}
@@ -512,10 +510,10 @@ public:
 
 			f << setprecision(9) << Rwc.at<float>(0, 0) << " " << Rwc.at<float>(0, 1) << " " << Rwc.at<float>(0, 2) << " " << twc.at<float>(0) << " " <<
 				Rwc.at<float>(1, 0) << " " << Rwc.at<float>(1, 1) << " " << Rwc.at<float>(1, 2) << " " << twc.at<float>(1) << " " <<
-				Rwc.at<float>(2, 0) << " " << Rwc.at<float>(2, 1) << " " << Rwc.at<float>(2, 2) << " " << twc.at<float>(2) << endl;
+				Rwc.at<float>(2, 0) << " " << Rwc.at<float>(2, 1) << " " << Rwc.at<float>(2, 2) << " " << twc.at<float>(2) << std::endl;
 		}
 		f.close();
-		cout << endl << "trajectory saved!" << endl;
+		std::cout << std::endl << "trajectory saved!" << std::endl;
 	}
 
 	// TODO: Save/Load functions
