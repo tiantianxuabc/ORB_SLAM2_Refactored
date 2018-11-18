@@ -372,16 +372,15 @@ public:
 			return;
 		}
 
-		vector<KeyFrame*> vpKFs = map_->GetAllKeyFrames();
-		sort(vpKFs.begin(), vpKFs.end(), KeyFrame::lId);
+		std::vector<KeyFrame*> keyframes = map_->GetAllKeyFrames();
+		std::sort(std::begin(keyframes), std::end(keyframes), KeyFrame::lId);
 
 		// Transform all keyframes so that the first keyframe is at the origin.
 		// After a loop closure the first keyframe might not be at the origin.
-		cv::Mat Two = vpKFs[0]->GetPoseInverse();
+		const cv::Mat Two = keyframes.front()->GetPoseInverse();
 
-		ofstream f;
-		f.open(filename.c_str());
-		f << fixed;
+		std::ofstream ofs(filename);
+		ofs << std::fixed;
 
 		// Frame pose is stored relative to its reference keyframe (which is optimized by BA and pose graph).
 		// We need to get first the keyframe pose and then concatenate the relative transformation.
@@ -394,28 +393,30 @@ public:
 			if (track.lost)
 				continue;
 
-			KeyFrame* pKF = (KeyFrame*)track.referenceKF;
+			KeyFrame* keyframe = (KeyFrame*)track.referenceKF;
 
 			cv::Mat Trw = cv::Mat::eye(4, 4, CV_32F);
 
 			// If the reference keyframe was culled, traverse the spanning tree to get a suitable keyframe.
-			while (pKF->isBad())
+			while (keyframe->isBad())
 			{
-				Trw = Trw*pKF->mTcp;
-				pKF = pKF->GetParent();
+				Trw = Trw * keyframe->mTcp;
+				keyframe = keyframe->GetParent();
 			}
 
-			Trw = Trw*pKF->GetPose()*Two;
+			Trw = Trw * keyframe->GetPose() * Two;
 
-			cv::Mat Tcw = track.Tcr * Trw;
-			cv::Mat Rwc = Tcw.rowRange(0, 3).colRange(0, 3).t();
-			cv::Mat twc = -Rwc*Tcw.rowRange(0, 3).col(3);
+			const cv::Mat1f Tcw = track.Tcr * Trw;
+			const cv::Mat1f Rwc = Tcw.rowRange(0, 3).colRange(0, 3).t();
+			const cv::Mat1f twc = -Rwc * Tcw.rowRange(0, 3).col(3);
 
-			vector<float> q = Converter::toQuaternion(Rwc);
+			std::vector<float> q = Converter::toQuaternion(Rwc);
 
-			f << setprecision(6) << track.timestamp << " " << setprecision(9) << twc.at<float>(0) << " " << twc.at<float>(1) << " " << twc.at<float>(2) << " " << q[0] << " " << q[1] << " " << q[2] << " " << q[3] << std::endl;
+			ofs << std::setprecision(6) << track.timestamp << " ";
+			ofs << std::setprecision(9) << twc(0) << " " << twc(1) << " " << twc(2) << " ";
+			ofs << q[0] << " " << q[1] << " " << q[2] << " " << q[3] << std::endl;
 		}
-		f.close();
+
 		std::cout << std::endl << "trajectory saved!" << std::endl;
 	}
 
@@ -427,35 +428,32 @@ public:
 	{
 		std::cout << std::endl << "Saving keyframe trajectory to " << filename << " ..." << std::endl;
 
-		vector<KeyFrame*> vpKFs = map_->GetAllKeyFrames();
-		sort(vpKFs.begin(), vpKFs.end(), KeyFrame::lId);
+		std::vector<KeyFrame*> keyframes = map_->GetAllKeyFrames();
+		std::sort(std::begin(keyframes), std::end(keyframes), KeyFrame::lId);
 
 		// Transform all keyframes so that the first keyframe is at the origin.
 		// After a loop closure the first keyframe might not be at the origin.
 		//cv::Mat Two = vpKFs[0]->GetPoseInverse();
 
-		ofstream f;
-		f.open(filename.c_str());
-		f << fixed;
+		std::ofstream ofs(filename);
+		ofs << std::fixed;
 
-		for (size_t i = 0; i < vpKFs.size(); i++)
+		for (size_t i = 0; i < keyframes.size(); i++)
 		{
-			KeyFrame* pKF = vpKFs[i];
+			KeyFrame* keyframe = keyframes[i];
 
-			// pKF->SetPose(pKF->GetPose()*Two);
-
-			if (pKF->isBad())
+			if (keyframe->isBad())
 				continue;
 
-			cv::Mat R = pKF->GetRotation().t();
-			vector<float> q = Converter::toQuaternion(R);
-			cv::Mat t = pKF->GetCameraCenter();
-			f << setprecision(6) << pKF->mTimeStamp << setprecision(7) << " " << t.at<float>(0) << " " << t.at<float>(1) << " " << t.at<float>(2)
-				<< " " << q[0] << " " << q[1] << " " << q[2] << " " << q[3] << std::endl;
+			const cv::Mat1f R = keyframe->GetRotation().t();
+			std::vector<float> q = Converter::toQuaternion(R);
+			const cv::Mat1f t = keyframe->GetCameraCenter();
+			ofs << std::setprecision(6) << keyframe->mTimeStamp << " ";
+			ofs << std::setprecision(7) << t(0) << " " << t(1) << " " << t(2) << " ";
+			ofs << q[0] << " " << q[1] << " " << q[2] << " " << q[3] << std::endl;
 
 		}
 
-		f.close();
 		std::cout << std::endl << "trajectory saved!" << std::endl;
 	}
 
