@@ -277,7 +277,8 @@ void ComputeStereoMatches(
 	}
 
 	std::sort(std::begin(distIndices), std::end(distIndices), std::greater<std::pair<int, int>>());
-	const int median = distIndices[distIndices.size() / 2 - 1].first;
+	const int m = std::max(distIndices.size() / 2 - 1, size_t(0));
+	const int median = distIndices[m].first;
 	const float thDist = 1.5f * 1.4f * median;
 
 	for (const auto& v : distIndices)
