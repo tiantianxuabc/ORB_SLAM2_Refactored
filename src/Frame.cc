@@ -110,6 +110,16 @@ static const int PATCH_RADIUS = 5;
 static const int PATCH_SIZE = 2 * PATCH_RADIUS + 1;
 static const int SEARCH_RADIUS = 5;
 
+static int PatchDistance(const cv::Mat1b& patchL, const cv::Mat1b& patchR)
+{
+	const int sub = patchL(PATCH_RADIUS, PATCH_RADIUS) - patchR(PATCH_RADIUS, PATCH_RADIUS);
+	int sum = 0;
+	for (int y = 0; y < PATCH_SIZE; y++)
+		for (int x = 0; x < PATCH_SIZE; x++)
+			sum += std::abs(patchL(y, x) - patchR(y, x) - sub);
+	return sum;
+}
+
 // Search a match for each keypoint in the left image to a keypoint in the right image.
 // If there is a match, depth is computed and the right coordinate associated to the left keypoint is stored.
 void ComputeStereoMatches(
@@ -215,8 +225,8 @@ void ComputeStereoMatches(
 			// sliding window search
 			const cv::Rect roiL(suL - PATCH_RADIUS, svL - PATCH_RADIUS, PATCH_SIZE, PATCH_SIZE);
 			cv::Mat IL = imageL(roiL);
-			IL.convertTo(IL, CV_32F);
-			IL = IL - IL.at<float>(PATCH_RADIUS, PATCH_RADIUS) *cv::Mat::ones(IL.rows, IL.cols, CV_32F);
+			//IL.convertTo(IL, CV_32F);
+			//IL = IL - IL.at<float>(PATCH_RADIUS, PATCH_RADIUS) *cv::Mat::ones(IL.rows, IL.cols, CV_32F);
 
 			int minDist = std::numeric_limits<int>::max();
 			int bestdxR = 0;
@@ -231,10 +241,11 @@ void ComputeStereoMatches(
 			{
 				const cv::Rect roiR(suR + dxR - PATCH_RADIUS, svL - PATCH_RADIUS, PATCH_SIZE, PATCH_SIZE);
 				cv::Mat IR = imageR(roiR);
-				IR.convertTo(IR, CV_32F);
-				IR = IR - IR.at<float>(PATCH_RADIUS, PATCH_RADIUS) *cv::Mat::ones(IR.rows, IR.cols, CV_32F);
+				//IR.convertTo(IR, CV_32F);
+				//IR = IR - IR.at<float>(PATCH_RADIUS, PATCH_RADIUS) *cv::Mat::ones(IR.rows, IR.cols, CV_32F);
 
-				int dist = (int)cv::norm(IL, IR, cv::NORM_L1);
+				//int dist = (int)cv::norm(IL, IR, cv::NORM_L1);
+				int dist = PatchDistance(IL, IR);
 				if (dist < minDist)
 				{
 					minDist = dist;
