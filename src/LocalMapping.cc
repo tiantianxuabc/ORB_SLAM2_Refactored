@@ -49,18 +49,18 @@ public:
 	{
 	}
 
-	void SetLoopCloser(LoopClosing* loopCloser)
+	void SetLoopCloser(LoopClosing* loopCloser) override
 	{
 		loopCloser_ = loopCloser;
 	}
 
-	void SetTracker(Tracking* tracker)
+	void SetTracker(Tracking* tracker) override
 	{
 		tracker_ = tracker;
 	}
 
 	// Main function
-	void Run()
+	void Run() override
 	{
 		finished_ = false;
 
@@ -126,7 +126,7 @@ public:
 		SetFinish();
 	}
 
-	void InsertKeyFrame(KeyFrame* keyframe)
+	void InsertKeyFrame(KeyFrame* keyframe) override
 	{
 		LOCK_MUTEX_NEW_KF();
 		newKeyFrames_.push_back(keyframe);
@@ -134,7 +134,7 @@ public:
 	}
 
 	// Thread Synch
-	void RequestStop()
+	void RequestStop() override
 	{
 		LOCK_MUTEX_STOP();
 		stopRequested_ = true;
@@ -142,7 +142,7 @@ public:
 		abortBA_ = true;
 	}
 
-	void RequestReset()
+	void RequestReset() override
 	{
 		{
 			LOCK_MUTEX_RESET();
@@ -160,7 +160,7 @@ public:
 		}
 	}
 
-	bool Stop()
+	bool Stop() override
 	{
 		LOCK_MUTEX_STOP();
 		if (stopRequested_ && !notStop_)
@@ -173,7 +173,7 @@ public:
 		return false;
 	}
 
-	void Release()
+	void Release() override
 	{
 		LOCK_MUTEX_STOP();
 		LOCK_MUTEX_FINISH();
@@ -190,31 +190,31 @@ public:
 		cout << "Local Mapping RELEASE" << endl;
 	}
 
-	bool isStopped()
+	bool isStopped() const override
 	{
 		LOCK_MUTEX_STOP();
 		return stopped_;
 	}
 
-	bool stopRequested()
+	bool stopRequested() const override
 	{
 		LOCK_MUTEX_STOP();
 		return stopRequested_;
 	}
 
-	bool AcceptKeyFrames()
+	bool AcceptKeyFrames() const override
 	{
 		LOCK_MUTEX_ACCEPT_KF();
 		return acceptKeyFrames_;
 	}
 
-	void SetAcceptKeyFrames(bool flag)
+	void SetAcceptKeyFrames(bool flag) override
 	{
 		LOCK_MUTEX_ACCEPT_KF();
 		acceptKeyFrames_ = flag;
 	}
 
-	bool SetNotStop(bool flag)
+	bool SetNotStop(bool flag) override
 	{
 		LOCK_MUTEX_STOP();
 
@@ -226,24 +226,24 @@ public:
 		return true;
 	}
 
-	void InterruptBA()
+	void InterruptBA() override
 	{
 		abortBA_ = true;
 	}
 
-	void RequestFinish()
+	void RequestFinish() override
 	{
 		LOCK_MUTEX_FINISH();
 		finishRequested_ = true;
 	}
 
-	bool isFinished()
+	bool isFinished() const override
 	{
 		LOCK_MUTEX_FINISH();
 		return finished_;
 	}
 
-	int KeyframesInQueue()
+	int KeyframesInQueue() const override
 	{
 		LOCK_MUTEX_NEW_KF();
 		return newKeyFrames_.size();
@@ -805,11 +805,11 @@ private:
 	bool notStop_;
 	bool acceptKeyFrames_;
 
-	std::mutex mutexNewKFs_;
-	std::mutex mutexReset_;
-	std::mutex mutexFinish_;
-	std::mutex mutexStop_;
-	std::mutex mutexAccept_;
+	mutable std::mutex mutexNewKFs_;
+	mutable std::mutex mutexReset_;
+	mutable std::mutex mutexFinish_;
+	mutable std::mutex mutexStop_;
+	mutable std::mutex mutexAccept_;
 };
 
 std::shared_ptr<LocalMapping> LocalMapping::Create(Map* map, bool monocular)

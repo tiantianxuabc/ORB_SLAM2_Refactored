@@ -51,18 +51,18 @@ public:
 	virtual void RequestReset() = 0;
 	virtual bool Stop() = 0;
 	virtual void Release() = 0;
-	virtual bool isStopped() = 0;
-	virtual bool stopRequested() = 0;
-	virtual bool AcceptKeyFrames() = 0;
+	virtual bool isStopped() const = 0;
+	virtual bool stopRequested() const = 0;
+	virtual bool AcceptKeyFrames() const = 0;
 	virtual void SetAcceptKeyFrames(bool flag) = 0;
 	virtual bool SetNotStop(bool flag) = 0;
 
 	virtual void InterruptBA() = 0;
 
 	virtual void RequestFinish() = 0;
-	virtual bool isFinished() = 0;
+	virtual bool isFinished() const = 0;
 
-	virtual int KeyframesInQueue() = 0;
+	virtual int KeyframesInQueue() const = 0;
 };
 
 } //namespace ORB_SLAM
