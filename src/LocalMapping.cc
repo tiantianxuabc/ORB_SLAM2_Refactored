@@ -43,20 +43,19 @@ public:
 	{
 	}
 
-	void SetLoopCloser(LoopClosing* pLoopCloser)
+	void SetLoopCloser(LoopClosing* loopCloser)
 	{
-		mpLoopCloser = pLoopCloser;
+		loopCloser_ = loopCloser;
 	}
 
-	void SetTracker(Tracking *pTracker)
+	void SetTracker(Tracking* tracker)
 	{
-		mpTracker = pTracker;
+		tracker_ = tracker;
 	}
 
 	// Main function
 	void Run()
 	{
-
 		finished_ = false;
 
 		while (1)
@@ -94,7 +93,7 @@ public:
 					KeyFrameCulling();
 				}
 
-				mpLoopCloser->InsertKeyFrame(mpCurrentKeyFrame);
+				loopCloser_->InsertKeyFrame(mpCurrentKeyFrame);
 			}
 			else if (Stop())
 			{
@@ -121,33 +120,33 @@ public:
 		SetFinish();
 	}
 
-	void InsertKeyFrame(KeyFrame *pKF)
+	void InsertKeyFrame(KeyFrame* keyframe)
 	{
-		unique_lock<mutex> lock(mMutexNewKFs);
-		mlNewKeyFrames.push_back(pKF);
+		unique_lock<mutex> lock(mutexNewKFs_);
+		newKeyFrames_.push_back(keyframe);
 		abortBA_ = true;
 	}
 
 	// Thread Synch
 	void RequestStop()
 	{
-		unique_lock<mutex> lock(mMutexStop);
+		unique_lock<mutex> lock(mutexStop_);
 		stopRequested_ = true;
-		unique_lock<mutex> lock2(mMutexNewKFs);
+		unique_lock<mutex> lock2(mutexNewKFs_);
 		abortBA_ = true;
 	}
 
 	void RequestReset()
 	{
 		{
-			unique_lock<mutex> lock(mMutexReset);
+			unique_lock<mutex> lock(mutexReset_);
 			resetRequested_ = true;
 		}
 
 		while (1)
 		{
 			{
-				unique_lock<mutex> lock2(mMutexReset);
+				unique_lock<mutex> lock2(mutexReset_);
 				if (!resetRequested_)
 					break;
 			}
@@ -157,7 +156,7 @@ public:
 
 	bool Stop()
 	{
-		unique_lock<mutex> lock(mMutexStop);
+		unique_lock<mutex> lock(mutexStop_);
 		if (stopRequested_ && !notStop_)
 		{
 			stopped_ = true;
@@ -170,46 +169,48 @@ public:
 
 	void Release()
 	{
-		unique_lock<mutex> lock(mMutexStop);
-		unique_lock<mutex> lock2(mMutexFinish);
+		unique_lock<mutex> lock(mutexStop_);
+		unique_lock<mutex> lock2(mutexFinish_);
+
 		if (finished_)
 			return;
+
 		stopped_ = false;
 		stopRequested_ = false;
-		for (list<KeyFrame*>::iterator lit = mlNewKeyFrames.begin(), lend = mlNewKeyFrames.end(); lit != lend; lit++)
+		for (list<KeyFrame*>::iterator lit = newKeyFrames_.begin(), lend = newKeyFrames_.end(); lit != lend; lit++)
 			delete *lit;
-		mlNewKeyFrames.clear();
+		newKeyFrames_.clear();
 
 		cout << "Local Mapping RELEASE" << endl;
 	}
 
 	bool isStopped()
 	{
-		unique_lock<mutex> lock(mMutexStop);
+		unique_lock<mutex> lock(mutexStop_);
 		return stopped_;
 	}
 
 	bool stopRequested()
 	{
-		unique_lock<mutex> lock(mMutexStop);
+		unique_lock<mutex> lock(mutexStop_);
 		return stopRequested_;
 	}
 
 	bool AcceptKeyFrames()
 	{
-		unique_lock<mutex> lock(mMutexAccept);
+		unique_lock<mutex> lock(mutexAccept_);
 		return acceptKeyFrames_;
 	}
 
 	void SetAcceptKeyFrames(bool flag)
 	{
-		unique_lock<mutex> lock(mMutexAccept);
+		unique_lock<mutex> lock(mutexAccept_);
 		acceptKeyFrames_ = flag;
 	}
 
 	bool SetNotStop(bool flag)
 	{
-		unique_lock<mutex> lock(mMutexStop);
+		unique_lock<mutex> lock(mutexStop_);
 
 		if (flag && stopped_)
 			return false;
@@ -226,36 +227,36 @@ public:
 
 	void RequestFinish()
 	{
-		unique_lock<mutex> lock(mMutexFinish);
+		unique_lock<mutex> lock(mutexFinish_);
 		finishRequested_ = true;
 	}
 
 	bool isFinished()
 	{
-		unique_lock<mutex> lock(mMutexFinish);
+		unique_lock<mutex> lock(mutexFinish_);
 		return finished_;
 	}
 
 	int KeyframesInQueue()
 	{
-		unique_lock<std::mutex> lock(mMutexNewKFs);
-		return mlNewKeyFrames.size();
+		unique_lock<std::mutex> lock(mutexNewKFs_);
+		return newKeyFrames_.size();
 	}
 
 private:
 
 	bool CheckNewKeyFrames()
 	{
-		unique_lock<mutex> lock(mMutexNewKFs);
-		return(!mlNewKeyFrames.empty());
+		unique_lock<mutex> lock(mutexNewKFs_);
+		return(!newKeyFrames_.empty());
 	}
 
 	void ProcessNewKeyFrame()
 	{
 		{
-			unique_lock<mutex> lock(mMutexNewKFs);
-			mpCurrentKeyFrame = mlNewKeyFrames.front();
-			mlNewKeyFrames.pop_front();
+			unique_lock<mutex> lock(mutexNewKFs_);
+			mpCurrentKeyFrame = newKeyFrames_.front();
+			newKeyFrames_.pop_front();
 		}
 
 		// Compute Bags of Words structures
@@ -752,10 +753,10 @@ private:
 
 	void ResetIfRequested()
 	{
-		unique_lock<mutex> lock(mMutexReset);
+		unique_lock<mutex> lock(mutexReset_);
 		if (resetRequested_)
 		{
-			mlNewKeyFrames.clear();
+			newKeyFrames_.clear();
 			mlpRecentAddedMapPoints.clear();
 			resetRequested_ = false;
 		}
@@ -763,47 +764,47 @@ private:
 
 	bool CheckFinish()
 	{
-		unique_lock<mutex> lock(mMutexFinish);
+		unique_lock<mutex> lock(mutexFinish_);
 		return finishRequested_;
 	}
 
 	void SetFinish()
 	{
-		unique_lock<mutex> lock(mMutexFinish);
+		unique_lock<mutex> lock(mutexFinish_);
 		finished_ = true;
-		unique_lock<mutex> lock2(mMutexStop);
+		unique_lock<mutex> lock2(mutexStop_);
 		stopped_ = true;
 	}
 
 	bool monocular_;
 	bool resetRequested_;
-	std::mutex mMutexReset;
+	std::mutex mutexReset_;
 	bool finishRequested_;
 	bool finished_;
-	std::mutex mMutexFinish;
+	std::mutex mutexFinish_;
 
 	Map* map_;
 
-	LoopClosing* mpLoopCloser;
-	Tracking* mpTracker;
+	LoopClosing* loopCloser_;
+	Tracking* tracker_;
 
-	std::list<KeyFrame*> mlNewKeyFrames;
+	std::list<KeyFrame*> newKeyFrames_;
 
 	KeyFrame* mpCurrentKeyFrame;
 
 	std::list<MapPoint*> mlpRecentAddedMapPoints;
 
-	std::mutex mMutexNewKFs;
+	std::mutex mutexNewKFs_;
 
 	bool abortBA_;
 
 	bool stopped_;
 	bool stopRequested_;
 	bool notStop_;
-	std::mutex mMutexStop;
+	std::mutex mutexStop_;
 
 	bool acceptKeyFrames_;
-	std::mutex mMutexAccept;
+	std::mutex mutexAccept_;
 };
 
 std::shared_ptr<LocalMapping> LocalMapping::Create(Map* map, bool monocular)
