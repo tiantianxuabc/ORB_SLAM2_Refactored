@@ -35,7 +35,7 @@ class LocalMapping
 {
 public:
 
-	static std::shared_ptr<LocalMapping> Create(Map* pMap, const float bMonocular);
+	static std::shared_ptr<LocalMapping> Create(Map* pMap, bool bMonocular);
 
 	virtual void SetLoopCloser(LoopClosing* pLoopCloser) = 0;
 

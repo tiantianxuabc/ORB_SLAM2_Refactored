@@ -37,9 +37,9 @@ class LocalMappingImpl : public LocalMapping
 {
 public:
 
-	LocalMappingImpl::LocalMappingImpl(Map *pMap, const float bMonocular) :
-		mbMonocular(bMonocular), mbResetRequested(false), mbFinishRequested(false), mbFinished(true), mpMap(pMap),
-		mbAbortBA(false), mbStopped(false), mbStopRequested(false), mbNotStop(false), mbAcceptKeyFrames(true)
+	LocalMappingImpl::LocalMappingImpl(Map* map, bool monocular) :
+		monocular_(monocular), resetRequested_(false), finishRequested_(false), finished_(true), map_(map),
+		abortBA_(false), stopped_(false), stopRequested_(false), notStop_(false), acceptKeyFrames_(true)
 	{
 	}
 
@@ -57,7 +57,7 @@ public:
 	void Run()
 	{
 
-		mbFinished = false;
+		finished_ = false;
 
 		while (1)
 		{
@@ -82,13 +82,13 @@ public:
 					SearchInNeighbors();
 				}
 
-				mbAbortBA = false;
+				abortBA_ = false;
 
 				if (!CheckNewKeyFrames() && !stopRequested())
 				{
 					// Local BA
-					if (mpMap->KeyFramesInMap() > 2)
-						Optimizer::LocalBundleAdjustment(mpCurrentKeyFrame, &mbAbortBA, mpMap);
+					if (map_->KeyFramesInMap() > 2)
+						Optimizer::LocalBundleAdjustment(mpCurrentKeyFrame, &abortBA_, map_);
 
 					// Check redundant local Keyframes
 					KeyFrameCulling();
@@ -125,30 +125,30 @@ public:
 	{
 		unique_lock<mutex> lock(mMutexNewKFs);
 		mlNewKeyFrames.push_back(pKF);
-		mbAbortBA = true;
+		abortBA_ = true;
 	}
 
 	// Thread Synch
 	void RequestStop()
 	{
 		unique_lock<mutex> lock(mMutexStop);
-		mbStopRequested = true;
+		stopRequested_ = true;
 		unique_lock<mutex> lock2(mMutexNewKFs);
-		mbAbortBA = true;
+		abortBA_ = true;
 	}
 
 	void RequestReset()
 	{
 		{
 			unique_lock<mutex> lock(mMutexReset);
-			mbResetRequested = true;
+			resetRequested_ = true;
 		}
 
 		while (1)
 		{
 			{
 				unique_lock<mutex> lock2(mMutexReset);
-				if (!mbResetRequested)
+				if (!resetRequested_)
 					break;
 			}
 			usleep(3000);
@@ -158,9 +158,9 @@ public:
 	bool Stop()
 	{
 		unique_lock<mutex> lock(mMutexStop);
-		if (mbStopRequested && !mbNotStop)
+		if (stopRequested_ && !notStop_)
 		{
-			mbStopped = true;
+			stopped_ = true;
 			cout << "Local Mapping STOP" << endl;
 			return true;
 		}
@@ -172,10 +172,10 @@ public:
 	{
 		unique_lock<mutex> lock(mMutexStop);
 		unique_lock<mutex> lock2(mMutexFinish);
-		if (mbFinished)
+		if (finished_)
 			return;
-		mbStopped = false;
-		mbStopRequested = false;
+		stopped_ = false;
+		stopRequested_ = false;
 		for (list<KeyFrame*>::iterator lit = mlNewKeyFrames.begin(), lend = mlNewKeyFrames.end(); lit != lend; lit++)
 			delete *lit;
 		mlNewKeyFrames.clear();
@@ -186,54 +186,54 @@ public:
 	bool isStopped()
 	{
 		unique_lock<mutex> lock(mMutexStop);
-		return mbStopped;
+		return stopped_;
 	}
 
 	bool stopRequested()
 	{
 		unique_lock<mutex> lock(mMutexStop);
-		return mbStopRequested;
+		return stopRequested_;
 	}
 
 	bool AcceptKeyFrames()
 	{
 		unique_lock<mutex> lock(mMutexAccept);
-		return mbAcceptKeyFrames;
+		return acceptKeyFrames_;
 	}
 
 	void SetAcceptKeyFrames(bool flag)
 	{
 		unique_lock<mutex> lock(mMutexAccept);
-		mbAcceptKeyFrames = flag;
+		acceptKeyFrames_ = flag;
 	}
 
 	bool SetNotStop(bool flag)
 	{
 		unique_lock<mutex> lock(mMutexStop);
 
-		if (flag && mbStopped)
+		if (flag && stopped_)
 			return false;
 
-		mbNotStop = flag;
+		notStop_ = flag;
 
 		return true;
 	}
 
 	void InterruptBA()
 	{
-		mbAbortBA = true;
+		abortBA_ = true;
 	}
 
 	void RequestFinish()
 	{
 		unique_lock<mutex> lock(mMutexFinish);
-		mbFinishRequested = true;
+		finishRequested_ = true;
 	}
 
 	bool isFinished()
 	{
 		unique_lock<mutex> lock(mMutexFinish);
-		return mbFinished;
+		return finished_;
 	}
 
 	int KeyframesInQueue()
@@ -289,7 +289,7 @@ private:
 		mpCurrentKeyFrame->UpdateConnections();
 
 		// Insert Keyframe in Map
-		mpMap->AddKeyFrame(mpCurrentKeyFrame);
+		map_->AddKeyFrame(mpCurrentKeyFrame);
 	}
 
 	void MapPointCulling()
@@ -299,7 +299,7 @@ private:
 		const unsigned long int nCurrentKFid = mpCurrentKeyFrame->mnId;
 
 		int nThObs;
-		if (mbMonocular)
+		if (monocular_)
 			nThObs = 2;
 		else
 			nThObs = 3;
@@ -333,7 +333,7 @@ private:
 	{
 		// Retrieve neighbor keyframes in covisibility graph
 		int nn = 10;
-		if (mbMonocular)
+		if (monocular_)
 			nn = 20;
 		const vector<KeyFrame*> vpNeighKFs = mpCurrentKeyFrame->GetBestCovisibilityKeyFrames(nn);
 
@@ -371,7 +371,7 @@ private:
 			cv::Mat vBaseline = Ow2 - Ow1;
 			const float baseline = cv::norm(vBaseline);
 
-			if (!mbMonocular)
+			if (!monocular_)
 			{
 				if (baseline < pKF2->camera.baseline)
 					continue;
@@ -556,7 +556,7 @@ private:
 					continue;
 
 				// Triangulation is succesfull
-				MapPoint* pMP = new MapPoint(x3D, mpCurrentKeyFrame, mpMap);
+				MapPoint* pMP = new MapPoint(x3D, mpCurrentKeyFrame, map_);
 
 				pMP->AddObservation(mpCurrentKeyFrame, idx1);
 				pMP->AddObservation(pKF2, idx2);
@@ -568,7 +568,7 @@ private:
 
 				pMP->UpdateNormalAndDepth();
 
-				mpMap->AddMapPoint(pMP);
+				map_->AddMapPoint(pMP);
 				mlpRecentAddedMapPoints.push_back(pMP);
 
 				nnew++;
@@ -580,7 +580,7 @@ private:
 	{
 		// Retrieve neighbor keyframes
 		int nn = 10;
-		if (mbMonocular)
+		if (monocular_)
 			nn = 20;
 		const vector<KeyFrame*> vpNeighKFs = mpCurrentKeyFrame->GetBestCovisibilityKeyFrames(nn);
 		vector<KeyFrame*> vpTargetKFs;
@@ -703,7 +703,7 @@ private:
 				{
 					if (!pMP->isBad())
 					{
-						if (!mbMonocular)
+						if (!monocular_)
 						{
 							if (pKF->mvDepth[i] > pKF->mThDepth || pKF->mvDepth[i] < 0)
 								continue;
@@ -753,36 +753,36 @@ private:
 	void ResetIfRequested()
 	{
 		unique_lock<mutex> lock(mMutexReset);
-		if (mbResetRequested)
+		if (resetRequested_)
 		{
 			mlNewKeyFrames.clear();
 			mlpRecentAddedMapPoints.clear();
-			mbResetRequested = false;
+			resetRequested_ = false;
 		}
 	}
 
 	bool CheckFinish()
 	{
 		unique_lock<mutex> lock(mMutexFinish);
-		return mbFinishRequested;
+		return finishRequested_;
 	}
 
 	void SetFinish()
 	{
 		unique_lock<mutex> lock(mMutexFinish);
-		mbFinished = true;
+		finished_ = true;
 		unique_lock<mutex> lock2(mMutexStop);
-		mbStopped = true;
+		stopped_ = true;
 	}
 
-	bool mbMonocular;
-	bool mbResetRequested;
+	bool monocular_;
+	bool resetRequested_;
 	std::mutex mMutexReset;
-	bool mbFinishRequested;
-	bool mbFinished;
+	bool finishRequested_;
+	bool finished_;
 	std::mutex mMutexFinish;
 
-	Map* mpMap;
+	Map* map_;
 
 	LoopClosing* mpLoopCloser;
 	Tracking* mpTracker;
@@ -795,20 +795,20 @@ private:
 
 	std::mutex mMutexNewKFs;
 
-	bool mbAbortBA;
+	bool abortBA_;
 
-	bool mbStopped;
-	bool mbStopRequested;
-	bool mbNotStop;
+	bool stopped_;
+	bool stopRequested_;
+	bool notStop_;
 	std::mutex mMutexStop;
 
-	bool mbAcceptKeyFrames;
+	bool acceptKeyFrames_;
 	std::mutex mMutexAccept;
 };
 
-std::shared_ptr<LocalMapping> LocalMapping::Create(Map* pMap, const float bMonocular)
+std::shared_ptr<LocalMapping> LocalMapping::Create(Map* map, bool monocular)
 {
-	return std::make_shared<LocalMappingImpl>(pMap, bMonocular);
+	return std::make_shared<LocalMappingImpl>(map, monocular);
 }
 
 } //namespace ORB_SLAM
