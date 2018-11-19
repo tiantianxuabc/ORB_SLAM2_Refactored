@@ -269,26 +269,22 @@ private:
 		currKeyFrame_->ComputeBoW();
 
 		// Associate MapPoints to the new keyframe and update normal and descriptor
-		const vector<MapPoint*> vpMapPointMatches = currKeyFrame_->GetMapPointMatches();
-
-		for (size_t i = 0; i < vpMapPointMatches.size(); i++)
+		const std::vector<MapPoint*> mapopints = currKeyFrame_->GetMapPointMatches();
+		for (size_t i = 0; i < mapopints.size(); i++)
 		{
-			MapPoint* pMP = vpMapPointMatches[i];
-			if (pMP)
+			MapPoint* mappoint = mapopints[i];
+			if (!mappoint || mappoint->isBad())
+				continue;
+
+			if (!mappoint->IsInKeyFrame(currKeyFrame_))
 			{
-				if (!pMP->isBad())
-				{
-					if (!pMP->IsInKeyFrame(currKeyFrame_))
-					{
-						pMP->AddObservation(currKeyFrame_, i);
-						pMP->UpdateNormalAndDepth();
-						pMP->ComputeDistinctiveDescriptors();
-					}
-					else // this can only happen for new stereo points inserted by the Tracking
-					{
-						mlpRecentAddedMapPoints.push_back(pMP);
-					}
-				}
+				mappoint->AddObservation(currKeyFrame_, i);
+				mappoint->UpdateNormalAndDepth();
+				mappoint->ComputeDistinctiveDescriptors();
+			}
+			else // this can only happen for new stereo points inserted by the Tracking
+			{
+				recentAddedMapPoints_.push_back(mappoint);
 			}
 		}
 
@@ -302,37 +298,36 @@ private:
 	void MapPointCulling()
 	{
 		// Check Recent Added MapPoints
-		list<MapPoint*>::iterator lit = mlpRecentAddedMapPoints.begin();
-		const unsigned long int nCurrentKFid = currKeyFrame_->mnId;
+		const int currKFId = static_cast<int>(currKeyFrame_->mnId);
 
-		int nThObs;
-		if (monocular_)
-			nThObs = 2;
-		else
-			nThObs = 3;
-		const int cnThObs = nThObs;
+		const int minObservation = monocular_ ? 2 : 3;
 
-		while (lit != mlpRecentAddedMapPoints.end())
+		for (auto it = std::begin(recentAddedMapPoints_); it != std::end(recentAddedMapPoints_);)
 		{
-			MapPoint* pMP = *lit;
-			if (pMP->isBad())
+			MapPoint* mappoint = *it;
+			const int firstKFId = mappoint->mnFirstKFid;
+			if (mappoint->isBad())
 			{
-				lit = mlpRecentAddedMapPoints.erase(lit);
+				it = recentAddedMapPoints_.erase(it);
 			}
-			else if (pMP->GetFoundRatio() < 0.25f)
+			else if (mappoint->GetFoundRatio() < 0.25f)
 			{
-				pMP->SetBadFlag();
-				lit = mlpRecentAddedMapPoints.erase(lit);
+				mappoint->SetBadFlag();
+				it = recentAddedMapPoints_.erase(it);
 			}
-			else if (((int)nCurrentKFid - (int)pMP->mnFirstKFid) >= 2 && pMP->Observations() <= cnThObs)
+			else if ((currKFId - firstKFId) >= 2 && mappoint->Observations() <= minObservation)
 			{
-				pMP->SetBadFlag();
-				lit = mlpRecentAddedMapPoints.erase(lit);
+				mappoint->SetBadFlag();
+				it = recentAddedMapPoints_.erase(it);
 			}
-			else if (((int)nCurrentKFid - (int)pMP->mnFirstKFid) >= 3)
-				lit = mlpRecentAddedMapPoints.erase(lit);
+			else if ((currKFId - firstKFId) >= 3)
+			{
+				it = recentAddedMapPoints_.erase(it);
+			}
 			else
-				lit++;
+			{
+				++it;
+			}
 		}
 	}
 
@@ -576,7 +571,7 @@ private:
 				pMP->UpdateNormalAndDepth();
 
 				map_->AddMapPoint(pMP);
-				mlpRecentAddedMapPoints.push_back(pMP);
+				recentAddedMapPoints_.push_back(pMP);
 
 				nnew++;
 			}
@@ -763,7 +758,7 @@ private:
 		if (resetRequested_)
 		{
 			newKeyFrames_.clear();
-			mlpRecentAddedMapPoints.clear();
+			recentAddedMapPoints_.clear();
 			resetRequested_ = false;
 		}
 	}
@@ -796,8 +791,7 @@ private:
 
 	KeyFrame* currKeyFrame_;
 
-	std::list<MapPoint*> mlpRecentAddedMapPoints;
-
+	std::list<MapPoint*> recentAddedMapPoints_;
 
 	bool abortBA_;
 	bool stopped_;
