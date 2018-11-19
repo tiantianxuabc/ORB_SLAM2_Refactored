@@ -246,7 +246,7 @@ public:
 	int KeyframesInQueue() const override
 	{
 		LOCK_MUTEX_NEW_KF();
-		return newKeyFrames_.size();
+		return static_cast<int>(newKeyFrames_.size());
 	}
 
 private:
@@ -370,7 +370,7 @@ private:
 
 			// Check first that baseline is not too short
 			const cv::Mat Ow2 = keyframe2->GetCameraCenter();
-			const float baseline = cv::norm(Ow2 - Ow1);
+			const float baseline = static_cast<float>(cv::norm(Ow2 - Ow1));
 
 			if (!monocular_)
 			{
@@ -411,8 +411,8 @@ private:
 			const int nmatches = static_cast<int>(matchIndices.size());
 			for (int ikp = 0; ikp < nmatches; ikp++)
 			{
-				const int idx1 = matchIndices[ikp].first;
-				const int idx2 = matchIndices[ikp].second;
+				const int idx1 = static_cast<int>(matchIndices[ikp].first);
+				const int idx2 = static_cast<int>(matchIndices[ikp].second);
 
 				const cv::KeyPoint& keypoint1 = keyframe1->mvKeysUn[idx1];
 				const float ur1 = keyframe1->mvuRight[idx1];
@@ -428,7 +428,7 @@ private:
 
 				const cv::Mat ray1 = Rwc1 * xn1;
 				const cv::Mat ray2 = Rwc2 * xn2;
-				const float cosParallaxRays = ray1.dot(ray2) / (cv::norm(ray1) * cv::norm(ray2));
+				const float cosParallaxRays = static_cast<float>(ray1.dot(ray2) / (cv::norm(ray1) * cv::norm(ray2)));
 
 				float cosParallaxStereo = cosParallaxRays + 1;
 				float cosParallaxStereo1 = cosParallaxStereo;
@@ -477,19 +477,19 @@ private:
 				cv::Mat x3Dt = x3D.t();
 
 				//Check triangulation in front of cameras
-				float z1 = Rcw1.row(2).dot(x3Dt) + tcw1.at<float>(2);
+				const float z1 = static_cast<float>(Rcw1.row(2).dot(x3Dt) + tcw1.at<float>(2));
 				if (z1 <= 0)
 					continue;
 
-				float z2 = Rcw2.row(2).dot(x3Dt) + tcw2.at<float>(2);
+				const float z2 = static_cast<float>(Rcw2.row(2).dot(x3Dt) + tcw2.at<float>(2));
 				if (z2 <= 0)
 					continue;
 
 				//Check reprojection error in first keyframe
 				const float sigmaSquare1 = keyframe1->pyramid.sigmaSq[keypoint1.octave];
-				const float x1 = Rcw1.row(0).dot(x3Dt) + tcw1.at<float>(0);
-				const float y1 = Rcw1.row(1).dot(x3Dt) + tcw1.at<float>(1);
-				const float invz1 = 1.0 / z1;
+				const float x1 = static_cast<float>(Rcw1.row(0).dot(x3Dt) + tcw1.at<float>(0));
+				const float y1 = static_cast<float>(Rcw1.row(1).dot(x3Dt) + tcw1.at<float>(1));
+				const float invz1 = 1.f / z1;
 
 				if (!stereo1)
 				{
@@ -514,9 +514,9 @@ private:
 
 				//Check reprojection error in second keyframe
 				const float sigmaSquare2 = keyframe2->pyramid.sigmaSq[keypoint2.octave];
-				const float x2 = Rcw2.row(0).dot(x3Dt) + tcw2.at<float>(0);
-				const float y2 = Rcw2.row(1).dot(x3Dt) + tcw2.at<float>(1);
-				const float invz2 = 1.0 / z2;
+				const float x2 = static_cast<float>(Rcw2.row(0).dot(x3Dt) + tcw2.at<float>(0));
+				const float y2 = static_cast<float>(Rcw2.row(1).dot(x3Dt) + tcw2.at<float>(1));
+				const float invz2 = 1.f / z2;
 				if (!stereo2)
 				{
 					float u2 = fx2*x2*invz2 + cx2;
@@ -540,10 +540,10 @@ private:
 
 				//Check scale consistency
 				cv::Mat normal1 = x3D - Ow1;
-				float dist1 = cv::norm(normal1);
+				float dist1 = static_cast<float>(cv::norm(normal1));
 
 				cv::Mat normal2 = x3D - Ow2;
-				float dist2 = cv::norm(normal2);
+				float dist2 = static_cast<float>(cv::norm(normal2));
 
 				if (dist1 == 0 || dist2 == 0)
 					continue;
