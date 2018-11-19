@@ -39,6 +39,32 @@
 namespace ORB_SLAM2
 {
 
+static cv::Mat SkewSymmetricMatrix(const cv::Mat &v)
+{
+	return (cv::Mat_<float>(3, 3) << 0, -v.at<float>(2), v.at<float>(1),
+		v.at<float>(2), 0, -v.at<float>(0),
+		-v.at<float>(1), v.at<float>(0), 0);
+}
+
+static cv::Mat ComputeF12(KeyFrame *&pKF1, KeyFrame *&pKF2)
+{
+	cv::Mat R1w = pKF1->GetRotation();
+	cv::Mat t1w = pKF1->GetTranslation();
+	cv::Mat R2w = pKF2->GetRotation();
+	cv::Mat t2w = pKF2->GetTranslation();
+
+	cv::Mat R12 = R1w*R2w.t();
+	cv::Mat t12 = -R1w*R2w.t()*t2w + t1w;
+
+	cv::Mat t12x = SkewSymmetricMatrix(t12);
+
+	const cv::Mat &K1 = pKF1->camera.Mat();
+	const cv::Mat &K2 = pKF2->camera.Mat();
+
+
+	return K1.t().inv()*t12x*R12*K2.inv();
+}
+
 class LocalMappingImpl : public LocalMapping
 {
 public:
@@ -636,25 +662,6 @@ private:
 		currKeyFrame_->UpdateConnections();
 	}
 
-	cv::Mat ComputeF12(KeyFrame *&pKF1, KeyFrame *&pKF2)
-	{
-		cv::Mat R1w = pKF1->GetRotation();
-		cv::Mat t1w = pKF1->GetTranslation();
-		cv::Mat R2w = pKF2->GetRotation();
-		cv::Mat t2w = pKF2->GetTranslation();
-
-		cv::Mat R12 = R1w*R2w.t();
-		cv::Mat t12 = -R1w*R2w.t()*t2w + t1w;
-
-		cv::Mat t12x = SkewSymmetricMatrix(t12);
-
-		const cv::Mat &K1 = pKF1->camera.Mat();
-		const cv::Mat &K2 = pKF2->camera.Mat();
-
-
-		return K1.t().inv()*t12x*R12*K2.inv();
-	}
-
 	void KeyFrameCulling()
 	{
 		// Check redundant keyframes (only local keyframes)
@@ -719,13 +726,6 @@ private:
 			if (nRedundantObservations > 0.9*nMPs)
 				pKF->SetBadFlag();
 		}
-	}
-
-	cv::Mat SkewSymmetricMatrix(const cv::Mat &v)
-	{
-		return (cv::Mat_<float>(3, 3) << 0, -v.at<float>(2), v.at<float>(1),
-			v.at<float>(2), 0, -v.at<float>(0),
-			-v.at<float>(1), v.at<float>(0), 0);
 	}
 
 	void ResetIfRequested()
