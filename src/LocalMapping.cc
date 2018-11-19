@@ -333,117 +333,116 @@ private:
 
 	void CreateNewMapPoints()
 	{
+		KeyFrame* keyframe1 = currKeyFrame_;
+
 		// Retrieve neighbor keyframes in covisibility graph
-		int nn = 10;
-		if (monocular_)
-			nn = 20;
-		const vector<KeyFrame*> vpNeighKFs = currKeyFrame_->GetBestCovisibilityKeyFrames(nn);
+		const int nneighbors = monocular_ ? 20 : 10;
+		const std::vector<KeyFrame*> neighborKFs = keyframe1->GetBestCovisibilityKeyFrames(nneighbors);
 
-		ORBmatcher matcher(0.6, false);
+		ORBmatcher matcher(0.6f, false);
 
-		cv::Mat Rcw1 = currKeyFrame_->GetRotation();
-		cv::Mat Rwc1 = Rcw1.t();
-		cv::Mat tcw1 = currKeyFrame_->GetTranslation();
-		cv::Mat Tcw1(3, 4, CV_32F);
+		const cv::Mat Rcw1 = keyframe1->GetRotation();
+		const cv::Mat Rwc1 = Rcw1.t();
+		const cv::Mat tcw1 = keyframe1->GetTranslation();
+		const cv::Mat Tcw1(3, 4, CV_32F);
 		Rcw1.copyTo(Tcw1.colRange(0, 3));
 		tcw1.copyTo(Tcw1.col(3));
-		cv::Mat Ow1 = currKeyFrame_->GetCameraCenter();
+		const cv::Mat Ow1 = keyframe1->GetCameraCenter();
 
-		const float &fx1 = currKeyFrame_->camera.fx;
-		const float &fy1 = currKeyFrame_->camera.fy;
-		const float &cx1 = currKeyFrame_->camera.cx;
-		const float &cy1 = currKeyFrame_->camera.cy;
-		const float &invfx1 = 1.f / fx1;
-		const float &invfy1 = 1.f / fy1;
+		const float fx1 = keyframe1->camera.fx;
+		const float fy1 = keyframe1->camera.fy;
+		const float cx1 = keyframe1->camera.cx;
+		const float cy1 = keyframe1->camera.cy;
+		const float invfx1 = 1.f / fx1;
+		const float invfy1 = 1.f / fy1;
 
-		const float ratioFactor = 1.5f*currKeyFrame_->pyramid.scaleFactor;
+		const float ratioFactor = 1.5f * keyframe1->pyramid.scaleFactor;
 
 		int nnew = 0;
 
 		// Search matches with epipolar restriction and triangulate
-		for (size_t i = 0; i < vpNeighKFs.size(); i++)
+		for (size_t i = 0; i < neighborKFs.size(); i++)
 		{
 			if (i > 0 && CheckNewKeyFrames())
 				return;
 
-			KeyFrame* pKF2 = vpNeighKFs[i];
+			KeyFrame* keyframe2 = neighborKFs[i];
 
 			// Check first that baseline is not too short
-			cv::Mat Ow2 = pKF2->GetCameraCenter();
-			cv::Mat vBaseline = Ow2 - Ow1;
-			const float baseline = cv::norm(vBaseline);
+			const cv::Mat Ow2 = keyframe2->GetCameraCenter();
+			const float baseline = cv::norm(Ow2 - Ow1);
 
 			if (!monocular_)
 			{
-				if (baseline < pKF2->camera.baseline)
+				if (baseline < keyframe2->camera.baseline)
 					continue;
 			}
 			else
 			{
-				const float medianDepthKF2 = pKF2->ComputeSceneMedianDepth(2);
+				const float medianDepthKF2 = keyframe2->ComputeSceneMedianDepth(2);
 				const float ratioBaselineDepth = baseline / medianDepthKF2;
 
-				if (ratioBaselineDepth < 0.01)
+				if (ratioBaselineDepth < 0.01f)
 					continue;
 			}
 
 			// Compute Fundamental Matrix
-			cv::Mat F12 = ComputeF12(currKeyFrame_, pKF2);
+			const cv::Mat F12 = ComputeF12(keyframe1, keyframe2);
 
 			// Search matches that fullfil epipolar constraint
-			vector<pair<size_t, size_t> > vMatchedIndices;
-			matcher.SearchForTriangulation(currKeyFrame_, pKF2, F12, vMatchedIndices, false);
+			std::vector<std::pair<size_t, size_t> > matchIndices;
+			matcher.SearchForTriangulation(keyframe1, keyframe2, F12, matchIndices, false);
 
-			cv::Mat Rcw2 = pKF2->GetRotation();
-			cv::Mat Rwc2 = Rcw2.t();
-			cv::Mat tcw2 = pKF2->GetTranslation();
-			cv::Mat Tcw2(3, 4, CV_32F);
+			const cv::Mat Rcw2 = keyframe2->GetRotation();
+			const cv::Mat Rwc2 = Rcw2.t();
+			const cv::Mat tcw2 = keyframe2->GetTranslation();
+			const cv::Mat Tcw2(3, 4, CV_32F);
 			Rcw2.copyTo(Tcw2.colRange(0, 3));
 			tcw2.copyTo(Tcw2.col(3));
 
-			const float &fx2 = pKF2->camera.fx;
-			const float &fy2 = pKF2->camera.fy;
-			const float &cx2 = pKF2->camera.cx;
-			const float &cy2 = pKF2->camera.cy;
-			const float &invfx2 = 1.f / fx2;
-			const float &invfy2 = 1.f / fy2;
+			const float fx2 = keyframe2->camera.fx;
+			const float fy2 = keyframe2->camera.fy;
+			const float cx2 = keyframe2->camera.cx;
+			const float cy2 = keyframe2->camera.cy;
+			const float invfx2 = 1.f / fx2;
+			const float invfy2 = 1.f / fy2;
 
 			// Triangulate each match
-			const int nmatches = vMatchedIndices.size();
+			const int nmatches = static_cast<int>(matchIndices.size());
 			for (int ikp = 0; ikp < nmatches; ikp++)
 			{
-				const int &idx1 = vMatchedIndices[ikp].first;
-				const int &idx2 = vMatchedIndices[ikp].second;
+				const int idx1 = matchIndices[ikp].first;
+				const int idx2 = matchIndices[ikp].second;
 
-				const cv::KeyPoint &kp1 = currKeyFrame_->mvKeysUn[idx1];
-				const float kp1_ur = currKeyFrame_->mvuRight[idx1];
-				bool bStereo1 = kp1_ur >= 0;
+				const cv::KeyPoint& keypoint1 = keyframe1->mvKeysUn[idx1];
+				const float ur1 = keyframe1->mvuRight[idx1];
+				const bool stereo1 = ur1 >= 0;
 
-				const cv::KeyPoint &kp2 = pKF2->mvKeysUn[idx2];
-				const float kp2_ur = pKF2->mvuRight[idx2];
-				bool bStereo2 = kp2_ur >= 0;
+				const cv::KeyPoint& keypoint2 = keyframe2->mvKeysUn[idx2];
+				const float ur2 = keyframe2->mvuRight[idx2];
+				const bool stereo2 = ur2 >= 0;
 
 				// Check parallax between rays
-				cv::Mat xn1 = (cv::Mat_<float>(3, 1) << (kp1.pt.x - cx1)*invfx1, (kp1.pt.y - cy1)*invfy1, 1.0);
-				cv::Mat xn2 = (cv::Mat_<float>(3, 1) << (kp2.pt.x - cx2)*invfx2, (kp2.pt.y - cy2)*invfy2, 1.0);
+				cv::Mat xn1 = (cv::Mat1f(3, 1) << (keypoint1.pt.x - cx1) * invfx1, (keypoint1.pt.y - cy1) * invfy1, 1.f);
+				cv::Mat xn2 = (cv::Mat1f(3, 1) << (keypoint2.pt.x - cx2) * invfx2, (keypoint2.pt.y - cy2) * invfy2, 1.f);
 
-				cv::Mat ray1 = Rwc1*xn1;
-				cv::Mat ray2 = Rwc2*xn2;
-				const float cosParallaxRays = ray1.dot(ray2) / (cv::norm(ray1)*cv::norm(ray2));
+				const cv::Mat ray1 = Rwc1 * xn1;
+				const cv::Mat ray2 = Rwc2 * xn2;
+				const float cosParallaxRays = ray1.dot(ray2) / (cv::norm(ray1) * cv::norm(ray2));
 
 				float cosParallaxStereo = cosParallaxRays + 1;
 				float cosParallaxStereo1 = cosParallaxStereo;
 				float cosParallaxStereo2 = cosParallaxStereo;
 
-				if (bStereo1)
-					cosParallaxStereo1 = cos(2 * atan2(currKeyFrame_->camera.baseline / 2, currKeyFrame_->mvDepth[idx1]));
-				else if (bStereo2)
-					cosParallaxStereo2 = cos(2 * atan2(pKF2->camera.baseline / 2, pKF2->mvDepth[idx2]));
+				if (stereo1)
+					cosParallaxStereo1 = cos(2 * atan2(keyframe1->camera.baseline / 2, keyframe1->mvDepth[idx1]));
+				else if (stereo2)
+					cosParallaxStereo2 = cos(2 * atan2(keyframe2->camera.baseline / 2, keyframe2->mvDepth[idx2]));
 
 				cosParallaxStereo = min(cosParallaxStereo1, cosParallaxStereo2);
 
 				cv::Mat x3D;
-				if (cosParallaxRays < cosParallaxStereo && cosParallaxRays>0 && (bStereo1 || bStereo2 || cosParallaxRays < 0.9998))
+				if (cosParallaxRays < cosParallaxStereo && cosParallaxRays>0 && (stereo1 || stereo2 || cosParallaxRays < 0.9998))
 				{
 					// Linear Triangulation Method
 					cv::Mat A(4, 4, CV_32F);
@@ -464,13 +463,13 @@ private:
 					x3D = x3D.rowRange(0, 3) / x3D.at<float>(3);
 
 				}
-				else if (bStereo1 && cosParallaxStereo1 < cosParallaxStereo2)
+				else if (stereo1 && cosParallaxStereo1 < cosParallaxStereo2)
 				{
-					x3D = currKeyFrame_->UnprojectStereo(idx1);
+					x3D = keyframe1->UnprojectStereo(idx1);
 				}
-				else if (bStereo2 && cosParallaxStereo2 < cosParallaxStereo1)
+				else if (stereo2 && cosParallaxStereo2 < cosParallaxStereo1)
 				{
-					x3D = pKF2->UnprojectStereo(idx2);
+					x3D = keyframe2->UnprojectStereo(idx2);
 				}
 				else
 					continue; //No stereo and very low parallax
@@ -487,54 +486,54 @@ private:
 					continue;
 
 				//Check reprojection error in first keyframe
-				const float &sigmaSquare1 = currKeyFrame_->pyramid.sigmaSq[kp1.octave];
+				const float sigmaSquare1 = keyframe1->pyramid.sigmaSq[keypoint1.octave];
 				const float x1 = Rcw1.row(0).dot(x3Dt) + tcw1.at<float>(0);
 				const float y1 = Rcw1.row(1).dot(x3Dt) + tcw1.at<float>(1);
 				const float invz1 = 1.0 / z1;
 
-				if (!bStereo1)
+				if (!stereo1)
 				{
 					float u1 = fx1*x1*invz1 + cx1;
 					float v1 = fy1*y1*invz1 + cy1;
-					float errX1 = u1 - kp1.pt.x;
-					float errY1 = v1 - kp1.pt.y;
+					float errX1 = u1 - keypoint1.pt.x;
+					float errY1 = v1 - keypoint1.pt.y;
 					if ((errX1*errX1 + errY1*errY1) > 5.991*sigmaSquare1)
 						continue;
 				}
 				else
 				{
 					float u1 = fx1*x1*invz1 + cx1;
-					float u1_r = u1 - currKeyFrame_->camera.bf*invz1;
+					float u1_r = u1 - keyframe1->camera.bf*invz1;
 					float v1 = fy1*y1*invz1 + cy1;
-					float errX1 = u1 - kp1.pt.x;
-					float errY1 = v1 - kp1.pt.y;
-					float errX1_r = u1_r - kp1_ur;
+					float errX1 = u1 - keypoint1.pt.x;
+					float errY1 = v1 - keypoint1.pt.y;
+					float errX1_r = u1_r - ur1;
 					if ((errX1*errX1 + errY1*errY1 + errX1_r*errX1_r) > 7.8*sigmaSquare1)
 						continue;
 				}
 
 				//Check reprojection error in second keyframe
-				const float sigmaSquare2 = pKF2->pyramid.sigmaSq[kp2.octave];
+				const float sigmaSquare2 = keyframe2->pyramid.sigmaSq[keypoint2.octave];
 				const float x2 = Rcw2.row(0).dot(x3Dt) + tcw2.at<float>(0);
 				const float y2 = Rcw2.row(1).dot(x3Dt) + tcw2.at<float>(1);
 				const float invz2 = 1.0 / z2;
-				if (!bStereo2)
+				if (!stereo2)
 				{
 					float u2 = fx2*x2*invz2 + cx2;
 					float v2 = fy2*y2*invz2 + cy2;
-					float errX2 = u2 - kp2.pt.x;
-					float errY2 = v2 - kp2.pt.y;
+					float errX2 = u2 - keypoint2.pt.x;
+					float errY2 = v2 - keypoint2.pt.y;
 					if ((errX2*errX2 + errY2*errY2) > 5.991*sigmaSquare2)
 						continue;
 				}
 				else
 				{
 					float u2 = fx2*x2*invz2 + cx2;
-					float u2_r = u2 - currKeyFrame_->camera.bf*invz2;
+					float u2_r = u2 - keyframe1->camera.bf*invz2;
 					float v2 = fy2*y2*invz2 + cy2;
-					float errX2 = u2 - kp2.pt.x;
-					float errY2 = v2 - kp2.pt.y;
-					float errX2_r = u2_r - kp2_ur;
+					float errX2 = u2 - keypoint2.pt.x;
+					float errY2 = v2 - keypoint2.pt.y;
+					float errX2_r = u2_r - ur2;
 					if ((errX2*errX2 + errY2*errY2 + errX2_r*errX2_r) > 7.8*sigmaSquare2)
 						continue;
 				}
@@ -550,21 +549,19 @@ private:
 					continue;
 
 				const float ratioDist = dist2 / dist1;
-				const float ratioOctave = currKeyFrame_->pyramid.scaleFactors[kp1.octave] / pKF2->pyramid.scaleFactors[kp2.octave];
+				const float ratioOctave = keyframe1->pyramid.scaleFactors[keypoint1.octave] / keyframe2->pyramid.scaleFactors[keypoint2.octave];
 
-				/*if(fabs(ratioDist-ratioOctave)>ratioFactor)
-				continue;*/
 				if (ratioDist*ratioFactor<ratioOctave || ratioDist>ratioOctave*ratioFactor)
 					continue;
 
 				// Triangulation is succesfull
-				MapPoint* pMP = new MapPoint(x3D, currKeyFrame_, map_);
+				MapPoint* pMP = new MapPoint(x3D, keyframe1, map_);
 
-				pMP->AddObservation(currKeyFrame_, idx1);
-				pMP->AddObservation(pKF2, idx2);
+				pMP->AddObservation(keyframe1, idx1);
+				pMP->AddObservation(keyframe2, idx2);
 
-				currKeyFrame_->AddMapPoint(pMP, idx1);
-				pKF2->AddMapPoint(pMP, idx2);
+				keyframe1->AddMapPoint(pMP, idx1);
+				keyframe2->AddMapPoint(pMP, idx2);
 
 				pMP->ComputeDistinctiveDescriptors();
 
@@ -714,7 +711,7 @@ private:
 						nMPs++;
 						if (pMP->Observations() > thObs)
 						{
-							const int &scaleLevel = pKF->mvKeysUn[i].octave;
+							const int scaleLevel = pKF->mvKeysUn[i].octave;
 							const map<KeyFrame*, size_t> observations = pMP->GetObservations();
 							int nObs = 0;
 							for (map<KeyFrame*, size_t>::const_iterator mit = observations.begin(), mend = observations.end(); mit != mend; mit++)
@@ -722,7 +719,7 @@ private:
 								KeyFrame* pKFi = mit->first;
 								if (pKFi == pKF)
 									continue;
-								const int &scaleLeveli = pKFi->mvKeysUn[mit->second].octave;
+								const int scaleLeveli = pKFi->mvKeysUn[mit->second].octave;
 
 								if (scaleLeveli <= scaleLevel + 1)
 								{
