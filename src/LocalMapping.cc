@@ -39,30 +39,30 @@
 namespace ORB_SLAM2
 {
 
-static cv::Mat SkewSymmetricMatrix(const cv::Mat &v)
+static cv::Mat SkewSymmetricMatrix(const cv::Mat1f& v)
 {
-	return (cv::Mat_<float>(3, 3) << 0, -v.at<float>(2), v.at<float>(1),
-		v.at<float>(2), 0, -v.at<float>(0),
-		-v.at<float>(1), v.at<float>(0), 0);
+	return (cv::Mat1f(3, 3) << 
+		    0, -v(2),  v(1),
+		 v(2),     0, -v(0),
+		-v(1),  v(0),    0);
 }
 
-static cv::Mat ComputeF12(KeyFrame *&pKF1, KeyFrame *&pKF2)
+static cv::Mat ComputeF12(KeyFrame* keyframe1, KeyFrame* keyframe2)
 {
-	cv::Mat R1w = pKF1->GetRotation();
-	cv::Mat t1w = pKF1->GetTranslation();
-	cv::Mat R2w = pKF2->GetRotation();
-	cv::Mat t2w = pKF2->GetTranslation();
+	const cv::Mat R1w = keyframe1->GetRotation();
+	const cv::Mat t1w = keyframe1->GetTranslation();
+	const cv::Mat R2w = keyframe2->GetRotation();
+	const cv::Mat t2w = keyframe2->GetTranslation();
 
-	cv::Mat R12 = R1w*R2w.t();
-	cv::Mat t12 = -R1w*R2w.t()*t2w + t1w;
+	const cv::Mat R12 = R1w * R2w.t();
+	const cv::Mat t12 = -R1w * R2w.t() * t2w + t1w;
 
-	cv::Mat t12x = SkewSymmetricMatrix(t12);
+	const cv::Mat t12x = SkewSymmetricMatrix(t12);
 
-	const cv::Mat &K1 = pKF1->camera.Mat();
-	const cv::Mat &K2 = pKF2->camera.Mat();
+	const cv::Mat& K1 = keyframe1->camera.Mat();
+	const cv::Mat& K2 = keyframe2->camera.Mat();
 
-
-	return K1.t().inv()*t12x*R12*K2.inv();
+	return K1.t().inv() * t12x * R12 * K2.inv();
 }
 
 class LocalMappingImpl : public LocalMapping
