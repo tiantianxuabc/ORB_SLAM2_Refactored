@@ -197,7 +197,7 @@ public:
 			map_.get(), keyFrameDB_.get(), settingsFile, sensor_);
 
 		//Initialize the Local Mapping thread and launch
-		localMapper_ = std::make_shared<LocalMapping>(map_.get(), sensor_ == MONOCULAR);
+		localMapper_ = LocalMapping::Create(map_.get(), sensor_ == MONOCULAR);
 		threads_[THREAD_LOCAL_MAPPING] = thread(&ORB_SLAM2::LocalMapping::Run, localMapper_);
 
 		//Initialize the Loop Closing thread and launch
