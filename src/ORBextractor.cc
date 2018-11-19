@@ -455,7 +455,7 @@ struct QTreeNode
 	bool divisible;
 };
 
-static void ComputePyramid(const cv::Mat& image, std::vector<cv::Mat>& images, std::vector<float>& invScaleFactors)
+static void ComputePyramid(const cv::Mat& image, std::vector<cv::Mat>& images, const std::vector<float>& invScaleFactors)
 {
 	CV_Assert(image.type() == CV_8U);
 
