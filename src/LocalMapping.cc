@@ -578,79 +578,58 @@ private:
 	void SearchInNeighbors()
 	{
 		// Retrieve neighbor keyframes
-		int nn = 10;
-		if (monocular_)
-			nn = 20;
-		const vector<KeyFrame*> vpNeighKFs = currKeyFrame_->GetBestCovisibilityKeyFrames(nn);
-		vector<KeyFrame*> vpTargetKFs;
-		for (vector<KeyFrame*>::const_iterator vit = vpNeighKFs.begin(), vend = vpNeighKFs.end(); vit != vend; vit++)
+		const int nneighbors = monocular_ ? 20 : 10;
+		std::vector<KeyFrame*> targetKFs;
+		for (KeyFrame* neighborKF : currKeyFrame_->GetBestCovisibilityKeyFrames(nneighbors))
 		{
-			KeyFrame* pKFi = *vit;
-			if (pKFi->isBad() || pKFi->mnFuseTargetForKF == currKeyFrame_->mnId)
+			if (neighborKF->isBad() || neighborKF->mnFuseTargetForKF == currKeyFrame_->mnId)
 				continue;
-			vpTargetKFs.push_back(pKFi);
-			pKFi->mnFuseTargetForKF = currKeyFrame_->mnId;
+
+			targetKFs.push_back(neighborKF);
+			neighborKF->mnFuseTargetForKF = currKeyFrame_->mnId;
 
 			// Extend to some second neighbors
-			const vector<KeyFrame*> vpSecondNeighKFs = pKFi->GetBestCovisibilityKeyFrames(5);
-			for (vector<KeyFrame*>::const_iterator vit2 = vpSecondNeighKFs.begin(), vend2 = vpSecondNeighKFs.end(); vit2 != vend2; vit2++)
+			for (KeyFrame* secondKF : neighborKF->GetBestCovisibilityKeyFrames(5))
 			{
-				KeyFrame* pKFi2 = *vit2;
-				if (pKFi2->isBad() || pKFi2->mnFuseTargetForKF == currKeyFrame_->mnId || pKFi2->mnId == currKeyFrame_->mnId)
+				if (secondKF->isBad() || secondKF->mnFuseTargetForKF == currKeyFrame_->mnId || secondKF->mnId == currKeyFrame_->mnId)
 					continue;
-				vpTargetKFs.push_back(pKFi2);
+				targetKFs.push_back(secondKF);
 			}
 		}
-
-
+		
 		// Search matches by projection from current KF in target KFs
 		ORBmatcher matcher;
-		vector<MapPoint*> vpMapPointMatches = currKeyFrame_->GetMapPointMatches();
-		for (vector<KeyFrame*>::iterator vit = vpTargetKFs.begin(), vend = vpTargetKFs.end(); vit != vend; vit++)
-		{
-			KeyFrame* pKFi = *vit;
-
-			matcher.Fuse(pKFi, vpMapPointMatches);
-		}
+		std::vector<MapPoint*> mappoints = currKeyFrame_->GetMapPointMatches();
+		for (KeyFrame* targetKF : targetKFs)
+			matcher.Fuse(targetKF, mappoints);
 
 		// Search matches by projection from target KFs in current KF
-		vector<MapPoint*> vpFuseCandidates;
-		vpFuseCandidates.reserve(vpTargetKFs.size()*vpMapPointMatches.size());
+		std::vector<MapPoint*> fuseCandidates;
+		fuseCandidates.reserve(targetKFs.size() * mappoints.size());
 
-		for (vector<KeyFrame*>::iterator vitKF = vpTargetKFs.begin(), vendKF = vpTargetKFs.end(); vitKF != vendKF; vitKF++)
+		for (KeyFrame* targetKF : targetKFs)
 		{
-			KeyFrame* pKFi = *vitKF;
-
-			vector<MapPoint*> vpMapPointsKFi = pKFi->GetMapPointMatches();
-
-			for (vector<MapPoint*>::iterator vitMP = vpMapPointsKFi.begin(), vendMP = vpMapPointsKFi.end(); vitMP != vendMP; vitMP++)
+			for (MapPoint* mappoint : targetKF->GetMapPointMatches())
 			{
-				MapPoint* pMP = *vitMP;
-				if (!pMP)
+				if (!mappoint || mappoint->isBad() || mappoint->mnFuseCandidateForKF == currKeyFrame_->mnId)
 					continue;
-				if (pMP->isBad() || pMP->mnFuseCandidateForKF == currKeyFrame_->mnId)
-					continue;
-				pMP->mnFuseCandidateForKF = currKeyFrame_->mnId;
-				vpFuseCandidates.push_back(pMP);
+
+				mappoint->mnFuseCandidateForKF = currKeyFrame_->mnId;
+				fuseCandidates.push_back(mappoint);
 			}
 		}
 
-		matcher.Fuse(currKeyFrame_, vpFuseCandidates);
-
+		matcher.Fuse(currKeyFrame_, fuseCandidates);
 
 		// Update points
-		vpMapPointMatches = currKeyFrame_->GetMapPointMatches();
-		for (size_t i = 0, iend = vpMapPointMatches.size(); i < iend; i++)
+		mappoints = currKeyFrame_->GetMapPointMatches();
+		for (MapPoint* mappoint : mappoints)
 		{
-			MapPoint* pMP = vpMapPointMatches[i];
-			if (pMP)
-			{
-				if (!pMP->isBad())
-				{
-					pMP->ComputeDistinctiveDescriptors();
-					pMP->UpdateNormalAndDepth();
-				}
-			}
+			if (!mappoint || mappoint->isBad())
+				continue;
+
+			mappoint->ComputeDistinctiveDescriptors();
+			mappoint->UpdateNormalAndDepth();
 		}
 
 		// Update connections in covisibility graph
