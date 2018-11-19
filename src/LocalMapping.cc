@@ -30,6 +30,12 @@
 
 #include<mutex>
 
+#define LOCK_MUTEX_NEW_KF()    std::unique_lock<std::mutex> lock1(mutexNewKFs_);
+#define LOCK_MUTEX_RESET()     std::unique_lock<std::mutex> lock2(mutexReset_);
+#define LOCK_MUTEX_FINISH()    std::unique_lock<std::mutex> lock3(mutexFinish_);
+#define LOCK_MUTEX_STOP()      std::unique_lock<std::mutex> lock4(mutexStop_);
+#define LOCK_MUTEX_ACCEPT_KF() std::unique_lock<std::mutex> lock5(mutexAccept_);
+
 namespace ORB_SLAM2
 {
 
@@ -122,7 +128,7 @@ public:
 
 	void InsertKeyFrame(KeyFrame* keyframe)
 	{
-		unique_lock<mutex> lock(mutexNewKFs_);
+		LOCK_MUTEX_NEW_KF();
 		newKeyFrames_.push_back(keyframe);
 		abortBA_ = true;
 	}
@@ -130,23 +136,23 @@ public:
 	// Thread Synch
 	void RequestStop()
 	{
-		unique_lock<mutex> lock(mutexStop_);
+		LOCK_MUTEX_STOP();
 		stopRequested_ = true;
-		unique_lock<mutex> lock2(mutexNewKFs_);
+		LOCK_MUTEX_NEW_KF();
 		abortBA_ = true;
 	}
 
 	void RequestReset()
 	{
 		{
-			unique_lock<mutex> lock(mutexReset_);
+			LOCK_MUTEX_RESET();
 			resetRequested_ = true;
 		}
 
 		while (1)
 		{
 			{
-				unique_lock<mutex> lock2(mutexReset_);
+				LOCK_MUTEX_RESET();
 				if (!resetRequested_)
 					break;
 			}
@@ -156,7 +162,7 @@ public:
 
 	bool Stop()
 	{
-		unique_lock<mutex> lock(mutexStop_);
+		LOCK_MUTEX_STOP();
 		if (stopRequested_ && !notStop_)
 		{
 			stopped_ = true;
@@ -169,8 +175,8 @@ public:
 
 	void Release()
 	{
-		unique_lock<mutex> lock(mutexStop_);
-		unique_lock<mutex> lock2(mutexFinish_);
+		LOCK_MUTEX_STOP();
+		LOCK_MUTEX_FINISH();
 
 		if (finished_)
 			return;
@@ -186,31 +192,31 @@ public:
 
 	bool isStopped()
 	{
-		unique_lock<mutex> lock(mutexStop_);
+		LOCK_MUTEX_STOP();
 		return stopped_;
 	}
 
 	bool stopRequested()
 	{
-		unique_lock<mutex> lock(mutexStop_);
+		LOCK_MUTEX_STOP();
 		return stopRequested_;
 	}
 
 	bool AcceptKeyFrames()
 	{
-		unique_lock<mutex> lock(mutexAccept_);
+		LOCK_MUTEX_ACCEPT_KF();
 		return acceptKeyFrames_;
 	}
 
 	void SetAcceptKeyFrames(bool flag)
 	{
-		unique_lock<mutex> lock(mutexAccept_);
+		LOCK_MUTEX_ACCEPT_KF();
 		acceptKeyFrames_ = flag;
 	}
 
 	bool SetNotStop(bool flag)
 	{
-		unique_lock<mutex> lock(mutexStop_);
+		LOCK_MUTEX_STOP();
 
 		if (flag && stopped_)
 			return false;
@@ -227,19 +233,19 @@ public:
 
 	void RequestFinish()
 	{
-		unique_lock<mutex> lock(mutexFinish_);
+		LOCK_MUTEX_FINISH();
 		finishRequested_ = true;
 	}
 
 	bool isFinished()
 	{
-		unique_lock<mutex> lock(mutexFinish_);
+		LOCK_MUTEX_FINISH();
 		return finished_;
 	}
 
 	int KeyframesInQueue()
 	{
-		unique_lock<std::mutex> lock(mutexNewKFs_);
+		LOCK_MUTEX_NEW_KF();
 		return newKeyFrames_.size();
 	}
 
@@ -247,14 +253,14 @@ private:
 
 	bool CheckNewKeyFrames()
 	{
-		unique_lock<mutex> lock(mutexNewKFs_);
+		LOCK_MUTEX_NEW_KF();
 		return(!newKeyFrames_.empty());
 	}
 
 	void ProcessNewKeyFrame()
 	{
 		{
-			unique_lock<mutex> lock(mutexNewKFs_);
+			LOCK_MUTEX_NEW_KF();
 			mpCurrentKeyFrame = newKeyFrames_.front();
 			newKeyFrames_.pop_front();
 		}
@@ -753,7 +759,7 @@ private:
 
 	void ResetIfRequested()
 	{
-		unique_lock<mutex> lock(mutexReset_);
+		LOCK_MUTEX_RESET();
 		if (resetRequested_)
 		{
 			newKeyFrames_.clear();
@@ -764,24 +770,22 @@ private:
 
 	bool CheckFinish()
 	{
-		unique_lock<mutex> lock(mutexFinish_);
+		LOCK_MUTEX_FINISH();
 		return finishRequested_;
 	}
 
 	void SetFinish()
 	{
-		unique_lock<mutex> lock(mutexFinish_);
+		LOCK_MUTEX_FINISH();
 		finished_ = true;
-		unique_lock<mutex> lock2(mutexStop_);
+		LOCK_MUTEX_STOP();
 		stopped_ = true;
 	}
 
 	bool monocular_;
 	bool resetRequested_;
-	std::mutex mutexReset_;
 	bool finishRequested_;
 	bool finished_;
-	std::mutex mutexFinish_;
 
 	Map* map_;
 
@@ -794,16 +798,17 @@ private:
 
 	std::list<MapPoint*> mlpRecentAddedMapPoints;
 
-	std::mutex mutexNewKFs_;
 
 	bool abortBA_;
-
 	bool stopped_;
 	bool stopRequested_;
 	bool notStop_;
-	std::mutex mutexStop_;
-
 	bool acceptKeyFrames_;
+
+	std::mutex mutexNewKFs_;
+	std::mutex mutexReset_;
+	std::mutex mutexFinish_;
+	std::mutex mutexStop_;
 	std::mutex mutexAccept_;
 };
 
