@@ -43,9 +43,8 @@ public:
 		Parameters(int nfeatures = 2000, float scaleFactor = 1.2f, int nlevels = 8, int iniThFAST = 20, int minThFAST = 7);
 	};
 
-	ORBextractor(int nfeatures, float scaleFactor, int nlevels, int iniThFAST, int minThFAST);
 	ORBextractor(const Parameters& param);
-	~ORBextractor() {}
+	void Init();
 
 	// Compute the ORB features and descriptors on an image.
 	// ORB are dispersed on the image using an octree.
@@ -62,23 +61,19 @@ public:
 
 private:
 
-	int nfeatures;
-	double scaleFactor;
-	int nlevels;
-	int iniThFAST;
-	int minThFAST;
-
-	std::vector<cv::Point> pattern;
-	std::vector<int> nfeaturesPerLevel_;
-
-	std::vector<int> umax_;
+	std::vector<int> nfeaturesPerScale_, umax_;
 
 	std::vector<float> scaleFactors_;
 	std::vector<float> invScaleFactors_;
-	std::vector<float> mvLevelSigma2;
-	std::vector<float> mvInvLevelSigma2;
+	std::vector<float> sigmaSq_;
+	std::vector<float> invSigmaSq_;
 
 	std::vector<cv::Mat> images_;
+	std::vector<cv::Mat> blurImages_;
+	std::vector<std::vector<cv::KeyPoint>> keypoints_;
+	std::vector<cv::Point> pattern_;
+
+	Parameters param_;
 };
 
 } //namespace ORB_SLAM
