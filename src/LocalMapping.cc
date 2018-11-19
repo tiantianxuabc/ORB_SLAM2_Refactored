@@ -93,13 +93,13 @@ public:
 				{
 					// Local BA
 					if (map_->KeyFramesInMap() > 2)
-						Optimizer::LocalBundleAdjustment(mpCurrentKeyFrame, &abortBA_, map_);
+						Optimizer::LocalBundleAdjustment(currKeyFrame_, &abortBA_, map_);
 
 					// Check redundant local Keyframes
 					KeyFrameCulling();
 				}
 
-				loopCloser_->InsertKeyFrame(mpCurrentKeyFrame);
+				loopCloser_->InsertKeyFrame(currKeyFrame_);
 			}
 			else if (Stop())
 			{
@@ -261,15 +261,15 @@ private:
 	{
 		{
 			LOCK_MUTEX_NEW_KF();
-			mpCurrentKeyFrame = newKeyFrames_.front();
+			currKeyFrame_ = newKeyFrames_.front();
 			newKeyFrames_.pop_front();
 		}
 
 		// Compute Bags of Words structures
-		mpCurrentKeyFrame->ComputeBoW();
+		currKeyFrame_->ComputeBoW();
 
 		// Associate MapPoints to the new keyframe and update normal and descriptor
-		const vector<MapPoint*> vpMapPointMatches = mpCurrentKeyFrame->GetMapPointMatches();
+		const vector<MapPoint*> vpMapPointMatches = currKeyFrame_->GetMapPointMatches();
 
 		for (size_t i = 0; i < vpMapPointMatches.size(); i++)
 		{
@@ -278,9 +278,9 @@ private:
 			{
 				if (!pMP->isBad())
 				{
-					if (!pMP->IsInKeyFrame(mpCurrentKeyFrame))
+					if (!pMP->IsInKeyFrame(currKeyFrame_))
 					{
-						pMP->AddObservation(mpCurrentKeyFrame, i);
+						pMP->AddObservation(currKeyFrame_, i);
 						pMP->UpdateNormalAndDepth();
 						pMP->ComputeDistinctiveDescriptors();
 					}
@@ -293,17 +293,17 @@ private:
 		}
 
 		// Update links in the Covisibility Graph
-		mpCurrentKeyFrame->UpdateConnections();
+		currKeyFrame_->UpdateConnections();
 
 		// Insert Keyframe in Map
-		map_->AddKeyFrame(mpCurrentKeyFrame);
+		map_->AddKeyFrame(currKeyFrame_);
 	}
 
 	void MapPointCulling()
 	{
 		// Check Recent Added MapPoints
 		list<MapPoint*>::iterator lit = mlpRecentAddedMapPoints.begin();
-		const unsigned long int nCurrentKFid = mpCurrentKeyFrame->mnId;
+		const unsigned long int nCurrentKFid = currKeyFrame_->mnId;
 
 		int nThObs;
 		if (monocular_)
@@ -342,26 +342,26 @@ private:
 		int nn = 10;
 		if (monocular_)
 			nn = 20;
-		const vector<KeyFrame*> vpNeighKFs = mpCurrentKeyFrame->GetBestCovisibilityKeyFrames(nn);
+		const vector<KeyFrame*> vpNeighKFs = currKeyFrame_->GetBestCovisibilityKeyFrames(nn);
 
 		ORBmatcher matcher(0.6, false);
 
-		cv::Mat Rcw1 = mpCurrentKeyFrame->GetRotation();
+		cv::Mat Rcw1 = currKeyFrame_->GetRotation();
 		cv::Mat Rwc1 = Rcw1.t();
-		cv::Mat tcw1 = mpCurrentKeyFrame->GetTranslation();
+		cv::Mat tcw1 = currKeyFrame_->GetTranslation();
 		cv::Mat Tcw1(3, 4, CV_32F);
 		Rcw1.copyTo(Tcw1.colRange(0, 3));
 		tcw1.copyTo(Tcw1.col(3));
-		cv::Mat Ow1 = mpCurrentKeyFrame->GetCameraCenter();
+		cv::Mat Ow1 = currKeyFrame_->GetCameraCenter();
 
-		const float &fx1 = mpCurrentKeyFrame->camera.fx;
-		const float &fy1 = mpCurrentKeyFrame->camera.fy;
-		const float &cx1 = mpCurrentKeyFrame->camera.cx;
-		const float &cy1 = mpCurrentKeyFrame->camera.cy;
+		const float &fx1 = currKeyFrame_->camera.fx;
+		const float &fy1 = currKeyFrame_->camera.fy;
+		const float &cx1 = currKeyFrame_->camera.cx;
+		const float &cy1 = currKeyFrame_->camera.cy;
 		const float &invfx1 = 1.f / fx1;
 		const float &invfy1 = 1.f / fy1;
 
-		const float ratioFactor = 1.5f*mpCurrentKeyFrame->pyramid.scaleFactor;
+		const float ratioFactor = 1.5f*currKeyFrame_->pyramid.scaleFactor;
 
 		int nnew = 0;
 
@@ -393,11 +393,11 @@ private:
 			}
 
 			// Compute Fundamental Matrix
-			cv::Mat F12 = ComputeF12(mpCurrentKeyFrame, pKF2);
+			cv::Mat F12 = ComputeF12(currKeyFrame_, pKF2);
 
 			// Search matches that fullfil epipolar constraint
 			vector<pair<size_t, size_t> > vMatchedIndices;
-			matcher.SearchForTriangulation(mpCurrentKeyFrame, pKF2, F12, vMatchedIndices, false);
+			matcher.SearchForTriangulation(currKeyFrame_, pKF2, F12, vMatchedIndices, false);
 
 			cv::Mat Rcw2 = pKF2->GetRotation();
 			cv::Mat Rwc2 = Rcw2.t();
@@ -420,8 +420,8 @@ private:
 				const int &idx1 = vMatchedIndices[ikp].first;
 				const int &idx2 = vMatchedIndices[ikp].second;
 
-				const cv::KeyPoint &kp1 = mpCurrentKeyFrame->mvKeysUn[idx1];
-				const float kp1_ur = mpCurrentKeyFrame->mvuRight[idx1];
+				const cv::KeyPoint &kp1 = currKeyFrame_->mvKeysUn[idx1];
+				const float kp1_ur = currKeyFrame_->mvuRight[idx1];
 				bool bStereo1 = kp1_ur >= 0;
 
 				const cv::KeyPoint &kp2 = pKF2->mvKeysUn[idx2];
@@ -441,7 +441,7 @@ private:
 				float cosParallaxStereo2 = cosParallaxStereo;
 
 				if (bStereo1)
-					cosParallaxStereo1 = cos(2 * atan2(mpCurrentKeyFrame->camera.baseline / 2, mpCurrentKeyFrame->mvDepth[idx1]));
+					cosParallaxStereo1 = cos(2 * atan2(currKeyFrame_->camera.baseline / 2, currKeyFrame_->mvDepth[idx1]));
 				else if (bStereo2)
 					cosParallaxStereo2 = cos(2 * atan2(pKF2->camera.baseline / 2, pKF2->mvDepth[idx2]));
 
@@ -471,7 +471,7 @@ private:
 				}
 				else if (bStereo1 && cosParallaxStereo1 < cosParallaxStereo2)
 				{
-					x3D = mpCurrentKeyFrame->UnprojectStereo(idx1);
+					x3D = currKeyFrame_->UnprojectStereo(idx1);
 				}
 				else if (bStereo2 && cosParallaxStereo2 < cosParallaxStereo1)
 				{
@@ -492,7 +492,7 @@ private:
 					continue;
 
 				//Check reprojection error in first keyframe
-				const float &sigmaSquare1 = mpCurrentKeyFrame->pyramid.sigmaSq[kp1.octave];
+				const float &sigmaSquare1 = currKeyFrame_->pyramid.sigmaSq[kp1.octave];
 				const float x1 = Rcw1.row(0).dot(x3Dt) + tcw1.at<float>(0);
 				const float y1 = Rcw1.row(1).dot(x3Dt) + tcw1.at<float>(1);
 				const float invz1 = 1.0 / z1;
@@ -509,7 +509,7 @@ private:
 				else
 				{
 					float u1 = fx1*x1*invz1 + cx1;
-					float u1_r = u1 - mpCurrentKeyFrame->camera.bf*invz1;
+					float u1_r = u1 - currKeyFrame_->camera.bf*invz1;
 					float v1 = fy1*y1*invz1 + cy1;
 					float errX1 = u1 - kp1.pt.x;
 					float errY1 = v1 - kp1.pt.y;
@@ -535,7 +535,7 @@ private:
 				else
 				{
 					float u2 = fx2*x2*invz2 + cx2;
-					float u2_r = u2 - mpCurrentKeyFrame->camera.bf*invz2;
+					float u2_r = u2 - currKeyFrame_->camera.bf*invz2;
 					float v2 = fy2*y2*invz2 + cy2;
 					float errX2 = u2 - kp2.pt.x;
 					float errY2 = v2 - kp2.pt.y;
@@ -555,7 +555,7 @@ private:
 					continue;
 
 				const float ratioDist = dist2 / dist1;
-				const float ratioOctave = mpCurrentKeyFrame->pyramid.scaleFactors[kp1.octave] / pKF2->pyramid.scaleFactors[kp2.octave];
+				const float ratioOctave = currKeyFrame_->pyramid.scaleFactors[kp1.octave] / pKF2->pyramid.scaleFactors[kp2.octave];
 
 				/*if(fabs(ratioDist-ratioOctave)>ratioFactor)
 				continue;*/
@@ -563,12 +563,12 @@ private:
 					continue;
 
 				// Triangulation is succesfull
-				MapPoint* pMP = new MapPoint(x3D, mpCurrentKeyFrame, map_);
+				MapPoint* pMP = new MapPoint(x3D, currKeyFrame_, map_);
 
-				pMP->AddObservation(mpCurrentKeyFrame, idx1);
+				pMP->AddObservation(currKeyFrame_, idx1);
 				pMP->AddObservation(pKF2, idx2);
 
-				mpCurrentKeyFrame->AddMapPoint(pMP, idx1);
+				currKeyFrame_->AddMapPoint(pMP, idx1);
 				pKF2->AddMapPoint(pMP, idx2);
 
 				pMP->ComputeDistinctiveDescriptors();
@@ -589,22 +589,22 @@ private:
 		int nn = 10;
 		if (monocular_)
 			nn = 20;
-		const vector<KeyFrame*> vpNeighKFs = mpCurrentKeyFrame->GetBestCovisibilityKeyFrames(nn);
+		const vector<KeyFrame*> vpNeighKFs = currKeyFrame_->GetBestCovisibilityKeyFrames(nn);
 		vector<KeyFrame*> vpTargetKFs;
 		for (vector<KeyFrame*>::const_iterator vit = vpNeighKFs.begin(), vend = vpNeighKFs.end(); vit != vend; vit++)
 		{
 			KeyFrame* pKFi = *vit;
-			if (pKFi->isBad() || pKFi->mnFuseTargetForKF == mpCurrentKeyFrame->mnId)
+			if (pKFi->isBad() || pKFi->mnFuseTargetForKF == currKeyFrame_->mnId)
 				continue;
 			vpTargetKFs.push_back(pKFi);
-			pKFi->mnFuseTargetForKF = mpCurrentKeyFrame->mnId;
+			pKFi->mnFuseTargetForKF = currKeyFrame_->mnId;
 
 			// Extend to some second neighbors
 			const vector<KeyFrame*> vpSecondNeighKFs = pKFi->GetBestCovisibilityKeyFrames(5);
 			for (vector<KeyFrame*>::const_iterator vit2 = vpSecondNeighKFs.begin(), vend2 = vpSecondNeighKFs.end(); vit2 != vend2; vit2++)
 			{
 				KeyFrame* pKFi2 = *vit2;
-				if (pKFi2->isBad() || pKFi2->mnFuseTargetForKF == mpCurrentKeyFrame->mnId || pKFi2->mnId == mpCurrentKeyFrame->mnId)
+				if (pKFi2->isBad() || pKFi2->mnFuseTargetForKF == currKeyFrame_->mnId || pKFi2->mnId == currKeyFrame_->mnId)
 					continue;
 				vpTargetKFs.push_back(pKFi2);
 			}
@@ -613,7 +613,7 @@ private:
 
 		// Search matches by projection from current KF in target KFs
 		ORBmatcher matcher;
-		vector<MapPoint*> vpMapPointMatches = mpCurrentKeyFrame->GetMapPointMatches();
+		vector<MapPoint*> vpMapPointMatches = currKeyFrame_->GetMapPointMatches();
 		for (vector<KeyFrame*>::iterator vit = vpTargetKFs.begin(), vend = vpTargetKFs.end(); vit != vend; vit++)
 		{
 			KeyFrame* pKFi = *vit;
@@ -636,18 +636,18 @@ private:
 				MapPoint* pMP = *vitMP;
 				if (!pMP)
 					continue;
-				if (pMP->isBad() || pMP->mnFuseCandidateForKF == mpCurrentKeyFrame->mnId)
+				if (pMP->isBad() || pMP->mnFuseCandidateForKF == currKeyFrame_->mnId)
 					continue;
-				pMP->mnFuseCandidateForKF = mpCurrentKeyFrame->mnId;
+				pMP->mnFuseCandidateForKF = currKeyFrame_->mnId;
 				vpFuseCandidates.push_back(pMP);
 			}
 		}
 
-		matcher.Fuse(mpCurrentKeyFrame, vpFuseCandidates);
+		matcher.Fuse(currKeyFrame_, vpFuseCandidates);
 
 
 		// Update points
-		vpMapPointMatches = mpCurrentKeyFrame->GetMapPointMatches();
+		vpMapPointMatches = currKeyFrame_->GetMapPointMatches();
 		for (size_t i = 0, iend = vpMapPointMatches.size(); i < iend; i++)
 		{
 			MapPoint* pMP = vpMapPointMatches[i];
@@ -662,7 +662,7 @@ private:
 		}
 
 		// Update connections in covisibility graph
-		mpCurrentKeyFrame->UpdateConnections();
+		currKeyFrame_->UpdateConnections();
 	}
 
 	cv::Mat ComputeF12(KeyFrame *&pKF1, KeyFrame *&pKF2)
@@ -690,7 +690,7 @@ private:
 		// A keyframe is considered redundant if the 90% of the MapPoints it sees, are seen
 		// in at least other 3 keyframes (in the same or finer scale)
 		// We only consider close stereo points
-		vector<KeyFrame*> vpLocalKeyFrames = mpCurrentKeyFrame->GetVectorCovisibleKeyFrames();
+		vector<KeyFrame*> vpLocalKeyFrames = currKeyFrame_->GetVectorCovisibleKeyFrames();
 
 		for (vector<KeyFrame*>::iterator vit = vpLocalKeyFrames.begin(), vend = vpLocalKeyFrames.end(); vit != vend; vit++)
 		{
@@ -794,7 +794,7 @@ private:
 
 	std::list<KeyFrame*> newKeyFrames_;
 
-	KeyFrame* mpCurrentKeyFrame;
+	KeyFrame* currKeyFrame_;
 
 	std::list<MapPoint*> mlpRecentAddedMapPoints;
 
