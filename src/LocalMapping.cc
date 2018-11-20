@@ -390,8 +390,6 @@ private:
 
 		const float ratioFactor = 1.5f * keyframe1->pyramid.scaleFactor;
 
-		int nnew = 0;
-
 		// Search matches with epipolar restriction and triangulate
 		for (size_t i = 0; i < neighborKFs.size(); i++)
 		{
@@ -601,8 +599,6 @@ private:
 
 				map_->AddMapPoint(pMP);
 				recentAddedMapPoints_.push_back(pMP);
-
-				nnew++;
 			}
 		}
 	}
