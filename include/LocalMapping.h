@@ -35,7 +35,7 @@ class LocalMapping
 {
 public:
 
-	static std::shared_ptr<LocalMapping> Create(Map* pMap, bool bMonocular);
+	static std::shared_ptr<LocalMapping> Create(Map* map, bool monocular);
 
 	virtual void SetLoopCloser(const std::shared_ptr<LoopClosing>& loopCloser) = 0;
 
@@ -44,7 +44,7 @@ public:
 	// Main function
 	virtual void Run() = 0;
 
-	virtual void InsertKeyFrame(KeyFrame* pKF) = 0;
+	virtual void InsertKeyFrame(KeyFrame* keyframe) = 0;
 
 	// Thread Synch
 	virtual void RequestStop() = 0;
