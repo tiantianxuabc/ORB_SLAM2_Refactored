@@ -85,6 +85,45 @@ public:
 		tracker_ = tracker;
 	}
 
+	void Update()
+	{
+		KeyFrame* currKeyFrame_;
+		{
+			LOCK_MUTEX_NEW_KF();
+			currKeyFrame_ = newKeyFrames_.front();
+			newKeyFrames_.pop_front();
+		}
+
+		// BoW conversion and insertion in Map
+		ProcessNewKeyFrame(currKeyFrame_);
+
+		// Check recent MapPoints
+		MapPointCulling(currKeyFrame_);
+
+		// Triangulate new MapPoints
+		CreateNewMapPoints(currKeyFrame_);
+
+		if (!CheckNewKeyFrames())
+		{
+			// Find more matches in neighbor keyframes and fuse point duplications
+			SearchInNeighbors(currKeyFrame_);
+		}
+
+		abortBA_ = false;
+
+		if (!CheckNewKeyFrames() && !stopRequested())
+		{
+			// Local BA
+			if (map_->KeyFramesInMap() > 2)
+				Optimizer::LocalBundleAdjustment(currKeyFrame_, &abortBA_, map_);
+
+			// Check redundant local Keyframes
+			KeyFrameCulling(currKeyFrame_);
+		}
+
+		loopCloser_->InsertKeyFrame(currKeyFrame_);
+	}
+
 	// Main function
 	void Run() override
 	{
@@ -98,34 +137,7 @@ public:
 			// Check if there are keyframes in the queue
 			if (CheckNewKeyFrames())
 			{
-				// BoW conversion and insertion in Map
-				ProcessNewKeyFrame();
-
-				// Check recent MapPoints
-				MapPointCulling();
-
-				// Triangulate new MapPoints
-				CreateNewMapPoints();
-
-				if (!CheckNewKeyFrames())
-				{
-					// Find more matches in neighbor keyframes and fuse point duplications
-					SearchInNeighbors();
-				}
-
-				abortBA_ = false;
-
-				if (!CheckNewKeyFrames() && !stopRequested())
-				{
-					// Local BA
-					if (map_->KeyFramesInMap() > 2)
-						Optimizer::LocalBundleAdjustment(currKeyFrame_, &abortBA_, map_);
-
-					// Check redundant local Keyframes
-					KeyFrameCulling();
-				}
-
-				loopCloser_->InsertKeyFrame(currKeyFrame_);
+				Update();
 			}
 			else if (Stop())
 			{
@@ -283,14 +295,8 @@ private:
 		return(!newKeyFrames_.empty());
 	}
 
-	void ProcessNewKeyFrame()
+	void ProcessNewKeyFrame(KeyFrame* currKeyFrame_)
 	{
-		{
-			LOCK_MUTEX_NEW_KF();
-			currKeyFrame_ = newKeyFrames_.front();
-			newKeyFrames_.pop_front();
-		}
-
 		// Compute Bags of Words structures
 		currKeyFrame_->ComputeBoW();
 
@@ -321,7 +327,7 @@ private:
 		map_->AddKeyFrame(currKeyFrame_);
 	}
 
-	void MapPointCulling()
+	void MapPointCulling(KeyFrame* currKeyFrame_)
 	{
 		// Check Recent Added MapPoints
 		const int currKFId = static_cast<int>(currKeyFrame_->mnId);
@@ -357,7 +363,7 @@ private:
 		}
 	}
 
-	void CreateNewMapPoints()
+	void CreateNewMapPoints(KeyFrame* currKeyFrame_)
 	{
 		KeyFrame* keyframe1 = currKeyFrame_;
 
@@ -601,7 +607,7 @@ private:
 		}
 	}
 
-	void SearchInNeighbors()
+	void SearchInNeighbors(KeyFrame* currKeyFrame_)
 	{
 		// Retrieve neighbor keyframes
 		const int nneighbors = monocular_ ? 20 : 10;
@@ -662,7 +668,7 @@ private:
 		currKeyFrame_->UpdateConnections();
 	}
 
-	void KeyFrameCulling()
+	void KeyFrameCulling(KeyFrame* currKeyFrame_)
 	{
 		// Check redundant keyframes (only local keyframes)
 		// A keyframe is considered redundant if the 90% of the MapPoints it sees, are seen
@@ -762,7 +768,7 @@ private:
 
 	std::list<KeyFrame*> newKeyFrames_;
 
-	KeyFrame* currKeyFrame_;
+	//KeyFrame* currKeyFrame_;
 
 	std::list<MapPoint*> recentAddedMapPoints_;
 
