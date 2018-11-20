@@ -23,7 +23,6 @@
 #include "Tracking.h"
 #include "LoopClosing.h"
 #include "ORBmatcher.h"
-#include "Optimizer.h"
 #include "Usleep.h"
 #include "KeyFrame.h"
 #include "Map.h"
@@ -38,6 +37,13 @@
 
 namespace ORB_SLAM2
 {
+
+namespace Optimizer
+{
+
+void LocalBundleAdjustment(KeyFrame* pKF, bool *pbStopFlag, Map *pMap);
+
+} // namespace Optimizer
 
 static cv::Mat SkewSymmetricMatrix(const cv::Mat1f& v)
 {
