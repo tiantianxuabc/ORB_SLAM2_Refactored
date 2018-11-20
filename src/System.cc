@@ -216,8 +216,8 @@ public:
 		tracker_->SetLocalMapper(localMapper_.get());
 		tracker_->SetLoopClosing(loopCloser_.get());
 
-		localMapper_->SetTracker(tracker_.get());
-		localMapper_->SetLoopCloser(loopCloser_.get());
+		localMapper_->SetTracker(tracker_);
+		localMapper_->SetLoopCloser(loopCloser_);
 
 		loopCloser_->SetTracker(tracker_.get());
 		loopCloser_->SetLocalMapper(localMapper_.get());

@@ -37,9 +37,9 @@ public:
 
 	static std::shared_ptr<LocalMapping> Create(Map* pMap, bool bMonocular);
 
-	virtual void SetLoopCloser(LoopClosing* pLoopCloser) = 0;
+	virtual void SetLoopCloser(const std::shared_ptr<LoopClosing>& loopCloser) = 0;
 
-	virtual void SetTracker(Tracking* pTracker) = 0;
+	virtual void SetTracker(const std::shared_ptr<Tracking>& tracker) = 0;
 
 	// Main function
 	virtual void Run() = 0;

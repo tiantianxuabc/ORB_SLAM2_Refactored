@@ -75,12 +75,12 @@ public:
 	{
 	}
 
-	void SetLoopCloser(LoopClosing* loopCloser) override
+	void SetLoopCloser(const std::shared_ptr<LoopClosing>& loopCloser) override
 	{
 		loopCloser_ = loopCloser;
 	}
 
-	void SetTracker(Tracking* tracker) override
+	void SetTracker(const std::shared_ptr<Tracking>& tracker) override
 	{
 		tracker_ = tracker;
 	}
@@ -763,13 +763,10 @@ private:
 
 	Map* map_;
 
-	LoopClosing* loopCloser_;
-	Tracking* tracker_;
+	std::shared_ptr<LoopClosing> loopCloser_;
+	std::shared_ptr<Tracking> tracker_;
 
 	std::list<KeyFrame*> newKeyFrames_;
-
-	//KeyFrame* currKeyFrame_;
-
 	std::list<MapPoint*> recentAddedMapPoints_;
 
 	bool abortBA_;
