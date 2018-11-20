@@ -668,63 +668,60 @@ private:
 		// A keyframe is considered redundant if the 90% of the MapPoints it sees, are seen
 		// in at least other 3 keyframes (in the same or finer scale)
 		// We only consider close stereo points
-		vector<KeyFrame*> vpLocalKeyFrames = currKeyFrame_->GetVectorCovisibleKeyFrames();
-
-		for (vector<KeyFrame*>::iterator vit = vpLocalKeyFrames.begin(), vend = vpLocalKeyFrames.end(); vit != vend; vit++)
+		for (KeyFrame* keyframe : currKeyFrame_->GetVectorCovisibleKeyFrames())
 		{
-			KeyFrame* pKF = *vit;
-			if (pKF->mnId == 0)
+			if (keyframe->mnId == 0)
 				continue;
-			const vector<MapPoint*> vpMapPoints = pKF->GetMapPointMatches();
 
-			int nObs = 3;
+			const std::vector<MapPoint*> mappoints = keyframe->GetMapPointMatches();
+
+			const int nObs = 3;
 			const int thObs = nObs;
+
 			int nRedundantObservations = 0;
-			int nMPs = 0;
-			for (size_t i = 0, iend = vpMapPoints.size(); i < iend; i++)
+			int npoints = 0;
+
+			for (size_t i = 0, iend = mappoints.size(); i < iend; i++)
 			{
-				MapPoint* pMP = vpMapPoints[i];
-				if (pMP)
+				MapPoint* mappoint = mappoints[i];
+				if (!mappoint || mappoint->isBad())
+					continue;
+
+				if (!monocular_)
 				{
-					if (!pMP->isBad())
+					if (keyframe->mvDepth[i] > keyframe->mThDepth || keyframe->mvDepth[i] < 0)
+						continue;
+				}
+
+				npoints++;
+				if (mappoint->Observations() > thObs)
+				{
+					const int scaleLevel = keyframe->mvKeysUn[i].octave;
+					const map<KeyFrame*, size_t> observations = mappoint->GetObservations();
+					int nObs = 0;
+					for (map<KeyFrame*, size_t>::const_iterator mit = observations.begin(), mend = observations.end(); mit != mend; mit++)
 					{
-						if (!monocular_)
-						{
-							if (pKF->mvDepth[i] > pKF->mThDepth || pKF->mvDepth[i] < 0)
-								continue;
-						}
+						KeyFrame* pKFi = mit->first;
+						if (pKFi == keyframe)
+							continue;
+						const int scaleLeveli = pKFi->mvKeysUn[mit->second].octave;
 
-						nMPs++;
-						if (pMP->Observations() > thObs)
+						if (scaleLeveli <= scaleLevel + 1)
 						{
-							const int scaleLevel = pKF->mvKeysUn[i].octave;
-							const map<KeyFrame*, size_t> observations = pMP->GetObservations();
-							int nObs = 0;
-							for (map<KeyFrame*, size_t>::const_iterator mit = observations.begin(), mend = observations.end(); mit != mend; mit++)
-							{
-								KeyFrame* pKFi = mit->first;
-								if (pKFi == pKF)
-									continue;
-								const int scaleLeveli = pKFi->mvKeysUn[mit->second].octave;
-
-								if (scaleLeveli <= scaleLevel + 1)
-								{
-									nObs++;
-									if (nObs >= thObs)
-										break;
-								}
-							}
+							nObs++;
 							if (nObs >= thObs)
-							{
-								nRedundantObservations++;
-							}
+								break;
 						}
+					}
+					if (nObs >= thObs)
+					{
+						nRedundantObservations++;
 					}
 				}
 			}
 
-			if (nRedundantObservations > 0.9*nMPs)
-				pKF->SetBadFlag();
+			if (nRedundantObservations > 0.9 * npoints)
+				keyframe->SetBadFlag();
 		}
 	}
 
