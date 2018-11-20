@@ -374,6 +374,11 @@ private:
 		return static_cast<float>(v1.dot(v2) / (cv::norm(v1) * cv::norm(v2)));
 	}
 
+	static inline float Parallax(float baseline, float Z)
+	{
+		return 2.f * atan2f(0.5f * baseline, Z);
+	}
+
 	void CreateNewMapPoints(KeyFrame* currKeyFrame_)
 	{
 		KeyFrame* keyframe1 = currKeyFrame_;
@@ -476,9 +481,9 @@ private:
 				float cosParallaxStereo2 = cosParallaxStereo;
 
 				if (stereo1)
-					cosParallaxStereo1 = cos(2 * atan2(keyframe1->camera.baseline / 2, keyframe1->mvDepth[idx1]));
+					cosParallaxStereo1 = cosf(Parallax(keyframe1->camera.baseline, keyframe1->mvDepth[idx1]));
 				else if (stereo2)
-					cosParallaxStereo2 = cos(2 * atan2(keyframe2->camera.baseline / 2, keyframe2->mvDepth[idx2]));
+					cosParallaxStereo2 = cosf(Parallax(keyframe2->camera.baseline, keyframe2->mvDepth[idx2]));
 
 				cosParallaxStereo = min(cosParallaxStereo1, cosParallaxStereo2);
 
