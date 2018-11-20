@@ -21,26 +21,21 @@
 #ifndef KEYFRAME_H
 #define KEYFRAME_H
 
-//#include "MapPoint.h"
-#include "Thirdparty/DBoW2/DBoW2/BowVector.h"
-#include "Thirdparty/DBoW2/DBoW2/FeatureVector.h"
-#include "ORBVocabulary.h"
-//#include "ORBextractor.h"
-#include "Frame.h"
-//#include "KeyFrameDatabase.h"
-#include "CameraParameters.h"
-
 #include <mutex>
 
+#include <Thirdparty/DBoW2/DBoW2/BowVector.h>
+#include <Thirdparty/DBoW2/DBoW2/FeatureVector.h>
+
+#include "Frame.h"
+#include "ORBVocabulary.h"
+#include "CameraParameters.h"
 
 namespace ORB_SLAM2
 {
 
 class Map;
 class MapPoint;
-//class Frame;
 class KeyFrameDatabase;
-//class ORBVocabulary;
 
 class KeyFrame
 {
@@ -130,11 +125,7 @@ public:
 
     // Grid (to speed up feature matching)
 	FeaturesGrid grid;
-    /*const int mnGridCols;
-    const int mnGridRows;
-    const float mfGridElementWidthInv;
-    const float mfGridElementHeightInv;*/
-
+    
     // Variables used by the tracking
     long unsigned int mnTrackReferenceForFrame;
     long unsigned int mnFuseTargetForKF;
@@ -180,22 +171,10 @@ public:
 
     // Scale
 	ScalePyramidInfo pyramid;
-    /*const int mnScaleLevels;
-    const float mfScaleFactor;
-    const float mfLogScaleFactor;
-    const std::vector<float> mvScaleFactors;
-    const std::vector<float> mvLevelSigma2;
-    const std::vector<float> mvInvLevelSigma2;*/
-
+    
     // Image bounds and calibration
 	ImageBounds imageBounds;
-    /*const int mnMinX;
-    const int mnMinY;
-    const int mnMaxX;
-    const int mnMaxY;*/
-    //const cv::Mat mK;
-
-
+    
     // The following variables need to be accessed trough a mutex to be thread safe.
 protected:
 
