@@ -90,7 +90,7 @@ public:
 	{
 		finished_ = false;
 
-		while (1)
+		while (true)
 		{
 			// Tracking will see that Local Mapping is busy
 			SetAcceptKeyFrames(false);
@@ -175,7 +175,7 @@ public:
 			resetRequested_ = true;
 		}
 
-		while (1)
+		while (true)
 		{
 			{
 				LOCK_MUTEX_RESET();
