@@ -363,6 +363,11 @@ private:
 		}
 	}
 
+	static inline float CosAngle(const cv::Mat& v1, const cv::Mat& v2)
+	{
+		return static_cast<float>(v1.dot(v2) / (cv::norm(v1) * cv::norm(v2)));
+	}
+
 	void CreateNewMapPoints(KeyFrame* currKeyFrame_)
 	{
 		KeyFrame* keyframe1 = currKeyFrame_;
@@ -458,7 +463,7 @@ private:
 
 				const cv::Mat ray1 = Rwc1 * xn1;
 				const cv::Mat ray2 = Rwc2 * xn2;
-				const float cosParallaxRays = static_cast<float>(ray1.dot(ray2) / (cv::norm(ray1) * cv::norm(ray2)));
+				const float cosParallaxRays = CosAngle(ray1, ray2);
 
 				float cosParallaxStereo = cosParallaxRays + 1;
 				float cosParallaxStereo1 = cosParallaxStereo;
