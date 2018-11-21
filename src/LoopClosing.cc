@@ -20,31 +20,20 @@
 
 #include "LoopClosing.h"
 
+#include <mutex>
+#include <thread>
+
 #include "Sim3Solver.h"
-
 #include "Converter.h"
-
 #include "Optimizer.h"
-
 #include "ORBmatcher.h"
-
 #include "Map.h"
-
 #include "KeyFrame.h"
-
 #include "KeyFrameDatabase.h"
-
 #include "ORBVocabulary.h"
-
 #include "Tracking.h"
-
 #include "LocalMapping.h"
-
 #include "Usleep.h"
-
-#include<mutex>
-#include<thread>
-
 
 namespace ORB_SLAM2
 {
