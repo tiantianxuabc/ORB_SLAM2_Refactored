@@ -38,6 +38,346 @@
 namespace ORB_SLAM2
 {
 
+class LoopDetector
+{
+
+private:
+
+	using ConsistentGroup = std::pair<std::set<KeyFrame*>, int>;
+
+	KeyFrameDatabase* mpKeyFrameDB;
+	ORBVocabulary* mpORBVocabulary;
+	std::vector<ConsistentGroup> mvConsistentGroups;
+	bool mbFixScale;
+	int mnCovisibilityConsistencyTh;
+
+public:
+
+	struct Loop
+	{
+		KeyFrame* mpMatchedKF;
+		cv::Mat mScw;
+		g2o::Sim3 mg2oScw;
+		std::vector<MapPoint*> mvpCurrentMatchedPoints;
+		std::vector<MapPoint*> mvpLoopMapPoints;
+	};
+
+	LoopDetector(KeyFrameDatabase *pDB, ORBVocabulary *pVoc, bool bFixScale)
+		: mpKeyFrameDB(pDB), mpORBVocabulary(pVoc), mbFixScale(bFixScale), mnCovisibilityConsistencyTh(3) {}
+
+	bool Detect(KeyFrame* mpCurrentKF, Loop& loop, int mLastLoopKFid)
+	{
+		std::vector<KeyFrame*> mvpEnoughConsistentCandidates;
+		if (!DetectLoop(mpCurrentKF, mvpEnoughConsistentCandidates, mLastLoopKFid))
+			return false;
+
+		if (!ComputeSim3(mpCurrentKF, mvpEnoughConsistentCandidates, loop))
+			return false;
+
+		return true;
+	}
+
+	bool DetectLoop(KeyFrame* mpCurrentKF, std::vector<KeyFrame*>& mvpEnoughConsistentCandidates, int mLastLoopKFid)
+	{
+		/*{
+			unique_lock<mutex> lock(mMutexLoopQueue);
+			mpCurrentKF = mlpLoopKeyFrameQueue.front();
+			mlpLoopKeyFrameQueue.pop_front();
+			mpCurrentKF->SetNotErase();
+		}*/
+
+		//If the map contains less than 10 KF or less than 10 KF have passed from last loop detection
+		if (mpCurrentKF->mnId < mLastLoopKFid + 10)
+		{
+			mpKeyFrameDB->add(mpCurrentKF);
+			mpCurrentKF->SetErase();
+			return false;
+		}
+
+		// Compute reference BoW similarity score
+		// This is the lowest score to a connected keyframe in the covisibility graph
+		// We will impose loop candidates to have a higher similarity than this
+		const vector<KeyFrame*> vpConnectedKeyFrames = mpCurrentKF->GetVectorCovisibleKeyFrames();
+		const DBoW2::BowVector &CurrentBowVec = mpCurrentKF->mBowVec;
+		float minScore = 1;
+		for (size_t i = 0; i < vpConnectedKeyFrames.size(); i++)
+		{
+			KeyFrame* pKF = vpConnectedKeyFrames[i];
+			if (pKF->isBad())
+				continue;
+			const DBoW2::BowVector &BowVec = pKF->mBowVec;
+
+			float score = mpORBVocabulary->score(CurrentBowVec, BowVec);
+
+			if (score < minScore)
+				minScore = score;
+		}
+
+		// Query the database imposing the minimum score
+		vector<KeyFrame*> vpCandidateKFs = mpKeyFrameDB->DetectLoopCandidates(mpCurrentKF, minScore);
+
+		// If there are no loop candidates, just add new keyframe and return false
+		if (vpCandidateKFs.empty())
+		{
+			mpKeyFrameDB->add(mpCurrentKF);
+			mvConsistentGroups.clear();
+			mpCurrentKF->SetErase();
+			return false;
+		}
+
+		// For each loop candidate check consistency with previous loop candidates
+		// Each candidate expands a covisibility group (keyframes connected to the loop candidate in the covisibility graph)
+		// A group is consistent with a previous group if they share at least a keyframe
+		// We must detect a consistent loop in several consecutive keyframes to accept it
+		mvpEnoughConsistentCandidates.clear();
+
+		vector<ConsistentGroup> vCurrentConsistentGroups;
+		vector<bool> vbConsistentGroup(mvConsistentGroups.size(), false);
+		for (size_t i = 0, iend = vpCandidateKFs.size(); i < iend; i++)
+		{
+			KeyFrame* pCandidateKF = vpCandidateKFs[i];
+
+			set<KeyFrame*> spCandidateGroup = pCandidateKF->GetConnectedKeyFrames();
+			spCandidateGroup.insert(pCandidateKF);
+
+			bool bEnoughConsistent = false;
+			bool bConsistentForSomeGroup = false;
+			for (size_t iG = 0, iendG = mvConsistentGroups.size(); iG < iendG; iG++)
+			{
+				set<KeyFrame*> sPreviousGroup = mvConsistentGroups[iG].first;
+
+				bool bConsistent = false;
+				for (set<KeyFrame*>::iterator sit = spCandidateGroup.begin(), send = spCandidateGroup.end(); sit != send; sit++)
+				{
+					if (sPreviousGroup.count(*sit))
+					{
+						bConsistent = true;
+						bConsistentForSomeGroup = true;
+						break;
+					}
+				}
+
+				if (bConsistent)
+				{
+					int nPreviousConsistency = mvConsistentGroups[iG].second;
+					int nCurrentConsistency = nPreviousConsistency + 1;
+					if (!vbConsistentGroup[iG])
+					{
+						ConsistentGroup cg = make_pair(spCandidateGroup, nCurrentConsistency);
+						vCurrentConsistentGroups.push_back(cg);
+						vbConsistentGroup[iG] = true; //this avoid to include the same group more than once
+					}
+					if (nCurrentConsistency >= mnCovisibilityConsistencyTh && !bEnoughConsistent)
+					{
+						mvpEnoughConsistentCandidates.push_back(pCandidateKF);
+						bEnoughConsistent = true; //this avoid to insert the same candidate more than once
+					}
+				}
+			}
+
+			// If the group is not consistent with any previous group insert with consistency counter set to zero
+			if (!bConsistentForSomeGroup)
+			{
+				ConsistentGroup cg = make_pair(spCandidateGroup, 0);
+				vCurrentConsistentGroups.push_back(cg);
+			}
+		}
+
+		// Update Covisibility Consistent Groups
+		mvConsistentGroups = vCurrentConsistentGroups;
+
+
+		// Add Current Keyframe to database
+		mpKeyFrameDB->add(mpCurrentKF);
+
+		if (mvpEnoughConsistentCandidates.empty())
+		{
+			mpCurrentKF->SetErase();
+			return false;
+		}
+		else
+		{
+			return true;
+		}
+
+		mpCurrentKF->SetErase();
+		return false;
+	}
+
+	bool ComputeSim3(KeyFrame* mpCurrentKF, std::vector<KeyFrame*>& mvpEnoughConsistentCandidates, Loop& loop)
+	{
+		// For each consistent loop candidate we try to compute a Sim3
+
+		const int nInitialCandidates = mvpEnoughConsistentCandidates.size();
+
+		// We compute first ORB matches for each candidate
+		// If enough matches are found, we setup a Sim3Solver
+		ORBmatcher matcher(0.75, true);
+
+		vector<Sim3Solver*> vpSim3Solvers;
+		vpSim3Solvers.resize(nInitialCandidates);
+
+		vector<vector<MapPoint*> > vvpMapPointMatches;
+		vvpMapPointMatches.resize(nInitialCandidates);
+
+		vector<bool> vbDiscarded;
+		vbDiscarded.resize(nInitialCandidates);
+
+		int nCandidates = 0; //candidates with enough matches
+
+		for (int i = 0; i < nInitialCandidates; i++)
+		{
+			KeyFrame* pKF = mvpEnoughConsistentCandidates[i];
+
+			// avoid that local mapping erase it while it is being processed in this thread
+			pKF->SetNotErase();
+
+			if (pKF->isBad())
+			{
+				vbDiscarded[i] = true;
+				continue;
+			}
+
+			int nmatches = matcher.SearchByBoW(mpCurrentKF, pKF, vvpMapPointMatches[i]);
+
+			if (nmatches < 20)
+			{
+				vbDiscarded[i] = true;
+				continue;
+			}
+			else
+			{
+				Sim3Solver* pSolver = new Sim3Solver(mpCurrentKF, pKF, vvpMapPointMatches[i], mbFixScale);
+				pSolver->SetRansacParameters(0.99, 20, 300);
+				vpSim3Solvers[i] = pSolver;
+			}
+
+			nCandidates++;
+		}
+
+		bool bMatch = false;
+
+		// Perform alternatively RANSAC iterations for each candidate
+		// until one is succesful or all fail
+		while (nCandidates > 0 && !bMatch)
+		{
+			for (int i = 0; i < nInitialCandidates; i++)
+			{
+				if (vbDiscarded[i])
+					continue;
+
+				KeyFrame* pKF = mvpEnoughConsistentCandidates[i];
+
+				// Perform 5 Ransac Iterations
+				vector<bool> vbInliers;
+				int nInliers;
+				bool bNoMore;
+
+				Sim3Solver* pSolver = vpSim3Solvers[i];
+				cv::Mat Scm = pSolver->iterate(5, bNoMore, vbInliers, nInliers);
+
+				// If Ransac reachs max. iterations discard keyframe
+				if (bNoMore)
+				{
+					vbDiscarded[i] = true;
+					nCandidates--;
+				}
+
+				// If RANSAC returns a Sim3, perform a guided matching and optimize with all correspondences
+				if (!Scm.empty())
+				{
+					vector<MapPoint*> vpMapPointMatches(vvpMapPointMatches[i].size(), static_cast<MapPoint*>(NULL));
+					for (size_t j = 0, jend = vbInliers.size(); j < jend; j++)
+					{
+						if (vbInliers[j])
+							vpMapPointMatches[j] = vvpMapPointMatches[i][j];
+					}
+
+					cv::Mat R = pSolver->GetEstimatedRotation();
+					cv::Mat t = pSolver->GetEstimatedTranslation();
+					const float s = pSolver->GetEstimatedScale();
+					matcher.SearchBySim3(mpCurrentKF, pKF, vpMapPointMatches, s, R, t, 7.5);
+
+					g2o::Sim3 gScm(Converter::toMatrix3d(R), Converter::toVector3d(t), s);
+					const int nInliers = Optimizer::OptimizeSim3(mpCurrentKF, pKF, vpMapPointMatches, gScm, 10, mbFixScale);
+
+					// If optimization is succesful stop ransacs and continue
+					if (nInliers >= 20)
+					{
+						bMatch = true;
+						loop.mpMatchedKF = pKF;
+						g2o::Sim3 gSmw(Converter::toMatrix3d(pKF->GetRotation()), Converter::toVector3d(pKF->GetTranslation()), 1.0);
+						loop.mg2oScw = gScm*gSmw;
+						loop.mScw = Converter::toCvMat(loop.mg2oScw);
+
+						loop.mvpCurrentMatchedPoints = vpMapPointMatches;
+						break;
+					}
+				}
+			}
+		}
+
+		if (!bMatch)
+		{
+			for (int i = 0; i < nInitialCandidates; i++)
+				mvpEnoughConsistentCandidates[i]->SetErase();
+			mpCurrentKF->SetErase();
+			return false;
+		}
+
+		// Retrieve MapPoints seen in Loop Keyframe and neighbors
+		vector<KeyFrame*> vpLoopConnectedKFs = loop.mpMatchedKF->GetVectorCovisibleKeyFrames();
+		vpLoopConnectedKFs.push_back(loop.mpMatchedKF);
+		loop.mvpLoopMapPoints.clear();
+		for (vector<KeyFrame*>::iterator vit = vpLoopConnectedKFs.begin(); vit != vpLoopConnectedKFs.end(); vit++)
+		{
+			KeyFrame* pKF = *vit;
+			vector<MapPoint*> vpMapPoints = pKF->GetMapPointMatches();
+			for (size_t i = 0, iend = vpMapPoints.size(); i < iend; i++)
+			{
+				MapPoint* pMP = vpMapPoints[i];
+				if (pMP)
+				{
+					if (!pMP->isBad() && pMP->mnLoopPointForKF != mpCurrentKF->mnId)
+					{
+						loop.mvpLoopMapPoints.push_back(pMP);
+						pMP->mnLoopPointForKF = mpCurrentKF->mnId;
+					}
+				}
+			}
+		}
+
+		// Find more matches projecting with the computed Sim3
+		matcher.SearchByProjection(mpCurrentKF, loop.mScw, loop.mvpLoopMapPoints, loop.mvpCurrentMatchedPoints, 10);
+
+		// If enough matches accept Loop
+		int nTotalMatches = 0;
+		for (size_t i = 0; i < loop.mvpCurrentMatchedPoints.size(); i++)
+		{
+			if (loop.mvpCurrentMatchedPoints[i])
+				nTotalMatches++;
+		}
+
+		if (nTotalMatches >= 40)
+		{
+			for (int i = 0; i < nInitialCandidates; i++)
+				if (mvpEnoughConsistentCandidates[i] != loop.mpMatchedKF)
+					mvpEnoughConsistentCandidates[i]->SetErase();
+			return true;
+		}
+		else
+		{
+			for (int i = 0; i < nInitialCandidates; i++)
+				mvpEnoughConsistentCandidates[i]->SetErase();
+			mpCurrentKF->SetErase();
+			return false;
+		}
+
+	}
+private:
+
+};
+
 class LoopClosingImpl : public LoopClosing
 {
 public:
@@ -48,10 +388,9 @@ public:
 
 	LoopClosingImpl(Map *pMap, KeyFrameDatabase *pDB, ORBVocabulary *pVoc, const bool bFixScale)
 		: mbResetRequested(false), mbFinishRequested(false), mbFinished(true), mpMap(pMap),
-		mpKeyFrameDB(pDB), mpORBVocabulary(pVoc), mpMatchedKF(NULL), mLastLoopKFid(0), mbRunningGBA(false), mbFinishedGBA(true),
-		mbStopGBA(false), mpThreadGBA(NULL), mbFixScale(bFixScale), mnFullBAIdx(0)
+		mLastLoopKFid(0), mbRunningGBA(false), mbFinishedGBA(true),
+		mbStopGBA(false), mpThreadGBA(NULL), mbFixScale(bFixScale), mnFullBAIdx(0), detector_(pDB, pVoc, bFixScale)
 	{
-		mnCovisibilityConsistencyTh = 3;
 	}
 
 	void SetTracker(Tracking *pTracker) override
@@ -74,17 +413,36 @@ public:
 			// Check if there are keyframes in the queue
 			if (CheckNewKeyFrames())
 			{
-				// Detect loop candidates and check covisibility consistency
-				if (DetectLoop())
+				KeyFrame* mpCurrentKF = nullptr;
 				{
-					// Compute similarity transformation [sR|t]
-					// In the stereo/RGBD case s=1
-					if (ComputeSim3())
-					{
-						// Perform loop fusion and pose graph optimization
-						CorrectLoop();
-					}
+					unique_lock<mutex> lock(mMutexLoopQueue);
+					mpCurrentKF = mlpLoopKeyFrameQueue.front();
+					mlpLoopKeyFrameQueue.pop_front();
+					mpCurrentKF->SetNotErase();
 				}
+
+				// Detect loop candidates and check covisibility consistency
+				// Compute similarity transformation [sR|t]
+				// In the stereo/RGBD case s=1
+				LoopDetector::Loop loop;
+				const bool found = detector_.Detect(mpCurrentKF, loop, mLastLoopKFid);
+				if (found)
+				{
+					// Perform loop fusion and pose graph optimization
+					CorrectLoop(mpCurrentKF, loop);
+				}
+
+				//// Detect loop candidates and check covisibility consistency
+				//if (DetectLoop())
+				//{
+				//	// Compute similarity transformation [sR|t]
+				//	// In the stereo/RGBD case s=1
+				//	if (ComputeSim3())
+				//	{
+				//		// Perform loop fusion and pose graph optimization
+				//		CorrectLoop();
+				//	}
+				//}
 			}
 
 			ResetIfRequested();
@@ -261,6 +619,7 @@ public:
 		return(!mlpLoopKeyFrameQueue.empty());
 	}
 
+#if 0
 	bool DetectLoop()
 	{
 		{
@@ -559,8 +918,9 @@ public:
 		}
 
 	}
+#endif
 
-	void SearchAndFuse(const KeyFrameAndPose &CorrectedPosesMap)
+	void SearchAndFuse(const KeyFrameAndPose &CorrectedPosesMap, std::vector<MapPoint*>& mvpLoopMapPoints)
 	{
 		ORBmatcher matcher(0.8);
 
@@ -588,10 +948,15 @@ public:
 		}
 	}
 
-	void CorrectLoop()
+	void CorrectLoop(KeyFrame* mpCurrentKF, LoopDetector::Loop& loop)
 	{
 		cout << "Loop detected!" << endl;
 
+		KeyFrame* mpMatchedKF = loop.mpMatchedKF;
+		g2o::Sim3& mg2oScw = loop.mg2oScw;
+		std::vector<MapPoint*>& mvpCurrentMatchedPoints = loop.mvpCurrentMatchedPoints;
+		std::vector<MapPoint*>& mvpLoopMapPoints = loop.mvpLoopMapPoints;
+		
 		// Send a stop signal to Local Mapping
 		// Avoid new keyframes are inserted while correcting the loop
 		mpLocalMapper->RequestStop();
@@ -621,6 +986,7 @@ public:
 		mpCurrentKF->UpdateConnections();
 
 		// Retrive keyframes connected to the current keyframe and compute corrected Sim3 pose by propagation
+		std::vector<KeyFrame*> mvpCurrentConnectedKFs;
 		mvpCurrentConnectedKFs = mpCurrentKF->GetVectorCovisibleKeyFrames();
 		mvpCurrentConnectedKFs.push_back(mpCurrentKF);
 
@@ -728,7 +1094,7 @@ public:
 		// Project MapPoints observed in the neighborhood of the loop keyframe
 		// into the current keyframe and neighbors using corrected poses.
 		// Fuse duplications.
-		SearchAndFuse(CorrectedSim3);
+		SearchAndFuse(CorrectedSim3, mvpLoopMapPoints);
 
 
 		// After the MapPoint fusion, new links in the covisibility graph will appear attaching both sides of the loop
@@ -806,19 +1172,19 @@ private:
 
 	Map* mpMap;
 	Tracking* mpTracker;
-
-	KeyFrameDatabase* mpKeyFrameDB;
-	ORBVocabulary* mpORBVocabulary;
-
 	LocalMapping *mpLocalMapper;
+
+	//KeyFrameDatabase* mpKeyFrameDB;
+	//ORBVocabulary* mpORBVocabulary;
 
 	std::list<KeyFrame*> mlpLoopKeyFrameQueue;
 
 	// Loop detector parameters
-	float mnCovisibilityConsistencyTh;
+	//float mnCovisibilityConsistencyTh;
 
 	// Loop detector variables
-	KeyFrame* mpCurrentKF;
+	LoopDetector detector_;
+	/*KeyFrame* mpCurrentKF;
 	KeyFrame* mpMatchedKF;
 	std::vector<ConsistentGroup> mvConsistentGroups;
 	std::vector<KeyFrame*> mvpEnoughConsistentCandidates;
@@ -826,7 +1192,7 @@ private:
 	std::vector<MapPoint*> mvpCurrentMatchedPoints;
 	std::vector<MapPoint*> mvpLoopMapPoints;
 	cv::Mat mScw;
-	g2o::Sim3 mg2oScw;
+	g2o::Sim3 mg2oScw;*/
 
 	long unsigned int mLastLoopKFid;
 
