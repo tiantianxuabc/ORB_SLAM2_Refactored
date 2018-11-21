@@ -77,8 +77,6 @@ public:
 
 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-protected:
-
 	bool CheckNewKeyFrames();
 
 	bool DetectLoop();
@@ -90,11 +88,17 @@ protected:
 	void CorrectLoop();
 
 	void ResetIfRequested();
+
+	bool CheckFinish();
+
+	void SetFinish();
+
+private:
+
 	bool mbResetRequested;
 	std::mutex mMutexReset;
 
-	bool CheckFinish();
-	void SetFinish();
+	
 	bool mbFinishRequested;
 	bool mbFinished;
 	std::mutex mMutexFinish;
