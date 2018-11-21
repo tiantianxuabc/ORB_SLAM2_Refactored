@@ -601,20 +601,20 @@ private:
 					continue;
 
 				// Triangulation is succesfull
-				MapPoint* pMP = new MapPoint(x3D, keyframe1, map_);
+				MapPoint* mappoint = new MapPoint(x3D, keyframe1, map_);
 
-				pMP->AddObservation(keyframe1, idx1);
-				pMP->AddObservation(keyframe2, idx2);
+				mappoint->AddObservation(keyframe1, idx1);
+				mappoint->AddObservation(keyframe2, idx2);
 
-				keyframe1->AddMapPoint(pMP, idx1);
-				keyframe2->AddMapPoint(pMP, idx2);
+				keyframe1->AddMapPoint(mappoint, idx1);
+				keyframe2->AddMapPoint(mappoint, idx2);
 
-				pMP->ComputeDistinctiveDescriptors();
+				mappoint->ComputeDistinctiveDescriptors();
 
-				pMP->UpdateNormalAndDepth();
+				mappoint->UpdateNormalAndDepth();
 
-				map_->AddMapPoint(pMP);
-				recentAddedMapPoints_.push_back(pMP);
+				map_->AddMapPoint(mappoint);
+				recentAddedMapPoints_.push_back(mappoint);
 			}
 		}
 	}
