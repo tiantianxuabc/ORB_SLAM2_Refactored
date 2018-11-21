@@ -54,18 +54,18 @@ public:
 		mnCovisibilityConsistencyTh = 3;
 	}
 
-	void SetTracker(Tracking *pTracker)
+	void SetTracker(Tracking *pTracker) override
 	{
 		mpTracker = pTracker;
 	}
 
-	void SetLocalMapper(LocalMapping *pLocalMapper)
+	void SetLocalMapper(LocalMapping *pLocalMapper) override
 	{
 		mpLocalMapper = pLocalMapper;
 	}
 
 	// Main function
-	void Run()
+	void Run() override
 	{
 		mbFinished = false;
 
@@ -98,14 +98,14 @@ public:
 		SetFinish();
 	}
 
-	void InsertKeyFrame(KeyFrame *pKF)
+	void InsertKeyFrame(KeyFrame *pKF) override
 	{
 		unique_lock<mutex> lock(mMutexLoopQueue);
 		if (pKF->mnId != 0)
 			mlpLoopKeyFrameQueue.push_back(pKF);
 	}
 
-	void RequestReset()
+	void RequestReset() override
 	{
 		{
 			unique_lock<mutex> lock(mMutexReset);
@@ -125,7 +125,7 @@ public:
 
 	// This function will run in a separate thread
 
-	void RunGlobalBundleAdjustment(unsigned long nLoopKF)
+	void RunGlobalBundleAdjustment(unsigned long nLoopKF) override
 	{
 		cout << "Starting Global Bundle Adjustment" << endl;
 
@@ -231,31 +231,31 @@ public:
 		}
 	}
 
-	bool isRunningGBA()
+	bool isRunningGBA() const override
 	{
 		unique_lock<std::mutex> lock(mMutexGBA);
 		return mbRunningGBA;
 	}
 
-	bool isFinishedGBA()
+	bool isFinishedGBA() const override
 	{
 		unique_lock<std::mutex> lock(mMutexGBA);
 		return mbFinishedGBA;
 	}
 
-	void RequestFinish()
+	void RequestFinish() override
 	{
 		unique_lock<mutex> lock(mMutexFinish);
 		mbFinishRequested = true;
 	}
 
-	bool isFinished()
+	bool isFinished() const override
 	{
 		unique_lock<mutex> lock(mMutexFinish);
 		return mbFinished;
 	}
 
-	bool CheckNewKeyFrames()
+	bool CheckNewKeyFrames() const
 	{
 		unique_lock<mutex> lock(mMutexLoopQueue);
 		return(!mlpLoopKeyFrameQueue.empty());
@@ -784,7 +784,7 @@ public:
 		}
 	}
 
-	bool CheckFinish()
+	bool CheckFinish() const
 	{
 		unique_lock<mutex> lock(mMutexFinish);
 		return mbFinishRequested;
@@ -801,12 +801,8 @@ public:
 private:
 
 	bool mbResetRequested;
-	std::mutex mMutexReset;
-
-
 	bool mbFinishRequested;
 	bool mbFinished;
-	std::mutex mMutexFinish;
 
 	Map* mpMap;
 	Tracking* mpTracker;
@@ -817,8 +813,6 @@ private:
 	LocalMapping *mpLocalMapper;
 
 	std::list<KeyFrame*> mlpLoopKeyFrameQueue;
-
-	std::mutex mMutexLoopQueue;
 
 	// Loop detector parameters
 	float mnCovisibilityConsistencyTh;
@@ -840,14 +834,16 @@ private:
 	bool mbRunningGBA;
 	bool mbFinishedGBA;
 	bool mbStopGBA;
-	std::mutex mMutexGBA;
 	std::thread* mpThreadGBA;
 
 	// Fix scale in the stereo/RGB-D case
 	bool mbFixScale;
-
-
 	bool mnFullBAIdx;
+
+	mutable std::mutex mMutexReset;
+	mutable std::mutex mMutexFinish;
+	mutable std::mutex mMutexLoopQueue;
+	mutable std::mutex mMutexGBA;
 };
 
 std::shared_ptr<LoopClosing> LoopClosing::Create(Map* pMap, KeyFrameDatabase* pDB, ORBVocabulary* pVoc, const bool bFixScale)

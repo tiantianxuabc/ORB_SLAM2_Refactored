@@ -55,12 +55,12 @@ public:
 	// This function will run in a separate thread
 	virtual void RunGlobalBundleAdjustment(unsigned long nLoopKF) = 0;
 
-	virtual bool isRunningGBA() = 0;
-	virtual bool isFinishedGBA() = 0;
+	virtual bool isRunningGBA() const = 0;
+	virtual bool isFinishedGBA() const = 0;
 
 	virtual void RequestFinish() = 0;
 
-	virtual bool isFinished() = 0;
+	virtual bool isFinished() const = 0;
 };
 
 } // namespace ORB_SLAM
