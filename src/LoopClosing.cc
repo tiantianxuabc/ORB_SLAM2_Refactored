@@ -879,7 +879,7 @@ public:
 			resetRequested_ = true;
 		}
 
-		while (1)
+		while (true)
 		{
 			{
 				unique_lock<mutex> lock2(mutexReset_);
