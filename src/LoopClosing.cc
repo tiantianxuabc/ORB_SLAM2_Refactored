@@ -72,44 +72,38 @@ public:
 		return true;
 	}
 
-	bool DetectLoop(KeyFrame* mpCurrentKF, std::vector<KeyFrame*>& mvpEnoughConsistentCandidates, int mLastLoopKFid)
+	bool DetectLoop(KeyFrame* currentKF, std::vector<KeyFrame*>& loopKFCandidates, int lastLoopKFId)
 	{
 		//If the map contains less than 10 KF or less than 10 KF have passed from last loop detection
-		if (mpCurrentKF->mnId < mLastLoopKFid + 10)
+		if (currentKF->mnId < lastLoopKFId + 10)
 		{
-			keyFrameDB_->add(mpCurrentKF);
-			mpCurrentKF->SetErase();
+			keyFrameDB_->add(currentKF);
+			currentKF->SetErase();
 			return false;
 		}
 
 		// Compute reference BoW similarity score
 		// This is the lowest score to a connected keyframe in the covisibility graph
 		// We will impose loop candidates to have a higher similarity than this
-		const vector<KeyFrame*> vpConnectedKeyFrames = mpCurrentKF->GetVectorCovisibleKeyFrames();
-		const DBoW2::BowVector &CurrentBowVec = mpCurrentKF->mBowVec;
-		float minScore = 1;
-		for (size_t i = 0; i < vpConnectedKeyFrames.size(); i++)
+		float minScore = 1.f;
+		for (KeyFrame* neighborKF : currentKF->GetVectorCovisibleKeyFrames())
 		{
-			KeyFrame* pKF = vpConnectedKeyFrames[i];
-			if (pKF->isBad())
+			if (neighborKF->isBad())
 				continue;
-			const DBoW2::BowVector &BowVec = pKF->mBowVec;
 
-			float score = voc_->score(CurrentBowVec, BowVec);
-
-			if (score < minScore)
-				minScore = score;
+			const float score = voc_->score(currentKF->mBowVec, neighborKF->mBowVec);
+			minScore = std::min(minScore, score);
 		}
 
 		// Query the database imposing the minimum score
-		vector<KeyFrame*> vpCandidateKFs = keyFrameDB_->DetectLoopCandidates(mpCurrentKF, minScore);
+		vector<KeyFrame*> vpCandidateKFs = keyFrameDB_->DetectLoopCandidates(currentKF, minScore);
 
 		// If there are no loop candidates, just add new keyframe and return false
 		if (vpCandidateKFs.empty())
 		{
-			keyFrameDB_->add(mpCurrentKF);
+			keyFrameDB_->add(currentKF);
 			mvConsistentGroups.clear();
-			mpCurrentKF->SetErase();
+			currentKF->SetErase();
 			return false;
 		}
 
@@ -117,7 +111,7 @@ public:
 		// Each candidate expands a covisibility group (keyframes connected to the loop candidate in the covisibility graph)
 		// A group is consistent with a previous group if they share at least a keyframe
 		// We must detect a consistent loop in several consecutive keyframes to accept it
-		mvpEnoughConsistentCandidates.clear();
+		loopKFCandidates.clear();
 
 		vector<ConsistentGroup> vCurrentConsistentGroups;
 		vector<bool> vbConsistentGroup(mvConsistentGroups.size(), false);
@@ -157,7 +151,7 @@ public:
 					}
 					if (nCurrentConsistency >= minConsistency_ && !bEnoughConsistent)
 					{
-						mvpEnoughConsistentCandidates.push_back(pCandidateKF);
+						loopKFCandidates.push_back(pCandidateKF);
 						bEnoughConsistent = true; //this avoid to insert the same candidate more than once
 					}
 				}
@@ -176,11 +170,11 @@ public:
 
 
 		// Add Current Keyframe to database
-		keyFrameDB_->add(mpCurrentKF);
+		keyFrameDB_->add(currentKF);
 
-		if (mvpEnoughConsistentCandidates.empty())
+		if (loopKFCandidates.empty())
 		{
-			mpCurrentKF->SetErase();
+			currentKF->SetErase();
 			return false;
 		}
 		else
@@ -188,7 +182,7 @@ public:
 			return true;
 		}
 
-		mpCurrentKF->SetErase();
+		currentKF->SetErase();
 		return false;
 	}
 
