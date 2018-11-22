@@ -79,13 +79,6 @@ public:
 
 	bool DetectLoop(KeyFrame* mpCurrentKF, std::vector<KeyFrame*>& mvpEnoughConsistentCandidates, int mLastLoopKFid)
 	{
-		/*{
-			unique_lock<mutex> lock(mMutexLoopQueue);
-			mpCurrentKF = mlpLoopKeyFrameQueue.front();
-			mlpLoopKeyFrameQueue.pop_front();
-			mpCurrentKF->SetNotErase();
-		}*/
-
 		//If the map contains less than 10 KF or less than 10 KF have passed from last loop detection
 		if (mpCurrentKF->mnId < mLastLoopKFid + 10)
 		{
