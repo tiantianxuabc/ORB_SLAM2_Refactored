@@ -831,7 +831,7 @@ public:
 	{
 		mbFinished = false;
 
-		while (1)
+		while (true)
 		{
 			// Check if there are keyframes in the queue
 			if (CheckNewKeyFrames())
