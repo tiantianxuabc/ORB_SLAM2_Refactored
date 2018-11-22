@@ -411,11 +411,11 @@ private:
 	std::thread* thread_;
 };
 
-class GlobalBundleAdjustmentThread
+class GlobalBA
 {
 public:
 
-	GlobalBundleAdjustmentThread(Map* pMap) : mpMap(pMap), mpLocalMapper(nullptr), mbRunningGBA(false),
+	GlobalBA(Map* pMap) : mpMap(pMap), mpLocalMapper(nullptr), mbRunningGBA(false),
 		mbFinishedGBA(true), mbStopGBA(false), mnFullBAIdx(0) {}
 
 	void SetLocalMapper(LocalMapping *pLocalMapper)
@@ -535,7 +535,7 @@ public:
 		mbRunningGBA = true;
 		mbFinishedGBA = false;
 		mbStopGBA = false;
-		mpThreadGBA.Reset(&GlobalBundleAdjustmentThread::_Run, this, nLoopKF);
+		mpThreadGBA.Reset(&GlobalBA::_Run, this, nLoopKF);
 	}
 
 	void Stop()
@@ -571,123 +571,25 @@ private:
 	ReusableThread mpThreadGBA;
 };
 
-class LoopClosingImpl : public LoopClosing
+class LoopCorrector
 {
+
+private:
+
+	Map* mpMap;
+	LocalMapping* mpLocalMapper;
+	GlobalBA* mGBA;
+	// Fix scale in the stereo/RGB-D case
+	bool mbFixScale;
+
 public:
 
-	typedef pair<set<KeyFrame*>, int> ConsistentGroup;
+	LoopCorrector(Map* pMap, GlobalBA* pGBA, bool bFixScale)
+		: mpMap(pMap), mGBA(pGBA), mbFixScale(bFixScale) {}
 
-public:
-
-	LoopClosingImpl(Map *pMap, KeyFrameDatabase *pDB, ORBVocabulary *pVoc, const bool bFixScale)
-		: mbResetRequested(false), mbFinishRequested(false), mbFinished(true), mpMap(pMap),
-		mLastLoopKFid(0), mbFixScale(bFixScale), detector_(pDB, pVoc, bFixScale), mGBA(pMap)
-	{
-	}
-
-	void SetTracker(Tracking *pTracker) override
-	{
-		mpTracker = pTracker;
-	}
-
-	void SetLocalMapper(LocalMapping *pLocalMapper) override
+	void SetLocalMapper(LocalMapping *pLocalMapper)
 	{
 		mpLocalMapper = pLocalMapper;
-		mGBA.SetLocalMapper(pLocalMapper);
-	}
-
-	// Main function
-	void Run() override
-	{
-		mbFinished = false;
-
-		while (1)
-		{
-			// Check if there are keyframes in the queue
-			if (CheckNewKeyFrames())
-			{
-				KeyFrame* mpCurrentKF = nullptr;
-				{
-					unique_lock<mutex> lock(mMutexLoopQueue);
-					mpCurrentKF = mlpLoopKeyFrameQueue.front();
-					mlpLoopKeyFrameQueue.pop_front();
-					mpCurrentKF->SetNotErase();
-				}
-
-				// Detect loop candidates and check covisibility consistency
-				// Compute similarity transformation [sR|t]
-				// In the stereo/RGBD case s=1
-				LoopDetector::Loop loop;
-				const bool found = detector_.Detect(mpCurrentKF, loop, mLastLoopKFid);
-				if (found)
-				{
-					// Perform loop fusion and pose graph optimization
-					CorrectLoop(mpCurrentKF, loop);
-				}
-			}
-
-			ResetIfRequested();
-
-			if (CheckFinish())
-				break;
-
-			usleep(5000);
-		}
-
-		SetFinish();
-	}
-
-	void InsertKeyFrame(KeyFrame *pKF) override
-	{
-		unique_lock<mutex> lock(mMutexLoopQueue);
-		if (pKF->mnId != 0)
-			mlpLoopKeyFrameQueue.push_back(pKF);
-	}
-
-	void RequestReset() override
-	{
-		{
-			unique_lock<mutex> lock(mMutexReset);
-			mbResetRequested = true;
-		}
-
-		while (1)
-		{
-			{
-				unique_lock<mutex> lock2(mMutexReset);
-				if (!mbResetRequested)
-					break;
-			}
-			usleep(5000);
-		}
-	}
-
-	bool isRunningGBA() const override
-	{
-		return mGBA.isRunningGBA();
-	}
-
-	bool isFinishedGBA() const override
-	{
-		return mGBA.isFinishedGBA();
-	}
-
-	void RequestFinish() override
-	{
-		unique_lock<mutex> lock(mMutexFinish);
-		mbFinishRequested = true;
-	}
-
-	bool isFinished() const override
-	{
-		unique_lock<mutex> lock(mMutexFinish);
-		return mbFinished;
-	}
-
-	bool CheckNewKeyFrames() const
-	{
-		unique_lock<mutex> lock(mMutexLoopQueue);
-		return(!mlpLoopKeyFrameQueue.empty());
 	}
 
 	void SearchAndFuse(const KeyFrameAndPose &CorrectedPosesMap, std::vector<MapPoint*>& mvpLoopMapPoints)
@@ -718,7 +620,7 @@ public:
 		}
 	}
 
-	void CorrectLoop(KeyFrame* mpCurrentKF, LoopDetector::Loop& loop)
+	void Correct(KeyFrame* mpCurrentKF, LoopDetector::Loop& loop)
 	{
 		cout << "Loop detected!" << endl;
 
@@ -732,11 +634,11 @@ public:
 		mpLocalMapper->RequestStop();
 
 		// If a Global Bundle Adjustment is running, abort it
-		if (mGBA.isRunningGBA())
+		if (mGBA->isRunningGBA())
 		{
-			mGBA.Stop();
+			mGBA->Stop();
 		}
-		
+
 		// Wait until Local Mapping has effectively stopped
 		while (!mpLocalMapper->isStopped())
 		{
@@ -889,12 +791,134 @@ public:
 		mpCurrentKF->AddLoopEdge(mpMatchedKF);
 
 		// Launch a new thread to perform Global Bundle Adjustment
-		mGBA.Run(mpCurrentKF->mnId);
-		
+		mGBA->Run(mpCurrentKF->mnId);
+
 		// Loop closed. Release Local Mapping.
 		mpLocalMapper->Release();
 
-		mLastLoopKFid = mpCurrentKF->mnId;
+		//mLastLoopKFid = mpCurrentKF->mnId;
+	}
+};
+
+class LoopClosingImpl : public LoopClosing
+{
+public:
+
+	typedef pair<set<KeyFrame*>, int> ConsistentGroup;
+
+public:
+
+	LoopClosingImpl(Map *pMap, KeyFrameDatabase *pDB, ORBVocabulary *pVoc, const bool bFixScale)
+		: mbResetRequested(false), mbFinishRequested(false), mbFinished(true), mLastLoopKFid(0),
+		detector_(pDB, pVoc, bFixScale), mGBA(pMap), corrector_(pMap, &mGBA, bFixScale)
+	{
+	}
+
+	void SetTracker(Tracking *pTracker) override
+	{
+		mpTracker = pTracker;
+	}
+
+	void SetLocalMapper(LocalMapping *pLocalMapper) override
+	{
+		mpLocalMapper = pLocalMapper;
+		mGBA.SetLocalMapper(pLocalMapper);
+		corrector_.SetLocalMapper(pLocalMapper);
+	}
+
+	// Main function
+	void Run() override
+	{
+		mbFinished = false;
+
+		while (1)
+		{
+			// Check if there are keyframes in the queue
+			if (CheckNewKeyFrames())
+			{
+				KeyFrame* mpCurrentKF = nullptr;
+				{
+					unique_lock<mutex> lock(mMutexLoopQueue);
+					mpCurrentKF = mlpLoopKeyFrameQueue.front();
+					mlpLoopKeyFrameQueue.pop_front();
+					mpCurrentKF->SetNotErase();
+				}
+
+				// Detect loop candidates and check covisibility consistency
+				// Compute similarity transformation [sR|t]
+				// In the stereo/RGBD case s=1
+				LoopDetector::Loop loop;
+				const bool found = detector_.Detect(mpCurrentKF, loop, mLastLoopKFid);
+				if (found)
+				{
+					// Perform loop fusion and pose graph optimization
+					corrector_.Correct(mpCurrentKF, loop);
+					mLastLoopKFid = mpCurrentKF->mnId;
+				}
+			}
+
+			ResetIfRequested();
+
+			if (CheckFinish())
+				break;
+
+			usleep(5000);
+		}
+
+		SetFinish();
+	}
+
+	void InsertKeyFrame(KeyFrame *pKF) override
+	{
+		unique_lock<mutex> lock(mMutexLoopQueue);
+		if (pKF->mnId != 0)
+			mlpLoopKeyFrameQueue.push_back(pKF);
+	}
+
+	void RequestReset() override
+	{
+		{
+			unique_lock<mutex> lock(mMutexReset);
+			mbResetRequested = true;
+		}
+
+		while (1)
+		{
+			{
+				unique_lock<mutex> lock2(mMutexReset);
+				if (!mbResetRequested)
+					break;
+			}
+			usleep(5000);
+		}
+	}
+
+	bool isRunningGBA() const override
+	{
+		return mGBA.isRunningGBA();
+	}
+
+	bool isFinishedGBA() const override
+	{
+		return mGBA.isFinishedGBA();
+	}
+
+	void RequestFinish() override
+	{
+		unique_lock<mutex> lock(mMutexFinish);
+		mbFinishRequested = true;
+	}
+
+	bool isFinished() const override
+	{
+		unique_lock<mutex> lock(mMutexFinish);
+		return mbFinished;
+	}
+
+	bool CheckNewKeyFrames() const
+	{
+		unique_lock<mutex> lock(mMutexLoopQueue);
+		return(!mlpLoopKeyFrameQueue.empty());
 	}
 
 	void ResetIfRequested()
@@ -928,7 +952,7 @@ private:
 	bool mbFinishRequested;
 	bool mbFinished;
 
-	Map* mpMap;
+	//Map* mpMap;
 	Tracking* mpTracker;
 	LocalMapping *mpLocalMapper;
 
@@ -940,10 +964,11 @@ private:
 	long unsigned int mLastLoopKFid;
 
 	// Variables related to Global Bundle Adjustment
-	GlobalBundleAdjustmentThread mGBA;
+	LoopCorrector corrector_;
+	GlobalBA mGBA;
 	
 	// Fix scale in the stereo/RGB-D case
-	bool mbFixScale;
+	//bool mbFixScale;
 	
 	mutable std::mutex mMutexReset;
 	mutable std::mutex mMutexFinish;
