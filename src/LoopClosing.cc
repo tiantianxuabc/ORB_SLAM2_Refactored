@@ -838,24 +838,24 @@ public:
 			// Check if there are keyframes in the queue
 			if (CheckNewKeyFrames())
 			{
-				KeyFrame* mpCurrentKF = nullptr;
+				KeyFrame* currentKF = nullptr;
 				{
 					LOCK_MUTEX_LOOP_QUEUE();
-					mpCurrentKF = loopKeyFrameQueue_.front();
+					currentKF = loopKeyFrameQueue_.front();
 					loopKeyFrameQueue_.pop_front();
-					mpCurrentKF->SetNotErase();
+					currentKF->SetNotErase();
 				}
 
 				// Detect loop candidates and check covisibility consistency
 				// Compute similarity transformation [sR|t]
 				// In the stereo/RGBD case s=1
 				LoopDetector::Loop loop;
-				const bool found = detector_.Detect(mpCurrentKF, loop, lastLoopKFId_);
+				const bool found = detector_.Detect(currentKF, loop, lastLoopKFId_);
 				if (found)
 				{
 					// Perform loop fusion and pose graph optimization
-					corrector_.Correct(mpCurrentKF, loop);
-					lastLoopKFId_ = mpCurrentKF->mnId;
+					corrector_.Correct(currentKF, loop);
+					lastLoopKFId_ = currentKF->mnId;
 				}
 			}
 
