@@ -35,6 +35,11 @@
 #include "LocalMapping.h"
 #include "Usleep.h"
 
+#define LOCK_MUTEX_LOOP_QUEUE() std::unique_lock<std::mutex> lock1(mutexLoopQueue_);
+#define LOCK_MUTEX_FINISH()     std::unique_lock<std::mutex> lock2(mutexFinish_);
+#define LOCK_MUTEX_RESET()      std::unique_lock<std::mutex> lock3(mutexReset_);
+#define LOCK_MUTEX_GLOBAL_BA()  std::unique_lock<std::mutex> lock4(mMutexGBA);
+
 namespace ORB_SLAM2
 {
 
@@ -436,7 +441,7 @@ public:
 		// not included in the Global BA and they are not consistent with the updated map.
 		// We need to propagate the correction through the spanning tree
 		{
-			unique_lock<mutex> lock(mMutexGBA);
+			LOCK_MUTEX_GLOBAL_BA();
 			if (idx != mnFullBAIdx)
 				return;
 
@@ -540,7 +545,7 @@ public:
 
 	void Stop()
 	{
-		unique_lock<mutex> lock(mMutexGBA);
+		LOCK_MUTEX_GLOBAL_BA();
 		mbStopGBA = true;
 
 		mnFullBAIdx++;
@@ -835,7 +840,7 @@ public:
 			{
 				KeyFrame* mpCurrentKF = nullptr;
 				{
-					unique_lock<mutex> lock(mutexLoopQueue_);
+					LOCK_MUTEX_LOOP_QUEUE();
 					mpCurrentKF = loopKeyFrameQueue_.front();
 					loopKeyFrameQueue_.pop_front();
 					mpCurrentKF->SetNotErase();
@@ -867,7 +872,7 @@ public:
 
 	void InsertKeyFrame(KeyFrame* keyframe) override
 	{
-		unique_lock<mutex> lock(mutexLoopQueue_);
+		LOCK_MUTEX_LOOP_QUEUE();
 		if (keyframe->mnId != 0)
 			loopKeyFrameQueue_.push_back(keyframe);
 	}
@@ -875,14 +880,14 @@ public:
 	void RequestReset() override
 	{
 		{
-			unique_lock<mutex> lock(mutexReset_);
+			LOCK_MUTEX_RESET();
 			resetRequested_ = true;
 		}
 
 		while (true)
 		{
 			{
-				unique_lock<mutex> lock2(mutexReset_);
+				LOCK_MUTEX_RESET();
 				if (!resetRequested_)
 					break;
 			}
@@ -902,25 +907,25 @@ public:
 
 	void RequestFinish() override
 	{
-		unique_lock<mutex> lock(mutexFinish_);
+		LOCK_MUTEX_FINISH();
 		finishRequested_ = true;
 	}
 
 	bool isFinished() const override
 	{
-		unique_lock<mutex> lock(mutexFinish_);
+		LOCK_MUTEX_FINISH();
 		return finished_;
 	}
 
 	bool CheckNewKeyFrames() const
 	{
-		unique_lock<mutex> lock(mutexLoopQueue_);
+		LOCK_MUTEX_LOOP_QUEUE();
 		return(!loopKeyFrameQueue_.empty());
 	}
 
 	void ResetIfRequested()
 	{
-		unique_lock<mutex> lock(mutexReset_);
+		LOCK_MUTEX_RESET();
 		if (resetRequested_)
 		{
 			loopKeyFrameQueue_.clear();
@@ -931,13 +936,13 @@ public:
 
 	bool CheckFinish() const
 	{
-		unique_lock<mutex> lock(mutexFinish_);
+		LOCK_MUTEX_FINISH();
 		return finishRequested_;
 	}
 
 	void SetFinish()
 	{
-		unique_lock<mutex> lock(mutexFinish_);
+		LOCK_MUTEX_FINISH();
 		finished_ = true;
 	}
 
