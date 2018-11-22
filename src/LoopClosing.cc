@@ -810,7 +810,7 @@ class LoopClosingImpl : public LoopClosing
 
 public:
 
-	LoopClosingImpl(Map *map, KeyFrameDatabase* keyframeDB, ORBVocabulary *voc, const bool fixScale)
+	LoopClosingImpl(Map *map, KeyFrameDatabase* keyframeDB, ORBVocabulary *voc, bool fixScale)
 		: resetRequested_(false), finishRequested_(false), finished_(true), lastLoopKFId_(0),
 		detector_(keyframeDB, voc, fixScale), GBA_(map), corrector_(map, &GBA_, fixScale)
 	{
@@ -973,9 +973,9 @@ private:
 	mutable std::mutex mutexLoopQueue_;
 };
 
-std::shared_ptr<LoopClosing> LoopClosing::Create(Map* pMap, KeyFrameDatabase* pDB, ORBVocabulary* pVoc, const bool bFixScale)
+std::shared_ptr<LoopClosing> LoopClosing::Create(Map* map, KeyFrameDatabase* keyframeDB, ORBVocabulary* voc, bool fixScale)
 {
-	return std::make_shared<LoopClosingImpl>(pMap, pDB, pVoc, bFixScale);
+	return std::make_shared<LoopClosingImpl>(map, keyframeDB, voc, fixScale);
 }
 
 } //namespace ORB_SLAM

@@ -39,21 +39,18 @@ class LoopClosing
 
 public:
 
-	static std::shared_ptr<LoopClosing> Create(Map* pMap, KeyFrameDatabase* pDB, ORBVocabulary* pVoc, const bool bFixScale);
+	static std::shared_ptr<LoopClosing> Create(Map* map, KeyFrameDatabase* keyframeDB, ORBVocabulary* voc, bool fixScale);
 	
-	virtual void SetTracker(Tracking* pTracker) = 0;
+	virtual void SetTracker(Tracking* tracker) = 0;
 
-	virtual void SetLocalMapper(LocalMapping* pLocalMapper) = 0;
+	virtual void SetLocalMapper(LocalMapping* localMapper) = 0;
 
 	// Main function
 	virtual void Run() = 0;
 
-	virtual void InsertKeyFrame(KeyFrame *pKF) = 0;
+	virtual void InsertKeyFrame(KeyFrame* keyframe) = 0;
 
 	virtual void RequestReset() = 0;
-
-	// This function will run in a separate thread
-	//virtual void RunGlobalBundleAdjustment(unsigned long nLoopKF) = 0;
 
 	virtual bool isRunningGBA() const = 0;
 	virtual bool isFinishedGBA() const = 0;
