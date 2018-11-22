@@ -46,16 +46,6 @@ namespace ORB_SLAM2
 class LoopDetector
 {
 
-private:
-
-	using ConsistentGroup = std::pair<std::set<KeyFrame*>, int>;
-
-	KeyFrameDatabase* mpKeyFrameDB;
-	ORBVocabulary* mpORBVocabulary;
-	std::vector<ConsistentGroup> mvConsistentGroups;
-	bool mbFixScale;
-	int mnCovisibilityConsistencyTh;
-
 public:
 
 	struct Loop
@@ -67,16 +57,16 @@ public:
 		std::vector<MapPoint*> mvpLoopMapPoints;
 	};
 
-	LoopDetector(KeyFrameDatabase *pDB, ORBVocabulary *pVoc, bool bFixScale)
-		: mpKeyFrameDB(pDB), mpORBVocabulary(pVoc), mbFixScale(bFixScale), mnCovisibilityConsistencyTh(3) {}
+	LoopDetector(KeyFrameDatabase* keyframeDB, ORBVocabulary* voc, bool fixScale)
+		: keyFrameDB_(keyframeDB), voc_(voc), fixScale_(fixScale), minConsistency_(3) {}
 
-	bool Detect(KeyFrame* mpCurrentKF, Loop& loop, int mLastLoopKFid)
+	bool Detect(KeyFrame* currentKF, Loop& loop, int lastLoopKFId)
 	{
-		std::vector<KeyFrame*> mvpEnoughConsistentCandidates;
-		if (!DetectLoop(mpCurrentKF, mvpEnoughConsistentCandidates, mLastLoopKFid))
+		std::vector<KeyFrame*> loopKFCandidates;
+		if (!DetectLoop(currentKF, loopKFCandidates, lastLoopKFId))
 			return false;
 
-		if (!ComputeSim3(mpCurrentKF, mvpEnoughConsistentCandidates, loop))
+		if (!ComputeSim3(currentKF, loopKFCandidates, loop))
 			return false;
 
 		return true;
@@ -87,7 +77,7 @@ public:
 		//If the map contains less than 10 KF or less than 10 KF have passed from last loop detection
 		if (mpCurrentKF->mnId < mLastLoopKFid + 10)
 		{
-			mpKeyFrameDB->add(mpCurrentKF);
+			keyFrameDB_->add(mpCurrentKF);
 			mpCurrentKF->SetErase();
 			return false;
 		}
@@ -105,19 +95,19 @@ public:
 				continue;
 			const DBoW2::BowVector &BowVec = pKF->mBowVec;
 
-			float score = mpORBVocabulary->score(CurrentBowVec, BowVec);
+			float score = voc_->score(CurrentBowVec, BowVec);
 
 			if (score < minScore)
 				minScore = score;
 		}
 
 		// Query the database imposing the minimum score
-		vector<KeyFrame*> vpCandidateKFs = mpKeyFrameDB->DetectLoopCandidates(mpCurrentKF, minScore);
+		vector<KeyFrame*> vpCandidateKFs = keyFrameDB_->DetectLoopCandidates(mpCurrentKF, minScore);
 
 		// If there are no loop candidates, just add new keyframe and return false
 		if (vpCandidateKFs.empty())
 		{
-			mpKeyFrameDB->add(mpCurrentKF);
+			keyFrameDB_->add(mpCurrentKF);
 			mvConsistentGroups.clear();
 			mpCurrentKF->SetErase();
 			return false;
@@ -165,7 +155,7 @@ public:
 						vCurrentConsistentGroups.push_back(cg);
 						vbConsistentGroup[iG] = true; //this avoid to include the same group more than once
 					}
-					if (nCurrentConsistency >= mnCovisibilityConsistencyTh && !bEnoughConsistent)
+					if (nCurrentConsistency >= minConsistency_ && !bEnoughConsistent)
 					{
 						mvpEnoughConsistentCandidates.push_back(pCandidateKF);
 						bEnoughConsistent = true; //this avoid to insert the same candidate more than once
@@ -186,7 +176,7 @@ public:
 
 
 		// Add Current Keyframe to database
-		mpKeyFrameDB->add(mpCurrentKF);
+		keyFrameDB_->add(mpCurrentKF);
 
 		if (mvpEnoughConsistentCandidates.empty())
 		{
@@ -245,7 +235,7 @@ public:
 			}
 			else
 			{
-				Sim3Solver* pSolver = new Sim3Solver(mpCurrentKF, pKF, vvpMapPointMatches[i], mbFixScale);
+				Sim3Solver* pSolver = new Sim3Solver(mpCurrentKF, pKF, vvpMapPointMatches[i], fixScale_);
 				pSolver->SetRansacParameters(0.99, 20, 300);
 				vpSim3Solvers[i] = pSolver;
 			}
@@ -297,7 +287,7 @@ public:
 					matcher.SearchBySim3(mpCurrentKF, pKF, vpMapPointMatches, s, R, t, 7.5);
 
 					g2o::Sim3 gScm(Converter::toMatrix3d(R), Converter::toVector3d(t), s);
-					const int nInliers = Optimizer::OptimizeSim3(mpCurrentKF, pKF, vpMapPointMatches, gScm, 10, mbFixScale);
+					const int nInliers = Optimizer::OptimizeSim3(mpCurrentKF, pKF, vpMapPointMatches, gScm, 10, fixScale_);
 
 					// If optimization is succesful stop ransacs and continue
 					if (nInliers >= 20)
@@ -372,8 +362,16 @@ public:
 		}
 
 	}
+
 private:
 
+	using ConsistentGroup = std::pair<std::set<KeyFrame*>, int>;
+
+	KeyFrameDatabase* keyFrameDB_;
+	ORBVocabulary* voc_;
+	std::vector<ConsistentGroup> mvConsistentGroups;
+	bool fixScale_;
+	int minConsistency_;
 };
 
 class ReusableThread
