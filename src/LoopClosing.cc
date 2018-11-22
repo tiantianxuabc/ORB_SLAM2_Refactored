@@ -805,28 +805,28 @@ class LoopClosingImpl : public LoopClosing
 
 public:
 
-	LoopClosingImpl(Map *pMap, KeyFrameDatabase *pDB, ORBVocabulary *pVoc, const bool bFixScale)
-		: mbResetRequested(false), mbFinishRequested(false), mbFinished(true), mLastLoopKFid(0),
-		detector_(pDB, pVoc, bFixScale), mGBA(pMap), corrector_(pMap, &mGBA, bFixScale)
+	LoopClosingImpl(Map *map, KeyFrameDatabase* keyframeDB, ORBVocabulary *voc, const bool fixScale)
+		: resetRequested_(false), finishRequested_(false), finished_(true), lastLoopKFId_(0),
+		detector_(keyframeDB, voc, fixScale), GBA_(map), corrector_(map, &GBA_, fixScale)
 	{
 	}
 
-	void SetTracker(Tracking *pTracker) override
+	void SetTracker(Tracking* tracker) override
 	{
-		mpTracker = pTracker;
+		tracker_ = tracker;
 	}
 
-	void SetLocalMapper(LocalMapping *pLocalMapper) override
+	void SetLocalMapper(LocalMapping* localMapper) override
 	{
-		mpLocalMapper = pLocalMapper;
-		mGBA.SetLocalMapper(pLocalMapper);
-		corrector_.SetLocalMapper(pLocalMapper);
+		localMapper_ = localMapper;
+		GBA_.SetLocalMapper(localMapper);
+		corrector_.SetLocalMapper(localMapper);
 	}
 
 	// Main function
 	void Run() override
 	{
-		mbFinished = false;
+		finished_ = false;
 
 		while (true)
 		{
@@ -835,9 +835,9 @@ public:
 			{
 				KeyFrame* mpCurrentKF = nullptr;
 				{
-					unique_lock<mutex> lock(mMutexLoopQueue);
-					mpCurrentKF = mlpLoopKeyFrameQueue.front();
-					mlpLoopKeyFrameQueue.pop_front();
+					unique_lock<mutex> lock(mutexLoopQueue_);
+					mpCurrentKF = loopKeyFrameQueue_.front();
+					loopKeyFrameQueue_.pop_front();
 					mpCurrentKF->SetNotErase();
 				}
 
@@ -845,12 +845,12 @@ public:
 				// Compute similarity transformation [sR|t]
 				// In the stereo/RGBD case s=1
 				LoopDetector::Loop loop;
-				const bool found = detector_.Detect(mpCurrentKF, loop, mLastLoopKFid);
+				const bool found = detector_.Detect(mpCurrentKF, loop, lastLoopKFId_);
 				if (found)
 				{
 					// Perform loop fusion and pose graph optimization
 					corrector_.Correct(mpCurrentKF, loop);
-					mLastLoopKFid = mpCurrentKF->mnId;
+					lastLoopKFId_ = mpCurrentKF->mnId;
 				}
 			}
 
@@ -865,25 +865,25 @@ public:
 		SetFinish();
 	}
 
-	void InsertKeyFrame(KeyFrame *pKF) override
+	void InsertKeyFrame(KeyFrame* keyframe) override
 	{
-		unique_lock<mutex> lock(mMutexLoopQueue);
-		if (pKF->mnId != 0)
-			mlpLoopKeyFrameQueue.push_back(pKF);
+		unique_lock<mutex> lock(mutexLoopQueue_);
+		if (keyframe->mnId != 0)
+			loopKeyFrameQueue_.push_back(keyframe);
 	}
 
 	void RequestReset() override
 	{
 		{
-			unique_lock<mutex> lock(mMutexReset);
-			mbResetRequested = true;
+			unique_lock<mutex> lock(mutexReset_);
+			resetRequested_ = true;
 		}
 
 		while (1)
 		{
 			{
-				unique_lock<mutex> lock2(mMutexReset);
-				if (!mbResetRequested)
+				unique_lock<mutex> lock2(mutexReset_);
+				if (!resetRequested_)
 					break;
 			}
 			usleep(5000);
@@ -892,80 +892,80 @@ public:
 
 	bool isRunningGBA() const override
 	{
-		return mGBA.isRunningGBA();
+		return GBA_.isRunningGBA();
 	}
 
 	bool isFinishedGBA() const override
 	{
-		return mGBA.isFinishedGBA();
+		return GBA_.isFinishedGBA();
 	}
 
 	void RequestFinish() override
 	{
-		unique_lock<mutex> lock(mMutexFinish);
-		mbFinishRequested = true;
+		unique_lock<mutex> lock(mutexFinish_);
+		finishRequested_ = true;
 	}
 
 	bool isFinished() const override
 	{
-		unique_lock<mutex> lock(mMutexFinish);
-		return mbFinished;
+		unique_lock<mutex> lock(mutexFinish_);
+		return finished_;
 	}
 
 	bool CheckNewKeyFrames() const
 	{
-		unique_lock<mutex> lock(mMutexLoopQueue);
-		return(!mlpLoopKeyFrameQueue.empty());
+		unique_lock<mutex> lock(mutexLoopQueue_);
+		return(!loopKeyFrameQueue_.empty());
 	}
 
 	void ResetIfRequested()
 	{
-		unique_lock<mutex> lock(mMutexReset);
-		if (mbResetRequested)
+		unique_lock<mutex> lock(mutexReset_);
+		if (resetRequested_)
 		{
-			mlpLoopKeyFrameQueue.clear();
-			mLastLoopKFid = 0;
-			mbResetRequested = false;
+			loopKeyFrameQueue_.clear();
+			lastLoopKFId_ = 0;
+			resetRequested_ = false;
 		}
 	}
 
 	bool CheckFinish() const
 	{
-		unique_lock<mutex> lock(mMutexFinish);
-		return mbFinishRequested;
+		unique_lock<mutex> lock(mutexFinish_);
+		return finishRequested_;
 	}
 
 	void SetFinish()
 	{
-		unique_lock<mutex> lock(mMutexFinish);
-		mbFinished = true;
+		unique_lock<mutex> lock(mutexFinish_);
+		finished_ = true;
 	}
 
 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
 private:
 
-	bool mbResetRequested;
-	bool mbFinishRequested;
-	bool mbFinished;
+	bool resetRequested_;
+	bool finishRequested_;
+	bool finished_;
 
-	Tracking* mpTracker;
-	LocalMapping *mpLocalMapper;
+	Tracking* tracker_;
+	LocalMapping *localMapper_;
 
-	std::list<KeyFrame*> mlpLoopKeyFrameQueue;
+	std::list<KeyFrame*> loopKeyFrameQueue_;
 
 	// Loop detector variables
 	LoopDetector detector_;
 
-	long unsigned int mLastLoopKFid;
+	long unsigned int lastLoopKFId_;
 
 	// Variables related to Global Bundle Adjustment
 	LoopCorrector corrector_;
-	GlobalBA mGBA;
+	GlobalBA GBA_;
 
-	mutable std::mutex mMutexReset;
-	mutable std::mutex mMutexFinish;
-	mutable std::mutex mMutexLoopQueue;
+	mutable std::mutex mutexReset_;
+	mutable std::mutex mutexFinish_;
+	mutable std::mutex mutexLoopQueue_;
 };
 
 std::shared_ptr<LoopClosing> LoopClosing::Create(Map* pMap, KeyFrameDatabase* pDB, ORBVocabulary* pVoc, const bool bFixScale)
