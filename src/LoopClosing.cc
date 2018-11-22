@@ -802,9 +802,6 @@ public:
 
 class LoopClosingImpl : public LoopClosing
 {
-public:
-
-	typedef pair<set<KeyFrame*>, int> ConsistentGroup;
 
 public:
 
@@ -952,7 +949,6 @@ private:
 	bool mbFinishRequested;
 	bool mbFinished;
 
-	//Map* mpMap;
 	Tracking* mpTracker;
 	LocalMapping *mpLocalMapper;
 
@@ -966,10 +962,7 @@ private:
 	// Variables related to Global Bundle Adjustment
 	LoopCorrector corrector_;
 	GlobalBA mGBA;
-	
-	// Fix scale in the stereo/RGB-D case
-	//bool mbFixScale;
-	
+
 	mutable std::mutex mMutexReset;
 	mutable std::mutex mMutexFinish;
 	mutable std::mutex mMutexLoopQueue;
