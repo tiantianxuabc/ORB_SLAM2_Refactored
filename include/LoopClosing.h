@@ -53,7 +53,7 @@ public:
 	virtual void RequestReset() = 0;
 
 	// This function will run in a separate thread
-	virtual void RunGlobalBundleAdjustment(unsigned long nLoopKF) = 0;
+	//virtual void RunGlobalBundleAdjustment(unsigned long nLoopKF) = 0;
 
 	virtual bool isRunningGBA() const = 0;
 	virtual bool isFinishedGBA() const = 0;

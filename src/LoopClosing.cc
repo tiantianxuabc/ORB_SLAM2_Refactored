@@ -371,6 +371,207 @@ private:
 
 };
 
+class ReusableThread
+{
+public:
+
+	ReusableThread() : thread_(nullptr) {}
+	~ReusableThread() { Join(); }
+
+	template <class... Args>
+	void Reset(Args&&... args)
+	{
+		Detach();
+		thread_ = new std::thread(std::forward<Args>(args)...);
+	}
+
+	void Join()
+	{
+		if (!thread_ || !thread_->joinable())
+			return;
+		thread_->join();
+		Clear();
+	}
+
+	void Detach()
+	{
+		if (!thread_ || !thread_->joinable())
+			return;
+		thread_->detach();
+		Clear();
+	}
+
+	void Clear()
+	{
+		delete thread_;
+		thread_ = nullptr;
+	}
+
+private:
+	std::thread* thread_;
+};
+
+class GlobalBundleAdjustmentThread
+{
+
+private:
+
+	Map* mpMap;
+	LocalMapping* mpLocalMapper;
+	bool mbRunningGBA;
+	bool mbFinishedGBA;
+	bool mbStopGBA;
+	int mnFullBAIdx;
+	mutable std::mutex mMutexGBA;
+	ReusableThread mpThreadGBA;
+
+public:
+
+	GlobalBundleAdjustmentThread(Map* pMap) : mpMap(pMap), mpLocalMapper(nullptr), mbRunningGBA(false), 
+		mbFinishedGBA(true), mbStopGBA(false), mnFullBAIdx(0){}
+
+	void SetLocalMapper(LocalMapping *pLocalMapper)
+	{
+		mpLocalMapper = pLocalMapper;
+	}
+
+	// This function will run in a separate thread
+	void _Run(int nLoopKF)
+	{
+		cout << "Starting Global Bundle Adjustment" << endl;
+
+		int idx = mnFullBAIdx;
+		Optimizer::GlobalBundleAdjustemnt(mpMap, 10, &mbStopGBA, nLoopKF, false);
+
+		// Update all MapPoints and KeyFrames
+		// Local Mapping was active during BA, that means that there might be new keyframes
+		// not included in the Global BA and they are not consistent with the updated map.
+		// We need to propagate the correction through the spanning tree
+		{
+			unique_lock<mutex> lock(mMutexGBA);
+			if (idx != mnFullBAIdx)
+				return;
+
+			if (!mbStopGBA)
+			{
+				cout << "Global Bundle Adjustment finished" << endl;
+				cout << "Updating map ..." << endl;
+				mpLocalMapper->RequestStop();
+				// Wait until Local Mapping has effectively stopped
+
+				while (!mpLocalMapper->isStopped() && !mpLocalMapper->isFinished())
+				{
+					usleep(1000);
+				}
+
+				// Get Map Mutex
+				unique_lock<mutex> lock(mpMap->mMutexMapUpdate);
+
+				// Correct keyframes starting at map first keyframe
+				list<KeyFrame*> lpKFtoCheck(mpMap->mvpKeyFrameOrigins.begin(), mpMap->mvpKeyFrameOrigins.end());
+
+				while (!lpKFtoCheck.empty())
+				{
+					KeyFrame* pKF = lpKFtoCheck.front();
+					const set<KeyFrame*> sChilds = pKF->GetChilds();
+					cv::Mat Twc = pKF->GetPoseInverse();
+					for (set<KeyFrame*>::const_iterator sit = sChilds.begin(); sit != sChilds.end(); sit++)
+					{
+						KeyFrame* pChild = *sit;
+						if (pChild->mnBAGlobalForKF != nLoopKF)
+						{
+							cv::Mat Tchildc = pChild->GetPose()*Twc;
+							pChild->mTcwGBA = Tchildc*pKF->mTcwGBA;//*Tcorc*pKF->mTcwGBA;
+							pChild->mnBAGlobalForKF = nLoopKF;
+
+						}
+						lpKFtoCheck.push_back(pChild);
+					}
+
+					pKF->mTcwBefGBA = pKF->GetPose();
+					pKF->SetPose(pKF->mTcwGBA);
+					lpKFtoCheck.pop_front();
+				}
+
+				// Correct MapPoints
+				const vector<MapPoint*> vpMPs = mpMap->GetAllMapPoints();
+
+				for (size_t i = 0; i < vpMPs.size(); i++)
+				{
+					MapPoint* pMP = vpMPs[i];
+
+					if (pMP->isBad())
+						continue;
+
+					if (pMP->mnBAGlobalForKF == nLoopKF)
+					{
+						// If optimized by Global BA, just update
+						pMP->SetWorldPos(pMP->mPosGBA);
+					}
+					else
+					{
+						// Update according to the correction of its reference keyframe
+						KeyFrame* pRefKF = pMP->GetReferenceKeyFrame();
+
+						if (pRefKF->mnBAGlobalForKF != nLoopKF)
+							continue;
+
+						// Map to non-corrected camera
+						cv::Mat Rcw = pRefKF->mTcwBefGBA.rowRange(0, 3).colRange(0, 3);
+						cv::Mat tcw = pRefKF->mTcwBefGBA.rowRange(0, 3).col(3);
+						cv::Mat Xc = Rcw*pMP->GetWorldPos() + tcw;
+
+						// Backproject using corrected camera
+						cv::Mat Twc = pRefKF->GetPoseInverse();
+						cv::Mat Rwc = Twc.rowRange(0, 3).colRange(0, 3);
+						cv::Mat twc = Twc.rowRange(0, 3).col(3);
+
+						pMP->SetWorldPos(Rwc*Xc + twc);
+					}
+				}
+
+				mpMap->InformNewBigChange();
+
+				mpLocalMapper->Release();
+
+				cout << "Map updated!" << endl;
+			}
+
+			mbFinishedGBA = true;
+			mbRunningGBA = false;
+		}
+	}
+
+	void Run(int nLoopKF)
+	{
+		mbRunningGBA = true;
+		mbFinishedGBA = false;
+		mbStopGBA = false;
+		mpThreadGBA.Reset(&GlobalBundleAdjustmentThread::_Run, this, nLoopKF);
+	}
+
+	void Stop()
+	{
+		unique_lock<mutex> lock(mMutexGBA);
+		mbStopGBA = true;
+
+		mnFullBAIdx++;
+		mpThreadGBA.Detach();
+	}
+
+	bool isRunningGBA() const
+	{
+		unique_lock<std::mutex> lock(mMutexGBA);
+		return mbRunningGBA;
+	}
+
+	bool isFinishedGBA() const
+	{
+		unique_lock<std::mutex> lock(mMutexGBA);
+		return mbFinishedGBA;
+	}
+};
+
 class LoopClosingImpl : public LoopClosing
 {
 public:
@@ -381,8 +582,7 @@ public:
 
 	LoopClosingImpl(Map *pMap, KeyFrameDatabase *pDB, ORBVocabulary *pVoc, const bool bFixScale)
 		: mbResetRequested(false), mbFinishRequested(false), mbFinished(true), mpMap(pMap),
-		mLastLoopKFid(0), mbRunningGBA(false), mbFinishedGBA(true),
-		mbStopGBA(false), mpThreadGBA(NULL), mbFixScale(bFixScale), mnFullBAIdx(0), detector_(pDB, pVoc, bFixScale)
+		mLastLoopKFid(0), mbFixScale(bFixScale), detector_(pDB, pVoc, bFixScale), mGBA(pMap)
 	{
 	}
 
@@ -394,6 +594,7 @@ public:
 	void SetLocalMapper(LocalMapping *pLocalMapper) override
 	{
 		mpLocalMapper = pLocalMapper;
+		mGBA.SetLocalMapper(pLocalMapper);
 	}
 
 	// Main function
@@ -462,6 +663,7 @@ public:
 		}
 	}
 
+#if 0
 	// This function will run in a separate thread
 
 	void RunGlobalBundleAdjustment(unsigned long nLoopKF) override
@@ -569,17 +771,16 @@ public:
 			mbRunningGBA = false;
 		}
 	}
+#endif
 
 	bool isRunningGBA() const override
 	{
-		unique_lock<std::mutex> lock(mMutexGBA);
-		return mbRunningGBA;
+		return mGBA.isRunningGBA();
 	}
 
 	bool isFinishedGBA() const override
 	{
-		unique_lock<std::mutex> lock(mMutexGBA);
-		return mbFinishedGBA;
+		return mGBA.isFinishedGBA();
 	}
 
 	void RequestFinish() override
@@ -642,7 +843,11 @@ public:
 		mpLocalMapper->RequestStop();
 
 		// If a Global Bundle Adjustment is running, abort it
-		if (isRunningGBA())
+		if (mGBA.isRunningGBA())
+		{
+			mGBA.Stop();
+		}
+		/*if (isRunningGBA())
 		{
 			unique_lock<mutex> lock(mMutexGBA);
 			mbStopGBA = true;
@@ -654,7 +859,7 @@ public:
 				mpThreadGBA->detach();
 				delete mpThreadGBA;
 			}
-		}
+		}*/
 
 		// Wait until Local Mapping has effectively stopped
 		while (!mpLocalMapper->isStopped())
@@ -808,10 +1013,11 @@ public:
 		mpCurrentKF->AddLoopEdge(mpMatchedKF);
 
 		// Launch a new thread to perform Global Bundle Adjustment
-		mbRunningGBA = true;
+		mGBA.Run(mpCurrentKF->mnId);
+		/*mbRunningGBA = true;
 		mbFinishedGBA = false;
 		mbStopGBA = false;
-		mpThreadGBA = new thread(&LoopClosingImpl::RunGlobalBundleAdjustment, this, mpCurrentKF->mnId);
+		mpThreadGBA = new thread(&LoopClosingImpl::RunGlobalBundleAdjustment, this, mpCurrentKF->mnId);*/
 
 		// Loop closed. Release Local Mapping.
 		mpLocalMapper->Release();
@@ -862,19 +1068,20 @@ private:
 	long unsigned int mLastLoopKFid;
 
 	// Variables related to Global Bundle Adjustment
-	bool mbRunningGBA;
+	GlobalBundleAdjustmentThread mGBA;
+	/*bool mbRunningGBA;
 	bool mbFinishedGBA;
 	bool mbStopGBA;
-	std::thread* mpThreadGBA;
+	std::thread* mpThreadGBA;*/
 
 	// Fix scale in the stereo/RGB-D case
 	bool mbFixScale;
-	bool mnFullBAIdx;
+	//bool mnFullBAIdx;
 
 	mutable std::mutex mMutexReset;
 	mutable std::mutex mMutexFinish;
 	mutable std::mutex mMutexLoopQueue;
-	mutable std::mutex mMutexGBA;
+	//mutable std::mutex mMutexGBA;
 };
 
 std::shared_ptr<LoopClosing> LoopClosing::Create(Map* pMap, KeyFrameDatabase* pDB, ORBVocabulary* pVoc, const bool bFixScale)
