@@ -72,7 +72,7 @@ public:
 		return true;
 	}
 
-	bool DetectLoop(KeyFrame* currentKF, std::vector<KeyFrame*>& loopKFCandidates, int lastLoopKFId)
+	bool DetectLoop(KeyFrame* currentKF, std::vector<KeyFrame*>& loopCandidates, int lastLoopKFId)
 	{
 		//If the map contains less than 10 KF or less than 10 KF have passed from last loop detection
 		if (currentKF->mnId < lastLoopKFId + 10)
@@ -96,13 +96,13 @@ public:
 		}
 
 		// Query the database imposing the minimum score
-		vector<KeyFrame*> vpCandidateKFs = keyFrameDB_->DetectLoopCandidates(currentKF, minScore);
+		const std::vector<KeyFrame*> candidateKFs = keyFrameDB_->DetectLoopCandidates(currentKF, minScore);
 
 		// If there are no loop candidates, just add new keyframe and return false
-		if (vpCandidateKFs.empty())
+		if (candidateKFs.empty())
 		{
 			keyFrameDB_->add(currentKF);
-			mvConsistentGroups.clear();
+			prevConsistentGroups_.clear();
 			currentKF->SetErase();
 			return false;
 		}
@@ -111,68 +111,62 @@ public:
 		// Each candidate expands a covisibility group (keyframes connected to the loop candidate in the covisibility graph)
 		// A group is consistent with a previous group if they share at least a keyframe
 		// We must detect a consistent loop in several consecutive keyframes to accept it
-		loopKFCandidates.clear();
+		loopCandidates.clear();
 
-		vector<ConsistentGroup> vCurrentConsistentGroups;
-		vector<bool> vbConsistentGroup(mvConsistentGroups.size(), false);
-		for (size_t i = 0, iend = vpCandidateKFs.size(); i < iend; i++)
+		std::vector<ConsistentGroup> currConsistentGroups;
+		std::vector<bool> isConsistentGroup(prevConsistentGroups_.size(), false);
+		for (KeyFrame* candidateKF : candidateKFs)
 		{
-			KeyFrame* pCandidateKF = vpCandidateKFs[i];
+			std::set<KeyFrame*> candidateGroup = candidateKF->GetConnectedKeyFrames();
+			candidateGroup.insert(candidateKF);
 
-			set<KeyFrame*> spCandidateGroup = pCandidateKF->GetConnectedKeyFrames();
-			spCandidateGroup.insert(pCandidateKF);
-
-			bool bEnoughConsistent = false;
-			bool bConsistentForSomeGroup = false;
-			for (size_t iG = 0, iendG = mvConsistentGroups.size(); iG < iendG; iG++)
+			bool candidateFound = false;
+			bool consistentForSomeGroup = false;
+			for (size_t iG = 0, iendG = prevConsistentGroups_.size(); iG < iendG; iG++)
 			{
-				set<KeyFrame*> sPreviousGroup = mvConsistentGroups[iG].first;
+				std::set<KeyFrame*> sPreviousGroup = prevConsistentGroups_[iG].first;
 
-				bool bConsistent = false;
-				for (set<KeyFrame*>::iterator sit = spCandidateGroup.begin(), send = spCandidateGroup.end(); sit != send; sit++)
+				bool isConsistent = false;
+				for (KeyFrame* grounpKF : candidateGroup)
 				{
-					if (sPreviousGroup.count(*sit))
+					if (sPreviousGroup.count(grounpKF))
 					{
-						bConsistent = true;
-						bConsistentForSomeGroup = true;
+						isConsistent = true;
+						consistentForSomeGroup = true;
 						break;
 					}
 				}
 
-				if (bConsistent)
+				if (isConsistent)
 				{
-					int nPreviousConsistency = mvConsistentGroups[iG].second;
-					int nCurrentConsistency = nPreviousConsistency + 1;
-					if (!vbConsistentGroup[iG])
+					const int currConsistency = prevConsistentGroups_[iG].second + 1;
+					if (!isConsistentGroup[iG])
 					{
-						ConsistentGroup cg = make_pair(spCandidateGroup, nCurrentConsistency);
-						vCurrentConsistentGroups.push_back(cg);
-						vbConsistentGroup[iG] = true; //this avoid to include the same group more than once
+						currConsistentGroups.push_back(std::make_pair(candidateGroup, currConsistency));
+						isConsistentGroup[iG] = true; //this avoid to include the same group more than once
 					}
-					if (nCurrentConsistency >= minConsistency_ && !bEnoughConsistent)
+					if (currConsistency >= minConsistency_ && !candidateFound)
 					{
-						loopKFCandidates.push_back(pCandidateKF);
-						bEnoughConsistent = true; //this avoid to insert the same candidate more than once
+						loopCandidates.push_back(candidateKF);
+						candidateFound = true; //this avoid to insert the same candidate more than once
 					}
 				}
 			}
 
 			// If the group is not consistent with any previous group insert with consistency counter set to zero
-			if (!bConsistentForSomeGroup)
+			if (!consistentForSomeGroup)
 			{
-				ConsistentGroup cg = make_pair(spCandidateGroup, 0);
-				vCurrentConsistentGroups.push_back(cg);
+				currConsistentGroups.push_back(std::make_pair(candidateGroup, 0));
 			}
 		}
 
 		// Update Covisibility Consistent Groups
-		mvConsistentGroups = vCurrentConsistentGroups;
-
-
+		prevConsistentGroups_ = currConsistentGroups;
+		
 		// Add Current Keyframe to database
 		keyFrameDB_->add(currentKF);
 
-		if (loopKFCandidates.empty())
+		if (loopCandidates.empty())
 		{
 			currentKF->SetErase();
 			return false;
@@ -363,7 +357,7 @@ private:
 
 	KeyFrameDatabase* keyFrameDB_;
 	ORBVocabulary* voc_;
-	std::vector<ConsistentGroup> mvConsistentGroups;
+	std::vector<ConsistentGroup> prevConsistentGroups_;
 	bool fixScale_;
 	int minConsistency_;
 };
