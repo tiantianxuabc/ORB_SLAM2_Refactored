@@ -281,13 +281,11 @@ public:
 
 	bool ComputeSim3(KeyFrame* currentKF, std::vector<KeyFrame*>& candidateKFs, Loop& loop)
 	{
-		const int nInitialCandidates = static_cast<int>(candidateKFs.size());
 		const bool bMatch = FindLoopInCandidateKFs(currentKF, candidateKFs, loop, fixScale_);
-
 		if (!bMatch)
 		{
-			for (int i = 0; i < nInitialCandidates; i++)
-				candidateKFs[i]->SetErase();
+			for (KeyFrame* candidateKF : candidateKFs)
+				candidateKF->SetErase();
 			currentKF->SetErase();
 			return false;
 		}
@@ -328,15 +326,15 @@ public:
 
 		if (nTotalMatches >= 40)
 		{
-			for (int i = 0; i < nInitialCandidates; i++)
-				if (candidateKFs[i] != loop.matchedKF)
-					candidateKFs[i]->SetErase();
+			for (KeyFrame* candidateKF : candidateKFs)
+				if (candidateKF != loop.matchedKF)
+					candidateKF->SetErase();
 			return true;
 		}
 		else
 		{
-			for (int i = 0; i < nInitialCandidates; i++)
-				candidateKFs[i]->SetErase();
+			for (KeyFrame* candidateKF : candidateKFs)
+				candidateKF->SetErase();
 			currentKF->SetErase();
 			return false;
 		}
