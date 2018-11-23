@@ -194,8 +194,8 @@ void MapPoint::Replace(MapPoint* pMP)
 		obs = mObservations;
 		mObservations.clear();
 		bad_ = true;
-		nvisible = nvisible;
-		nfound = nfound;
+		nvisible = nvisible_;
+		nfound = nfound_;
 		replaced_ = pMP;
 	}
 
