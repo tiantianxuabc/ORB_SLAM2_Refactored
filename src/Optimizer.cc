@@ -275,7 +275,7 @@ int Optimizer::PoseOptimization(Frame *pFrame)
 
 
     {
-    unique_lock<mutex> lock(MapPoint::mGlobalMutex);
+    unique_lock<mutex> lock(MapPoint::globalMutex_);
 
     for(int i=0; i<N; i++)
     {

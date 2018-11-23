@@ -113,7 +113,7 @@ public:
 	frameid_t BAGlobalForKF;
 
 
-	static std::mutex mGlobalMutex;
+	static std::mutex globalMutex_;
 
 protected:
 
@@ -146,8 +146,8 @@ protected:
 
 	Map* map_;
 
-	std::mutex mMutexPos;
-	std::mutex mMutexFeatures;
+	std::mutex mutexPos_;
+	std::mutex mutexFeatures_;
 };
 
 } //namespace ORB_SLAM
