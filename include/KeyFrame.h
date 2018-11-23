@@ -40,7 +40,8 @@ class KeyFrameDatabase;
 class KeyFrame
 {
 public:
-	KeyFrame(Frame &F, Map* pMap, KeyFrameDatabase* pKFDB);
+
+	KeyFrame(const Frame& frame, Map* map, KeyFrameDatabase* keyframeDB);
 
 	// Pose functions
 	void SetPose(const cv::Mat &Tcw);

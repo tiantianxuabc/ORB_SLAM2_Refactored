@@ -51,7 +51,7 @@ static void Split(const std::vector<std::pair<T, U>>& vec12, std::vector<T>& vec
 	}
 }
 
-KeyFrame::KeyFrame(Frame& frame, Map* map, KeyFrameDatabase* keyframeDB) :
+KeyFrame::KeyFrame(const Frame& frame, Map* map, KeyFrameDatabase* keyframeDB) :
 	frameId(frame.id), timestamp(frame.timestamp), grid(frame.grid),
 	trackReferenceForFrame(0), fuseTargetForKF(0), BALocalForKF(0), BAFixedForKF(0),
 	loopQuery(0), loopWords(0), relocQuery(0), relocWords(0), BAGlobalForKF(0),
