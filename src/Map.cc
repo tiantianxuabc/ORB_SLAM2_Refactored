@@ -93,13 +93,13 @@ std::vector<MapPoint*> Map::GetAllMapPoints()
 	return std::vector<MapPoint*>(mappoints_.begin(), mappoints_.end());
 }
 
-long unsigned int Map::MapPointsInMap()
+size_t Map::MapPointsInMap()
 {
 	LOCK_MUTEX_MAP();
 	return mappoints_.size();
 }
 
-long unsigned int Map::KeyFramesInMap()
+size_t Map::KeyFramesInMap()
 {
 	LOCK_MUTEX_MAP();
 	return keyframes_.size();
