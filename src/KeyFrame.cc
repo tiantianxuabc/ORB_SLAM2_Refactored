@@ -272,34 +272,26 @@ MapPoint* KeyFrame::GetMapPoint(size_t idx)
 
 void KeyFrame::UpdateConnections()
 {
-	map<KeyFrame*, int> KFcounter;
-
-	vector<MapPoint*> vpMP;
-
+	std::vector<MapPoint*> mappoints;
 	{
 		LOCK_MUTEX_FEATURES();
-		vpMP = mappoints_;
+		mappoints = mappoints_;
 	}
 
 	//For all map points in keyframe check in which other keyframes are they seen
 	//Increase counter for those keyframes
-	for (vector<MapPoint*>::iterator vit = vpMP.begin(), vend = vpMP.end(); vit != vend; vit++)
+	std::map<KeyFrame*, int> KFcounter;
+	for (MapPoint* mappoint : mappoints)
 	{
-		MapPoint* pMP = *vit;
-
-		if (!pMP)
+		if (!mappoint || mappoint->isBad())
 			continue;
 
-		if (pMP->isBad())
-			continue;
-
-		map<KeyFrame*, size_t> observations = pMP->GetObservations();
-
-		for (map<KeyFrame*, size_t>::iterator mit = observations.begin(), mend = observations.end(); mit != mend; mit++)
+		for (const auto& observation : mappoint->GetObservations())
 		{
-			if (mit->first->id == id)
+			KeyFrame* keyframe = observation.first;
+			if (keyframe->id == id)
 				continue;
-			KFcounter[mit->first]++;
+			KFcounter[keyframe]++;
 		}
 	}
 
@@ -309,56 +301,49 @@ void KeyFrame::UpdateConnections()
 
 	//If the counter is greater than threshold add connection
 	//In case no keyframe counter is over threshold add the one with maximum counter
-	int nmax = 0;
-	KeyFrame* pKFmax = NULL;
-	int th = 15;
+	int maxCount = 0;
+	KeyFrame* maxKF = NULL;
+	const int threshold = 15;
 
-	vector<pair<int, KeyFrame*> > vPairs;
-	vPairs.reserve(KFcounter.size());
-	for (map<KeyFrame*, int>::iterator mit = KFcounter.begin(), mend = KFcounter.end(); mit != mend; mit++)
+	std::vector<WeightAndKeyFrame> pairs;
+	pairs.reserve(KFcounter.size());
+
+	//for (map<KeyFrame*, int>::iterator mit = KFcounter.begin(), mend = KFcounter.end(); mit != mend; mit++)
+	for (const auto& v : KFcounter)
 	{
-		if (mit->second > nmax)
+		KeyFrame* keyframe = v.first;
+		const int count = v.second;
+		if (count > maxCount)
 		{
-			nmax = mit->second;
-			pKFmax = mit->first;
+			maxCount = count;
+			maxKF = keyframe;
 		}
-		if (mit->second >= th)
+		if (count >= threshold)
 		{
-			vPairs.push_back(make_pair(mit->second, mit->first));
-			(mit->first)->AddConnection(this, mit->second);
+			pairs.push_back(std::make_pair(count, keyframe));
+			keyframe->AddConnection(this, count);
 		}
 	}
 
-	if (vPairs.empty())
+	if (pairs.empty())
 	{
-		vPairs.push_back(make_pair(nmax, pKFmax));
-		pKFmax->AddConnection(this, nmax);
+		pairs.push_back(std::make_pair(maxCount, maxKF));
+		maxKF->AddConnection(this, maxCount);
 	}
 
-	sort(vPairs.begin(), vPairs.end());
-	list<KeyFrame*> lKFs;
-	list<int> lWs;
-	for (size_t i = 0; i < vPairs.size(); i++)
-	{
-		lKFs.push_front(vPairs[i].second);
-		lWs.push_front(vPairs[i].first);
-	}
+	std::sort(std::begin(pairs), std::end(pairs), std::greater<WeightAndKeyFrame>());
 
 	{
 		LOCK_MUTEX_CONNECTIONS();
-
-		// mspConnectedKeyFrames = spConnectedKeyFrames;
 		connectionTo_ = KFcounter;
-		orderedConnectedKeyFrames_ = vector<KeyFrame*>(lKFs.begin(), lKFs.end());
-		orderedWeights_ = vector<int>(lWs.begin(), lWs.end());
-
+		Split(pairs, orderedWeights_, orderedConnectedKeyFrames_);
+		
 		if (firstConnection_ && id != 0)
 		{
 			parent_ = orderedConnectedKeyFrames_.front();
 			parent_->AddChild(this);
 			firstConnection_ = false;
 		}
-
 	}
 }
 
