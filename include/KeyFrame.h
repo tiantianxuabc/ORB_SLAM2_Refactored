@@ -84,7 +84,7 @@ public:
 	void ReplaceMapPointMatch(size_t idx, MapPoint* pMP);
 	std::set<MapPoint*> GetMapPoints();
 	std::vector<MapPoint*> GetMapPointMatches();
-	int TrackedMapPoints(const int &minObs);
+	int TrackedMapPoints(int minObs);
 	MapPoint* GetMapPoint(size_t idx);
 
 	// KeyPoint functions

@@ -233,31 +233,29 @@ std::set<MapPoint*> KeyFrame::GetMapPoints()
 	return s;
 }
 
-int KeyFrame::TrackedMapPoints(const int &minObs)
+int KeyFrame::TrackedMapPoints(int minObs)
 {
 	LOCK_MUTEX_FEATURES();
 
-	int nPoints = 0;
-	const bool bCheckObs = minObs > 0;
-	for (int i = 0; i < N; i++)
+	const bool checkObs = minObs > 0;
+	int npoints = 0;
+	for (MapPoint* mappint : mappoints_)
 	{
-		MapPoint* pMP = mappoints_[i];
-		if (pMP)
+		if (!mappint || mappint->isBad())
+			continue;
+
+		if (checkObs)
 		{
-			if (!pMP->isBad())
-			{
-				if (bCheckObs)
-				{
-					if (mappoints_[i]->Observations() >= minObs)
-						nPoints++;
-				}
-				else
-					nPoints++;
-			}
+			if (mappint->Observations() >= minObs)
+				npoints++;
+		}
+		else
+		{
+			npoints++;
 		}
 	}
 
-	return nPoints;
+	return npoints;
 }
 
 vector<MapPoint*> KeyFrame::GetMapPointMatches()
