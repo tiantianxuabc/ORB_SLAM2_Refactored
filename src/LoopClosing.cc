@@ -381,9 +381,9 @@ public:
 	// This function will run in a separate thread
 	void _Run(int loopKFId)
 	{
-		cout << "Starting Global Bundle Adjustment" << endl;
+		std::cout << "Starting Global Bundle Adjustment" << std::endl;
 
-		int idx = fullBAIdx_;
+		const int idx = fullBAIdx_;
 		Optimizer::GlobalBundleAdjustemnt(map_, 10, &stop_, loopKFId, false);
 
 		// Update all MapPoints and KeyFrames
@@ -397,11 +397,11 @@ public:
 
 			if (!stop_)
 			{
-				cout << "Global Bundle Adjustment finished" << endl;
-				cout << "Updating map ..." << endl;
+				std::cout << "Global Bundle Adjustment finished" << std::endl;
+				std::cout << "Updating map ..." << std::endl;
 				localMapper_->RequestStop();
-				// Wait until Local Mapping has effectively stopped
 
+				// Wait until Local Mapping has effectively stopped
 				while (!localMapper_->isStopped() && !localMapper_->isFinished())
 				{
 					usleep(1000);
@@ -411,65 +411,58 @@ public:
 				unique_lock<mutex> lock(map_->mMutexMapUpdate);
 
 				// Correct keyframes starting at map first keyframe
-				list<KeyFrame*> lpKFtoCheck(map_->mvpKeyFrameOrigins.begin(), map_->mvpKeyFrameOrigins.end());
-
-				while (!lpKFtoCheck.empty())
+				std::list<KeyFrame*> toCheck(std::begin(map_->mvpKeyFrameOrigins), std::end(map_->mvpKeyFrameOrigins));
+				while (!toCheck.empty())
 				{
-					KeyFrame* pKF = lpKFtoCheck.front();
-					const set<KeyFrame*> sChilds = pKF->GetChilds();
-					cv::Mat Twc = pKF->GetPoseInverse();
-					for (set<KeyFrame*>::const_iterator sit = sChilds.begin(); sit != sChilds.end(); sit++)
+					KeyFrame* keyframe = toCheck.front();
+					cv::Mat Twc = keyframe->GetPoseInverse();
+					for (KeyFrame* child : keyframe->GetChilds())
 					{
-						KeyFrame* pChild = *sit;
-						if (pChild->mnBAGlobalForKF != loopKFId)
+						if (child->mnBAGlobalForKF != loopKFId)
 						{
-							cv::Mat Tchildc = pChild->GetPose()*Twc;
-							pChild->mTcwGBA = Tchildc*pKF->mTcwGBA;//*Tcorc*pKF->mTcwGBA;
-							pChild->mnBAGlobalForKF = loopKFId;
+							cv::Mat Tchildc = child->GetPose() * Twc;
+							child->mTcwGBA = Tchildc * keyframe->mTcwGBA;//*Tcorc*pKF->mTcwGBA;
+							child->mnBAGlobalForKF = loopKFId;
 
 						}
-						lpKFtoCheck.push_back(pChild);
+						toCheck.push_back(child);
 					}
 
-					pKF->mTcwBefGBA = pKF->GetPose();
-					pKF->SetPose(pKF->mTcwGBA);
-					lpKFtoCheck.pop_front();
+					keyframe->mTcwBefGBA = keyframe->GetPose();
+					keyframe->SetPose(keyframe->mTcwGBA);
+					toCheck.pop_front();
 				}
 
 				// Correct MapPoints
-				const vector<MapPoint*> vpMPs = map_->GetAllMapPoints();
-
-				for (size_t i = 0; i < vpMPs.size(); i++)
+				for (MapPoint* mappoint : map_->GetAllMapPoints())
 				{
-					MapPoint* pMP = vpMPs[i];
-
-					if (pMP->isBad())
+					if (mappoint->isBad())
 						continue;
 
-					if (pMP->mnBAGlobalForKF == loopKFId)
+					if (mappoint->mnBAGlobalForKF == loopKFId)
 					{
 						// If optimized by Global BA, just update
-						pMP->SetWorldPos(pMP->mPosGBA);
+						mappoint->SetWorldPos(mappoint->mPosGBA);
 					}
 					else
 					{
 						// Update according to the correction of its reference keyframe
-						KeyFrame* pRefKF = pMP->GetReferenceKeyFrame();
+						KeyFrame* referenceKF = mappoint->GetReferenceKeyFrame();
 
-						if (pRefKF->mnBAGlobalForKF != loopKFId)
+						if (referenceKF->mnBAGlobalForKF != loopKFId)
 							continue;
 
 						// Map to non-corrected camera
-						cv::Mat Rcw = pRefKF->mTcwBefGBA.rowRange(0, 3).colRange(0, 3);
-						cv::Mat tcw = pRefKF->mTcwBefGBA.rowRange(0, 3).col(3);
-						cv::Mat Xc = Rcw*pMP->GetWorldPos() + tcw;
+						cv::Mat Rcw = referenceKF->mTcwBefGBA.rowRange(0, 3).colRange(0, 3);
+						cv::Mat tcw = referenceKF->mTcwBefGBA.rowRange(0, 3).col(3);
+						cv::Mat Xc = Rcw*mappoint->GetWorldPos() + tcw;
 
 						// Backproject using corrected camera
-						cv::Mat Twc = pRefKF->GetPoseInverse();
+						cv::Mat Twc = referenceKF->GetPoseInverse();
 						cv::Mat Rwc = Twc.rowRange(0, 3).colRange(0, 3);
 						cv::Mat twc = Twc.rowRange(0, 3).col(3);
 
-						pMP->SetWorldPos(Rwc*Xc + twc);
+						mappoint->SetWorldPos(Rwc*Xc + twc);
 					}
 				}
 
@@ -477,7 +470,7 @@ public:
 
 				localMapper_->Release();
 
-				cout << "Map updated!" << endl;
+				std::cout << "Map updated!" << std::endl;
 			}
 
 			finished_ = true;
