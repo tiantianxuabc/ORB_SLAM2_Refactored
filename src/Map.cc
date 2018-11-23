@@ -84,13 +84,13 @@ int Map::GetLastBigChangeIdx() const
 std::vector<KeyFrame*> Map::GetAllKeyFrames() const
 {
 	LOCK_MUTEX_MAP();
-	return std::vector<KeyFrame*>(keyframes_.begin(), keyframes_.end());
+	return std::vector<KeyFrame*>(std::begin(keyframes_), std::end(keyframes_));
 }
 
 std::vector<MapPoint*> Map::GetAllMapPoints() const
 {
 	LOCK_MUTEX_MAP();
-	return std::vector<MapPoint*>(mappoints_.begin(), mappoints_.end());
+	return std::vector<MapPoint*>(std::begin(mappoints_), std::end(mappoints_));
 }
 
 size_t Map::MapPointsInMap() const
