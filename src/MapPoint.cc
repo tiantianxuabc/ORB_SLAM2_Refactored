@@ -50,7 +50,7 @@ MapPoint::MapPoint(const cv::Mat& Xw, KeyFrame* referenceKF, Map* map) :
 	id = nextId++;
 }
 
-MapPoint::MapPoint(const cv::Mat& Xw, Map* map, Frame* frame, const int &idxF) :
+MapPoint::MapPoint(const cv::Mat& Xw, Map* map, Frame* frame, const int &idx) :
 	firstKFid(-1), firstFrame(frame->id), nobservations_(0), trackReferenceForFrame(0), lastFrameSeen(0),
 	BALocalForKF(0), fuseCandidateForKF(0), loopPointForKF(0), correctedByKF(0),
 	correctedReference(0), BAGlobalForKF(0), referenceKF_(nullptr), nvisible_(1),
