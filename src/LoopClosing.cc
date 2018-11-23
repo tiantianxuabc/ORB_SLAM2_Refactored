@@ -399,7 +399,7 @@ public:
 				LOCK_MUTEX_MAP_UPDATE();
 
 				// Correct keyframes starting at map first keyframe
-				std::list<KeyFrame*> toCheck(std::begin(map_->mvpKeyFrameOrigins), std::end(map_->mvpKeyFrameOrigins));
+				std::list<KeyFrame*> toCheck(std::begin(map_->keyFrameOrigins), std::end(map_->keyFrameOrigins));
 				while (!toCheck.empty())
 				{
 					KeyFrame* keyframe = toCheck.front();

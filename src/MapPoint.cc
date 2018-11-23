@@ -39,7 +39,7 @@ MapPoint::MapPoint(const cv::Mat &Pos, KeyFrame *pRefKF, Map* pMap):
     mNormalVector = cv::Mat::zeros(3,1,CV_32F);
 
     // MapPoints can be created from Tracking and Local Mapping. This mutex avoid conflicts with id.
-    std::unique_lock<std::mutex> lock(mpMap->mMutexPointCreation);
+    std::unique_lock<std::mutex> lock(mpMap->mutexPointCreation);
     mnId=nNextId++;
 }
 
@@ -66,7 +66,7 @@ MapPoint::MapPoint(const cv::Mat &Pos, Map* pMap, Frame* pFrame, const int &idxF
     pFrame->descriptorsL.row(idxF).copyTo(mDescriptor);
 
     // MapPoints can be created from Tracking and Local Mapping. This mutex avoid conflicts with id.
-    std::unique_lock<std::mutex> lock(mpMap->mMutexPointCreation);
+    std::unique_lock<std::mutex> lock(mpMap->mutexPointCreation);
     mnId=nNextId++;
 }
 

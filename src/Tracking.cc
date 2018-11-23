@@ -1137,7 +1137,7 @@ public:
 
 		map_->SetReferenceMapPoints(localMap_.mappoints);
 
-		map_->mvpKeyFrameOrigins.push_back(keyframe);
+		map_->keyFrameOrigins.push_back(keyframe);
 
 		mapDrawer_->SetCurrentCameraPose(currFrame.pose.Tcw);
 
@@ -1314,7 +1314,7 @@ public:
 
 		mapDrawer_->SetCurrentCameraPose(pKFcur->GetPose());
 
-		map_->mvpKeyFrameOrigins.push_back(pKFini);
+		map_->keyFrameOrigins.push_back(pKFini);
 
 		state_ = STATE_OK;
 	}
@@ -1340,7 +1340,7 @@ public:
 		lastProcessedState_ = state_;
 
 		// Get Map Mutex -> Map cannot be changed
-		unique_lock<mutex> lock(map_->mMutexMapUpdate);
+		unique_lock<mutex> lock(map_->mutexMapUpdate);
 
 		// Initialize Tracker if not initialized.
 		if (state_ == STATE_NOT_INITIALIZED)

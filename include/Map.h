@@ -57,12 +57,12 @@ public:
 
 	void clear();
 
-	std::vector<KeyFrame*> mvpKeyFrameOrigins;
+	std::vector<KeyFrame*> keyFrameOrigins;
 
-	std::mutex mMutexMapUpdate;
+	std::mutex mutexMapUpdate;
 
 	// This avoid that two points are created simultaneously in separate threads (id conflict)
-	std::mutex mMutexPointCreation;
+	std::mutex mutexPointCreation;
 
 protected:
 

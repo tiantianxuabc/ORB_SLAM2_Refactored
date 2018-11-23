@@ -129,7 +129,7 @@ void Map::clear()
 	keyframes_.clear();
 	maxKFId_ = 0;
 	referenceMapPoints_.clear();
-	mvpKeyFrameOrigins.clear();
+	keyFrameOrigins.clear();
 }
 
 } //namespace ORB_SLAM
