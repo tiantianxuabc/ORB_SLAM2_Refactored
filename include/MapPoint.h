@@ -86,11 +86,10 @@ public:
 public:
 
 	mappointid_t id;
-	static mappointid_t nextId_;
+	static mappointid_t nextId;
 	int firstKFid;
 	int firstFrame;
-	int nobservations;
-
+	
 	// Variables used by the tracking
 	float mTrackProjX;
 	float mTrackProjY;
@@ -122,6 +121,7 @@ protected:
 
 	// Keyframes observing the point and associated index in keyframe
 	std::map<KeyFrame*, size_t> mObservations;
+	int nobservations_;
 
 	// Mean viewing direction
 	cv::Mat normal_;

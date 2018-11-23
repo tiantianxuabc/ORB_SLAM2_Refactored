@@ -28,11 +28,11 @@
 namespace ORB_SLAM2
 {
 
-MapPoint::mappointid_t MapPoint::nextId_ = 0;
+MapPoint::mappointid_t MapPoint::nextId = 0;
 std::mutex MapPoint::globalMutex_;
 
 MapPoint::MapPoint(const cv::Mat& Xw, KeyFrame* referenceKF, Map* map) :
-	firstKFid(referenceKF->id), firstFrame(referenceKF->frameId), nobservations(0), trackReferenceForFrame(0),
+	firstKFid(referenceKF->id), firstFrame(referenceKF->frameId), nobservations_(0), trackReferenceForFrame(0),
 	lastFrameSeen(0), BALocalForKF(0), fuseCandidateForKF(0), loopPointForKF(0), correctedByKF(0),
 	correctedReference(0), BAGlobalForKF(0), referenceKF_(referenceKF), nvisible_(1), nfound_(1), bad_(false),
 	replaced_(nullptr), minDistance_(0), maxDistance_(0), map_(map)
@@ -42,11 +42,11 @@ MapPoint::MapPoint(const cv::Mat& Xw, KeyFrame* referenceKF, Map* map) :
 
 	// MapPoints can be created from Tracking and Local Mapping. This mutex avoid conflicts with id.
 	std::unique_lock<std::mutex> lock(map_->mutexPointCreation);
-	id = nextId_++;
+	id = nextId++;
 }
 
 MapPoint::MapPoint(const cv::Mat& Xw, Map* map, Frame* frame, const int &idxF) :
-	firstKFid(-1), firstFrame(frame->id), nobservations(0), trackReferenceForFrame(0), lastFrameSeen(0),
+	firstKFid(-1), firstFrame(frame->id), nobservations_(0), trackReferenceForFrame(0), lastFrameSeen(0),
 	BALocalForKF(0), fuseCandidateForKF(0), loopPointForKF(0), correctedByKF(0),
 	correctedReference(0), BAGlobalForKF(0), referenceKF_(nullptr), nvisible_(1),
 	nfound_(1), bad_(false), replaced_(nullptr), map_(map)
@@ -69,7 +69,7 @@ MapPoint::MapPoint(const cv::Mat& Xw, Map* map, Frame* frame, const int &idxF) :
 
 	// MapPoints can be created from Tracking and Local Mapping. This mutex avoid conflicts with id.
 	std::unique_lock<std::mutex> lock(map_->mutexPointCreation);
-	id = nextId_++;
+	id = nextId++;
 }
 
 void MapPoint::SetWorldPos(const cv::Mat &Pos)
@@ -105,9 +105,9 @@ void MapPoint::AddObservation(KeyFrame* pKF, size_t idx)
 	mObservations[pKF] = idx;
 
 	if (pKF->uright[idx] >= 0)
-		nobservations += 2;
+		nobservations_ += 2;
 	else
-		nobservations++;
+		nobservations_++;
 }
 
 void MapPoint::EraseObservation(KeyFrame* pKF)
@@ -119,9 +119,9 @@ void MapPoint::EraseObservation(KeyFrame* pKF)
 		{
 			int idx = mObservations[pKF];
 			if (pKF->uright[idx] >= 0)
-				nobservations -= 2;
+				nobservations_ -= 2;
 			else
-				nobservations--;
+				nobservations_--;
 
 			mObservations.erase(pKF);
 
@@ -129,7 +129,7 @@ void MapPoint::EraseObservation(KeyFrame* pKF)
 				referenceKF_ = mObservations.begin()->first;
 
 			// If only 2 observations or less, discard point
-			if (nobservations <= 2)
+			if (nobservations_ <= 2)
 				bBad = true;
 		}
 	}
@@ -147,7 +147,7 @@ std::map<KeyFrame*, size_t> MapPoint::GetObservations()
 int MapPoint::Observations()
 {
 	std::unique_lock<std::mutex> lock(mutexFeatures_);
-	return nobservations;
+	return nobservations_;
 }
 
 void MapPoint::SetBadFlag()
