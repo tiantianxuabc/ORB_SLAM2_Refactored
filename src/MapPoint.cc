@@ -182,42 +182,43 @@ MapPoint* MapPoint::GetReplaced()
 	return replaced_;
 }
 
-void MapPoint::Replace(MapPoint* pMP)
+void MapPoint::Replace(MapPoint* mappoint)
 {
-	if (pMP->id == this->id)
+	if (mappoint->id == this->id)
 		return;
 
-	int nvisible, nfound;
-	std::map<KeyFrame*, size_t> obs;
+	int nvisible = 0, nfound = 0;
+	std::map<KeyFrame*, size_t> observations;
 	{
 		LOCK_MUTEX_FEATURES();
 		LOCK_MUTEX_POSITION();
-		obs = observations_;
+		observations = observations_;
 		observations_.clear();
 		bad_ = true;
 		nvisible = nvisible_;
 		nfound = nfound_;
-		replaced_ = pMP;
+		replaced_ = mappoint;
 	}
 
-	for (std::map<KeyFrame*, size_t>::iterator mit = obs.begin(), mend = obs.end(); mit != mend; mit++)
+	for (const auto& observation : observations)
 	{
 		// Replace measurement in keyframe
-		KeyFrame* pKF = mit->first;
+		KeyFrame* keyframe = observation.first;
+		const size_t idx = observation.second;
 
-		if (!pMP->IsInKeyFrame(pKF))
+		if (!mappoint->IsInKeyFrame(keyframe))
 		{
-			pKF->ReplaceMapPointMatch(mit->second, pMP);
-			pMP->AddObservation(pKF, mit->second);
+			keyframe->ReplaceMapPointMatch(idx, mappoint);
+			mappoint->AddObservation(keyframe, idx);
 		}
 		else
 		{
-			pKF->EraseMapPointMatch(mit->second);
+			keyframe->EraseMapPointMatch(idx);
 		}
 	}
-	pMP->IncreaseFound(nfound);
-	pMP->IncreaseVisible(nvisible);
-	pMP->ComputeDistinctiveDescriptors();
+	mappoint->IncreaseFound(nfound);
+	mappoint->IncreaseVisible(nvisible);
+	mappoint->ComputeDistinctiveDescriptors();
 
 	map_->EraseMapPoint(this);
 }
