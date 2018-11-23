@@ -100,14 +100,16 @@ KeyFrame* MapPoint::GetReferenceKeyFrame()
 	return referenceKF_;
 }
 
-void MapPoint::AddObservation(KeyFrame* pKF, size_t idx)
+void MapPoint::AddObservation(KeyFrame* keyframe, size_t idx)
 {
 	LOCK_MUTEX_FEATURES();
-	if (observations_.count(pKF))
-		return;
-	observations_[pKF] = idx;
 
-	if (pKF->uright[idx] >= 0)
+	if (observations_.count(keyframe))
+		return;
+
+	observations_[keyframe] = idx;
+
+	if (keyframe->uright[idx] >= 0)
 		nobservations_ += 2;
 	else
 		nobservations_++;
