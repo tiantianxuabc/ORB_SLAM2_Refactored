@@ -157,18 +157,19 @@ int MapPoint::Observations()
 
 void MapPoint::SetBadFlag()
 {
-	std::map<KeyFrame*, size_t> obs;
+	std::map<KeyFrame*, size_t> observations;
 	{
 		LOCK_MUTEX_FEATURES();
 		LOCK_MUTEX_POSITION();
 		bad_ = true;
-		obs = observations_;
+		observations = observations_;
 		observations_.clear();
 	}
-	for (std::map<KeyFrame*, size_t>::iterator mit = obs.begin(), mend = obs.end(); mit != mend; mit++)
+
+	for (const auto& observation : observations)
 	{
-		KeyFrame* pKF = mit->first;
-		pKF->EraseMapPointMatch(mit->second);
+		KeyFrame* keyframe = observation.first;
+		keyframe->EraseMapPointMatch(observation.second);
 	}
 
 	map_->EraseMapPoint(this);
