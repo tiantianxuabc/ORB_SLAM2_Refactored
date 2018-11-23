@@ -62,11 +62,10 @@ public:
 
 	bool Detect(KeyFrame* currentKF, Loop& loop, int lastLoopKFId)
 	{
-		std::vector<KeyFrame*> loopKFCandidates;
-		if (!DetectLoop(currentKF, loopKFCandidates, lastLoopKFId))
+		std::vector<KeyFrame*> candidateKFs;
+		if (!DetectLoop(currentKF, candidateKFs, lastLoopKFId))
 			return false;
-
-		if (!ComputeSim3(currentKF, loopKFCandidates, loop))
+		if (!ComputeSim3(currentKF, candidateKFs, loop))
 			return false;
 
 		return true;
