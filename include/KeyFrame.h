@@ -45,12 +45,12 @@ public:
 
 	// Pose functions
 	void SetPose(const cv::Mat &Tcw);
-	cv::Mat GetPose();
-	cv::Mat GetPoseInverse();
-	cv::Mat GetCameraCenter();
-	cv::Mat GetStereoCenter();
-	cv::Mat GetRotation();
-	cv::Mat GetTranslation();
+	cv::Mat GetPose() const;
+	cv::Mat GetPoseInverse() const;
+	cv::Mat GetCameraCenter() const;
+	cv::Mat GetStereoCenter() const;
+	cv::Mat GetRotation() const;
+	cv::Mat GetTranslation() const;
 
 	// Bag of Words Representation
 	void ComputeBoW();
@@ -60,37 +60,37 @@ public:
 	void EraseConnection(KeyFrame* pKF);
 	void UpdateConnections();
 	void UpdateBestCovisibles();
-	std::set<KeyFrame *> GetConnectedKeyFrames();
-	std::vector<KeyFrame* > GetVectorCovisibleKeyFrames();
-	std::vector<KeyFrame*> GetBestCovisibilityKeyFrames(int N);
-	std::vector<KeyFrame*> GetCovisiblesByWeight(int w);
-	int GetWeight(KeyFrame* pKF);
+	std::set<KeyFrame *> GetConnectedKeyFrames() const;
+	std::vector<KeyFrame* > GetVectorCovisibleKeyFrames() const;
+	std::vector<KeyFrame*> GetBestCovisibilityKeyFrames(int N) const;
+	std::vector<KeyFrame*> GetCovisiblesByWeight(int w) const;
+	int GetWeight(KeyFrame* pKF) const;
 
 	// Spanning tree functions
 	void AddChild(KeyFrame* pKF);
 	void EraseChild(KeyFrame* pKF);
 	void ChangeParent(KeyFrame* pKF);
-	std::set<KeyFrame*> GetChildren();
-	KeyFrame* GetParent();
-	bool hasChild(KeyFrame* pKF);
+	std::set<KeyFrame*> GetChildren() const;
+	KeyFrame* GetParent() const;
+	bool hasChild(KeyFrame* pKF) const;
 
 	// Loop Edges
 	void AddLoopEdge(KeyFrame* pKF);
-	std::set<KeyFrame*> GetLoopEdges();
+	std::set<KeyFrame*> GetLoopEdges() const;
 
 	// MapPoint observation functions
 	void AddMapPoint(MapPoint* pMP, size_t idx);
 	void EraseMapPointMatch(size_t idx);
 	void EraseMapPointMatch(MapPoint* pMP);
 	void ReplaceMapPointMatch(size_t idx, MapPoint* pMP);
-	std::set<MapPoint*> GetMapPoints();
-	std::vector<MapPoint*> GetMapPointMatches();
-	int TrackedMapPoints(int minObs);
-	MapPoint* GetMapPoint(size_t idx);
+	std::set<MapPoint*> GetMapPoints() const;
+	std::vector<MapPoint*> GetMapPointMatches() const;
+	int TrackedMapPoints(int minObs) const;
+	MapPoint* GetMapPoint(size_t idx) const;
 
 	// KeyPoint functions
 	std::vector<size_t> GetFeaturesInArea(float x, float y, float r) const;
-	cv::Mat UnprojectStereo(int i);
+	cv::Mat UnprojectStereo(int i) const;
 
 	// Image
 	bool IsInImage(float x, float y) const;
@@ -101,10 +101,10 @@ public:
 
 	// Set/check bad flag
 	void SetBadFlag();
-	bool isBad();
+	bool isBad() const;
 
 	// Compute Scene Depth (q=2 median). Used in monocular.
-	float ComputeSceneMedianDepth(int q);
+	float ComputeSceneMedianDepth(int q) const;
 
 	static bool lId(KeyFrame* pKF1, KeyFrame* pKF2) {
 		return pKF1->id < pKF2->id;
@@ -211,9 +211,9 @@ protected:
 
 	Map* map_;
 
-	std::mutex mutexPose_;
-	std::mutex mutexConnections_;
-	std::mutex mutexFeatures_;
+	mutable std::mutex mutexPose_;
+	mutable std::mutex mutexConnections_;
+	mutable std::mutex mutexFeatures_;
 };
 
 } //namespace ORB_SLAM

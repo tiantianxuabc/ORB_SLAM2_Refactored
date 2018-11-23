@@ -92,38 +92,38 @@ void KeyFrame::SetPose(const cv::Mat& Tcw_)
 	Cw = Twc * center;
 }
 
-cv::Mat KeyFrame::GetPose()
+cv::Mat KeyFrame::GetPose() const
 {
 	LOCK_MUTEX_POSE();
 	return Tcw.clone();
 }
 
-cv::Mat KeyFrame::GetPoseInverse()
+cv::Mat KeyFrame::GetPoseInverse() const
 {
 	LOCK_MUTEX_POSE();
 	return Twc.clone();
 }
 
-cv::Mat KeyFrame::GetCameraCenter()
+cv::Mat KeyFrame::GetCameraCenter() const
 {
 	LOCK_MUTEX_POSE();
 	return Ow.clone();
 }
 
-cv::Mat KeyFrame::GetStereoCenter()
+cv::Mat KeyFrame::GetStereoCenter() const
 {
 	LOCK_MUTEX_POSE();
 	return Cw.clone();
 }
 
 
-cv::Mat KeyFrame::GetRotation()
+cv::Mat KeyFrame::GetRotation() const
 {
 	LOCK_MUTEX_POSE();
 	return GetR(Tcw).clone();
 }
 
-cv::Mat KeyFrame::GetTranslation()
+cv::Mat KeyFrame::GetTranslation() const
 {
 	LOCK_MUTEX_POSE();
 	return Gett(Tcw).clone();
@@ -156,7 +156,7 @@ void KeyFrame::UpdateBestCovisibles()
 	Split(pairs, orderedWeights_, orderedConnectedKeyFrames_);
 }
 
-std::set<KeyFrame*> KeyFrame::GetConnectedKeyFrames()
+std::set<KeyFrame*> KeyFrame::GetConnectedKeyFrames() const
 {
 	LOCK_MUTEX_CONNECTIONS();
 	std::set<KeyFrame*> s;
@@ -165,20 +165,20 @@ std::set<KeyFrame*> KeyFrame::GetConnectedKeyFrames()
 	return s;
 }
 
-std::vector<KeyFrame*> KeyFrame::GetVectorCovisibleKeyFrames()
+std::vector<KeyFrame*> KeyFrame::GetVectorCovisibleKeyFrames() const
 {
 	LOCK_MUTEX_CONNECTIONS();
 	return orderedConnectedKeyFrames_;
 }
 
-std::vector<KeyFrame*> KeyFrame::GetBestCovisibilityKeyFrames(int N)
+std::vector<KeyFrame*> KeyFrame::GetBestCovisibilityKeyFrames(int N) const
 {
 	LOCK_MUTEX_CONNECTIONS();
 	N = std::min(N, static_cast<int>(orderedConnectedKeyFrames_.size()));
 	return std::vector<KeyFrame*>(std::begin(orderedConnectedKeyFrames_), std::begin(orderedConnectedKeyFrames_) + N);
 }
 
-std::vector<KeyFrame*> KeyFrame::GetCovisiblesByWeight(int w)
+std::vector<KeyFrame*> KeyFrame::GetCovisiblesByWeight(int w) const
 {
 	LOCK_MUTEX_CONNECTIONS();
 
@@ -193,10 +193,10 @@ std::vector<KeyFrame*> KeyFrame::GetCovisiblesByWeight(int w)
 	return std::vector<KeyFrame*>(std::begin(orderedConnectedKeyFrames_), std::begin(orderedConnectedKeyFrames_) + n);
 }
 
-int KeyFrame::GetWeight(KeyFrame* keyframe)
+int KeyFrame::GetWeight(KeyFrame* keyframe) const
 {
 	LOCK_MUTEX_CONNECTIONS();
-	return connectionTo_.count(keyframe) ? connectionTo_[keyframe] : 0;
+	return connectionTo_.count(keyframe) ? connectionTo_.at(keyframe) : 0;
 }
 
 void KeyFrame::AddMapPoint(MapPoint* mappiont, size_t idx)
@@ -223,7 +223,7 @@ void KeyFrame::ReplaceMapPointMatch(size_t idx, MapPoint* mappiont)
 	mappoints_[idx] = mappiont;
 }
 
-std::set<MapPoint*> KeyFrame::GetMapPoints()
+std::set<MapPoint*> KeyFrame::GetMapPoints() const
 {
 	LOCK_MUTEX_FEATURES();
 	std::set<MapPoint*> s;
@@ -233,7 +233,7 @@ std::set<MapPoint*> KeyFrame::GetMapPoints()
 	return s;
 }
 
-int KeyFrame::TrackedMapPoints(int minObs)
+int KeyFrame::TrackedMapPoints(int minObs) const
 {
 	LOCK_MUTEX_FEATURES();
 
@@ -258,13 +258,13 @@ int KeyFrame::TrackedMapPoints(int minObs)
 	return npoints;
 }
 
-std::vector<MapPoint*> KeyFrame::GetMapPointMatches()
+std::vector<MapPoint*> KeyFrame::GetMapPointMatches() const
 {
 	LOCK_MUTEX_FEATURES();
 	return mappoints_;
 }
 
-MapPoint* KeyFrame::GetMapPoint(size_t idx)
+MapPoint* KeyFrame::GetMapPoint(size_t idx) const
 {
 	LOCK_MUTEX_FEATURES();
 	return mappoints_[idx];
@@ -366,19 +366,19 @@ void KeyFrame::ChangeParent(KeyFrame* keyframe)
 	keyframe->AddChild(this);
 }
 
-std::set<KeyFrame*> KeyFrame::GetChildren()
+std::set<KeyFrame*> KeyFrame::GetChildren() const
 {
 	LOCK_MUTEX_CONNECTIONS();
 	return children_;
 }
 
-KeyFrame* KeyFrame::GetParent()
+KeyFrame* KeyFrame::GetParent() const
 {
 	LOCK_MUTEX_CONNECTIONS();
 	return parent_;
 }
 
-bool KeyFrame::hasChild(KeyFrame* keyframe)
+bool KeyFrame::hasChild(KeyFrame* keyframe) const
 {
 	LOCK_MUTEX_CONNECTIONS();
 	return children_.count(keyframe);
@@ -391,7 +391,7 @@ void KeyFrame::AddLoopEdge(KeyFrame* keyframe)
 	loopEdges_.insert(keyframe);
 }
 
-std::set<KeyFrame*> KeyFrame::GetLoopEdges()
+std::set<KeyFrame*> KeyFrame::GetLoopEdges() const
 {
 	LOCK_MUTEX_CONNECTIONS();
 	return loopEdges_;
@@ -508,7 +508,7 @@ void KeyFrame::SetBadFlag()
 	keyFrameDB_->erase(this);
 }
 
-bool KeyFrame::isBad()
+bool KeyFrame::isBad() const
 {
 	LOCK_MUTEX_CONNECTIONS();
 	return bad_;
@@ -537,7 +537,7 @@ bool KeyFrame::IsInImage(float x, float y) const
 	return imageBounds.Contains(x, y);
 }
 
-cv::Mat KeyFrame::UnprojectStereo(int i)
+cv::Mat KeyFrame::UnprojectStereo(int i) const
 {
 	const float Zc = depth[i];
 	if (Zc <= 0.f)
@@ -558,7 +558,7 @@ cv::Mat KeyFrame::UnprojectStereo(int i)
 	return GetR(Twc) * x3Dc + Gett(Twc);
 }
 
-float KeyFrame::ComputeSceneMedianDepth(int q)
+float KeyFrame::ComputeSceneMedianDepth(int q) const
 {
 	std::vector<MapPoint*> mappoints;
 	cv::Mat Tcw_;
