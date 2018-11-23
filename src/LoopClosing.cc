@@ -281,8 +281,8 @@ public:
 
 	bool ComputeSim3(KeyFrame* currentKF, std::vector<KeyFrame*>& candidateKFs, Loop& loop)
 	{
-		const bool bMatch = FindLoopInCandidateKFs(currentKF, candidateKFs, loop, fixScale_);
-		if (!bMatch)
+		const bool found = FindLoopInCandidateKFs(currentKF, candidateKFs, loop, fixScale_);
+		if (!found)
 		{
 			for (KeyFrame* candidateKF : candidateKFs)
 				candidateKF->SetErase();
@@ -291,24 +291,18 @@ public:
 		}
 
 		// Retrieve MapPoints seen in Loop Keyframe and neighbors
-		std::vector<KeyFrame*> vpLoopConnectedKFs = loop.matchedKF->GetVectorCovisibleKeyFrames();
-		vpLoopConnectedKFs.push_back(loop.matchedKF);
+		std::vector<KeyFrame*> connectedKFs = loop.matchedKF->GetVectorCovisibleKeyFrames();
+		connectedKFs.push_back(loop.matchedKF);
 		loop.loopMapPoints.clear();
-		for (vector<KeyFrame*>::iterator vit = vpLoopConnectedKFs.begin(); vit != vpLoopConnectedKFs.end(); vit++)
+		for (KeyFrame* connectedKF : connectedKFs)
 		{
-			KeyFrame* pKF = *vit;
-			vector<MapPoint*> vpMapPoints = pKF->GetMapPointMatches();
-			for (size_t i = 0, iend = vpMapPoints.size(); i < iend; i++)
+			for (MapPoint* mappoint : connectedKF->GetMapPointMatches())
 			{
-				MapPoint* pMP = vpMapPoints[i];
-				if (pMP)
-				{
-					if (!pMP->isBad() && pMP->mnLoopPointForKF != currentKF->mnId)
-					{
-						loop.loopMapPoints.push_back(pMP);
-						pMP->mnLoopPointForKF = currentKF->mnId;
-					}
-				}
+				if (!mappoint || mappoint->isBad() || mappoint->mnLoopPointForKF == currentKF->mnId)
+					continue;
+
+				loop.loopMapPoints.push_back(mappoint);
+				mappoint->mnLoopPointForKF = currentKF->mnId;
 			}
 		}
 
@@ -317,14 +311,10 @@ public:
 		matcher.SearchByProjection(currentKF, loop.Scw, loop.loopMapPoints, loop.matchedPoints, 10);
 
 		// If enough matches accept Loop
-		int nTotalMatches = 0;
-		for (size_t i = 0; i < loop.matchedPoints.size(); i++)
-		{
-			if (loop.matchedPoints[i])
-				nTotalMatches++;
-		}
+		const auto nmatches = std::count_if(std::begin(loop.matchedPoints), std::end(loop.matchedPoints),
+			[](const MapPoint* mappoint) { return mappoint != nullptr; });
 
-		if (nTotalMatches >= 40)
+		if (nmatches >= 40)
 		{
 			for (KeyFrame* candidateKF : candidateKFs)
 				if (candidateKF != loop.matchedKF)
@@ -338,7 +328,6 @@ public:
 			currentKF->SetErase();
 			return false;
 		}
-
 	}
 
 private:
