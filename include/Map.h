@@ -44,16 +44,16 @@ public:
 	void EraseKeyFrame(KeyFrame* keyframe);
 	void SetReferenceMapPoints(const std::vector<MapPoint*>& mappoints);
 	void InformNewBigChange();
-	int GetLastBigChangeIdx();
+	int GetLastBigChangeIdx() const;
 
-	std::vector<KeyFrame*> GetAllKeyFrames();
-	std::vector<MapPoint*> GetAllMapPoints();
-	std::vector<MapPoint*> GetReferenceMapPoints();
+	std::vector<KeyFrame*> GetAllKeyFrames() const;
+	std::vector<MapPoint*> GetAllMapPoints() const;
+	std::vector<MapPoint*> GetReferenceMapPoints() const;
 
-	size_t MapPointsInMap();
-	size_t KeyFramesInMap();
+	size_t MapPointsInMap() const;
+	size_t KeyFramesInMap() const;
 
-	frameid_t GetMaxKFid();
+	frameid_t GetMaxKFid() const;
 
 	void clear();
 
@@ -76,7 +76,7 @@ protected:
 	// Index related to a big change in the map (loop closure, global BA)
 	int bigChangeId_;
 
-	std::mutex mutexMap_;
+	mutable std::mutex mutexMap_;
 };
 
 } //namespace ORB_SLAM

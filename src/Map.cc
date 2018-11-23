@@ -75,43 +75,43 @@ void Map::InformNewBigChange()
 	bigChangeId_++;
 }
 
-int Map::GetLastBigChangeIdx()
+int Map::GetLastBigChangeIdx() const
 {
 	LOCK_MUTEX_MAP();
 	return bigChangeId_;
 }
 
-std::vector<KeyFrame*> Map::GetAllKeyFrames()
+std::vector<KeyFrame*> Map::GetAllKeyFrames() const
 {
 	LOCK_MUTEX_MAP();
 	return std::vector<KeyFrame*>(keyframes_.begin(), keyframes_.end());
 }
 
-std::vector<MapPoint*> Map::GetAllMapPoints()
+std::vector<MapPoint*> Map::GetAllMapPoints() const
 {
 	LOCK_MUTEX_MAP();
 	return std::vector<MapPoint*>(mappoints_.begin(), mappoints_.end());
 }
 
-size_t Map::MapPointsInMap()
+size_t Map::MapPointsInMap() const
 {
 	LOCK_MUTEX_MAP();
 	return mappoints_.size();
 }
 
-size_t Map::KeyFramesInMap()
+size_t Map::KeyFramesInMap() const
 {
 	LOCK_MUTEX_MAP();
 	return keyframes_.size();
 }
 
-std::vector<MapPoint*> Map::GetReferenceMapPoints()
+std::vector<MapPoint*> Map::GetReferenceMapPoints() const
 {
 	LOCK_MUTEX_MAP();
 	return referenceMapPoints_;
 }
 
-frameid_t Map::GetMaxKFid()
+frameid_t Map::GetMaxKFid() const
 {
 	LOCK_MUTEX_MAP();
 	return maxKFId_;
