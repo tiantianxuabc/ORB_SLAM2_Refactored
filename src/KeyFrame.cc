@@ -47,13 +47,12 @@ KeyFrame::KeyFrame(Frame& frame, Map* map, KeyFrameDatabase* keyframeDB) :
 
 void KeyFrame::ComputeBoW()
 {
-	if (bowVector.empty() || featureVector.empty())
-	{
-		vector<cv::Mat> vCurrentDesc = Converter::toDescriptorVector(descriptorsL);
-		// Feature vector associate features with nodes in the 4th level (from leaves up)
-		// We assume the vocabulary tree has 6 levels, change the 4 otherwise
-		voc_->transform(vCurrentDesc, bowVector, featureVector, 4);
-	}
+	if (!bowVector.empty() && !featureVector.empty())
+		return;
+
+	// Feature vector associate features with nodes in the 4th level (from leaves up)
+	// We assume the vocabulary tree has 6 levels, change the 4 otherwise
+	voc_->transform(Converter::toDescriptorVector(descriptorsL), bowVector, featureVector, 4);
 }
 
 void KeyFrame::SetPose(const cv::Mat &Tcw_)
