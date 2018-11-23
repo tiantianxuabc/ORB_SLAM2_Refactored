@@ -39,6 +39,20 @@ auto Gett = CameraPose::Gett;
 
 long unsigned int KeyFrame::nextId = 0;
 
+using WeightAndKeyFrame = std::pair<int, KeyFrame*>;
+
+template <typename T, typename U>
+static void Split(const std::vector<std::pair<T, U>>& vec12, std::vector<T>& vec1, std::vector<U>& vec2)
+{
+	vec1.clear();
+	vec2.clear();
+	for (const auto& v : vec12)
+	{
+		vec1.push_back(v.first);
+		vec2.push_back(v.second);
+	}
+}
+
 KeyFrame::KeyFrame(Frame& frame, Map* map, KeyFrameDatabase* keyframeDB) :
 	frameId(frame.id), timestamp(frame.timestamp), grid(frame.grid),
 	trackReferenceForFrame(0), fuseTargetForKF(0), BALocalForKF(0), BAFixedForKF(0),
@@ -133,22 +147,15 @@ void KeyFrame::AddConnection(KeyFrame* keyframe, int weight)
 void KeyFrame::UpdateBestCovisibles()
 {
 	LOCK_MUTEX_CONNECTIONS();
-	vector<pair<int, KeyFrame*> > vPairs;
-	vPairs.reserve(connectionTo_.size());
-	for (map<KeyFrame*, int>::iterator mit = connectionTo_.begin(), mend = connectionTo_.end(); mit != mend; mit++)
-		vPairs.push_back(make_pair(mit->second, mit->first));
 
-	sort(vPairs.begin(), vPairs.end());
-	list<KeyFrame*> lKFs;
-	list<int> lWs;
-	for (size_t i = 0, iend = vPairs.size(); i < iend; i++)
-	{
-		lKFs.push_front(vPairs[i].second);
-		lWs.push_front(vPairs[i].first);
-	}
+	std::vector<WeightAndKeyFrame> pairs;
+	pairs.reserve(connectionTo_.size());
 
-	orderedConnectedKeyFrames_ = vector<KeyFrame*>(lKFs.begin(), lKFs.end());
-	orderedWeights_ = vector<int>(lWs.begin(), lWs.end());
+	for (const auto& v : connectionTo_)
+		pairs.push_back(std::make_pair(v.second, v.first));
+	
+	std::sort(std::begin(pairs), std::end(pairs), std::greater<WeightAndKeyFrame>());
+	Split(pairs, orderedWeights_, orderedConnectedKeyFrames_);
 }
 
 set<KeyFrame*> KeyFrame::GetConnectedKeyFrames()
