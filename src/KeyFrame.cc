@@ -34,6 +34,9 @@
 namespace ORB_SLAM2
 {
 
+auto GetR = CameraPose::GetR;
+auto Gett = CameraPose::Gett;
+
 long unsigned int KeyFrame::nextId = 0;
 
 KeyFrame::KeyFrame(Frame& frame, Map* map, KeyFrameDatabase* keyframeDB) :
@@ -61,20 +64,20 @@ void KeyFrame::ComputeBoW()
 	voc_->transform(Converter::toDescriptorVector(descriptorsL), bowVector, featureVector, 4);
 }
 
-void KeyFrame::SetPose(const cv::Mat &Tcw_)
+void KeyFrame::SetPose(const cv::Mat& Tcw_)
 {
 	LOCK_MUTEX_POSE();
 	Tcw_.copyTo(Tcw);
-	cv::Mat Rcw = Tcw.rowRange(0, 3).colRange(0, 3);
-	cv::Mat tcw = Tcw.rowRange(0, 3).col(3);
+	cv::Mat Rcw = GetR(Tcw);
+	cv::Mat tcw = Gett(Tcw);
 	cv::Mat Rwc = Rcw.t();
-	Ow = -Rwc*tcw;
+	Ow = -Rwc * tcw;
 
 	Twc = cv::Mat::eye(4, 4, Tcw.type());
-	Rwc.copyTo(Twc.rowRange(0, 3).colRange(0, 3));
-	Ow.copyTo(Twc.rowRange(0, 3).col(3));
+	Rwc.copyTo(GetR(Twc));
+	Ow.copyTo(Gett(Twc));
 	cv::Mat center = (cv::Mat_<float>(4, 1) << halfBaseline_, 0, 0, 1);
-	Cw = Twc*center;
+	Cw = Twc * center;
 }
 
 cv::Mat KeyFrame::GetPose()
@@ -105,13 +108,13 @@ cv::Mat KeyFrame::GetStereoCenter()
 cv::Mat KeyFrame::GetRotation()
 {
 	LOCK_MUTEX_POSE();
-	return Tcw.rowRange(0, 3).colRange(0, 3).clone();
+	return GetR(Tcw).clone();
 }
 
 cv::Mat KeyFrame::GetTranslation()
 {
 	LOCK_MUTEX_POSE();
-	return Tcw.rowRange(0, 3).col(3).clone();
+	return Gett(Tcw).clone();
 }
 
 void KeyFrame::AddConnection(KeyFrame *pKF, const int &weight)
@@ -586,7 +589,7 @@ cv::Mat KeyFrame::UnprojectStereo(int i)
 		cv::Mat x3Dc = (cv::Mat_<float>(3, 1) << x, y, z);
 
 		LOCK_MUTEX_POSE();
-		return Twc.rowRange(0, 3).colRange(0, 3)*x3Dc + Twc.rowRange(0, 3).col(3);
+		return GetR(Twc) * x3Dc + Gett(Twc);
 	}
 	else
 		return cv::Mat();

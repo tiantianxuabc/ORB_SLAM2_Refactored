@@ -432,9 +432,9 @@ std::vector<size_t> FeaturesGrid::GetFeaturesInArea(float x, float y, float r, i
 
 void CameraPose::Update()
 {
-	Rcw = Tcw.rowRange(0, 3).colRange(0, 3);
+	Rcw = GetR(Tcw);
 	Rwc = Rcw.t();
-	tcw = Tcw.rowRange(0, 3).col(3);
+	tcw = Gett(Tcw);
 	Ow = -Rcw.t() * tcw;
 }
 

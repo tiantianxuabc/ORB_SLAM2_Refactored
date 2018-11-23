@@ -59,6 +59,9 @@ struct ScalePyramidInfo
 
 struct CameraPose
 {
+	static inline cv::Mat GetR(const cv::Mat& T) { return T(cv::Range(0, 3), cv::Range(0, 3)); }
+	static inline cv::Mat Gett(const cv::Mat& T) { return T(cv::Range(0, 3), cv::Range(3, 4)); }
+
 	// Computes rotation, translation and camera center matrices from the camera pose.
 	void Update();
 
