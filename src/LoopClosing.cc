@@ -70,15 +70,9 @@ public:
 		// If enough matches are found, we setup a Sim3Solver
 		ORBmatcher matcher(0.75f, true);
 
-		std::vector<Sim3Solver*> solvers;
-		solvers.resize(ninitialCandidates);
-
-		std::vector<vector<MapPoint*>> vmatches;
-		vmatches.resize(ninitialCandidates);
-
-		std::vector<bool> discarded;
-		discarded.resize(ninitialCandidates);
-
+		std::vector<Sim3Solver*> solvers(ninitialCandidates);
+		std::vector<std::vector<MapPoint*>> vmatches(ninitialCandidates);
+		std::vector<bool> discarded(ninitialCandidates);
 		int ncandidates = 0; //candidates with enough matches
 
 		for (int i = 0; i < ninitialCandidates; i++)
