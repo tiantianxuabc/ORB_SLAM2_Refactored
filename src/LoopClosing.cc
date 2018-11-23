@@ -746,8 +746,8 @@ public:
 				KeyFrame* currentKF = nullptr;
 				{
 					LOCK_MUTEX_LOOP_QUEUE();
-					currentKF = loopKeyFrameQueue_.front();
-					loopKeyFrameQueue_.pop_front();
+					currentKF = keyFrameQueue_.front();
+					keyFrameQueue_.pop_front();
 					currentKF->SetNotErase();
 				}
 
@@ -787,7 +787,7 @@ public:
 	{
 		LOCK_MUTEX_LOOP_QUEUE();
 		if (keyframe->mnId != 0)
-			loopKeyFrameQueue_.push_back(keyframe);
+			keyFrameQueue_.push_back(keyframe);
 	}
 
 	void RequestReset() override
@@ -833,7 +833,7 @@ public:
 	bool CheckNewKeyFrames() const
 	{
 		LOCK_MUTEX_LOOP_QUEUE();
-		return(!loopKeyFrameQueue_.empty());
+		return(!keyFrameQueue_.empty());
 	}
 
 	void ResetIfRequested()
@@ -841,7 +841,7 @@ public:
 		LOCK_MUTEX_RESET();
 		if (resetRequested_)
 		{
-			loopKeyFrameQueue_.clear();
+			keyFrameQueue_.clear();
 			lastLoopKFId_ = 0;
 			resetRequested_ = false;
 		}
@@ -870,7 +870,7 @@ private:
 	Tracking* tracker_;
 	LocalMapping *localMapper_;
 
-	std::list<KeyFrame*> loopKeyFrameQueue_;
+	std::list<KeyFrame*> keyFrameQueue_;
 
 	// Loop detector variables
 	KeyFrameDatabase* keyframeDB_;
