@@ -50,7 +50,7 @@ MapPoint::MapPoint(const cv::Mat& Xw, KeyFrame* referenceKF, Map* map) :
 	id = nextId++;
 }
 
-MapPoint::MapPoint(const cv::Mat& Xw, Map* map, Frame* frame, const int &idx) :
+MapPoint::MapPoint(const cv::Mat& Xw, Map* map, Frame* frame, int idx) :
 	firstKFid(-1), firstFrame(frame->id), nobservations_(0), trackReferenceForFrame(0), lastFrameSeen(0),
 	BALocalForKF(0), fuseCandidateForKF(0), loopPointForKF(0), correctedByKF(0),
 	correctedReference(0), BAGlobalForKF(0), referenceKF_(nullptr), nvisible_(1),
@@ -63,14 +63,14 @@ MapPoint::MapPoint(const cv::Mat& Xw, Map* map, Frame* frame, const int &idx) :
 
 	cv::Mat PC = Xw - Ow;
 	const float dist = cv::norm(PC);
-	const int level = frame->keypointsUn[idxF].octave;
+	const int level = frame->keypointsUn[idx].octave;
 	const float levelScaleFactor = frame->pyramid.scaleFactors[level];
 	const int nLevels = frame->pyramid.nlevels;
 
 	maxDistance_ = dist*levelScaleFactor;
 	minDistance_ = maxDistance_ / frame->pyramid.scaleFactors[nLevels - 1];
 
-	frame->descriptorsL.row(idxF).copyTo(mDescriptor);
+	frame->descriptorsL.row(idx).copyTo(mDescriptor);
 
 	// MapPoints can be created from Tracking and Local Mapping. This mutex avoid conflicts with id.
 	LOCK_MUTEX_POINT_CREATION();

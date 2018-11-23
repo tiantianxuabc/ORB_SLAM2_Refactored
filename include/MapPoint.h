@@ -42,7 +42,7 @@ public:
 	using mappointid_t = long unsigned int;
 
 	MapPoint(const cv::Mat& Xw, KeyFrame* referenceKF, Map* map);
-	MapPoint(const cv::Mat& Xw, Map* map, Frame* frame, const int &idx);
+	MapPoint(const cv::Mat& Xw, Map* map, Frame* frame, int idx);
 
 	void SetWorldPos(const cv::Mat &Pos);
 	cv::Mat GetWorldPos();
