@@ -36,8 +36,7 @@ void Map::AddKeyFrame(KeyFrame* keyframe)
 {
 	LOCK_MUTEX_MAP();
 	keyframes_.insert(keyframe);
-	if (keyframe->id > maxKFId_)
-		maxKFId_ = keyframe->id;
+	maxKFId_ = std::max(maxKFId_, keyframe->id);
 }
 
 void Map::AddMapPoint(MapPoint* mappoint)
