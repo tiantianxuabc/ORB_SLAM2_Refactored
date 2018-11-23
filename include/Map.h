@@ -36,11 +36,11 @@ class Map
 public:
 	Map();
 
-	void AddKeyFrame(KeyFrame* pKF);
-	void AddMapPoint(MapPoint* pMP);
-	void EraseMapPoint(MapPoint* pMP);
-	void EraseKeyFrame(KeyFrame* pKF);
-	void SetReferenceMapPoints(const std::vector<MapPoint*> &vpMPs);
+	void AddKeyFrame(KeyFrame* keyframe);
+	void AddMapPoint(MapPoint* mappoint);
+	void EraseMapPoint(MapPoint* mappoint);
+	void EraseKeyFrame(KeyFrame* keyframe);
+	void SetReferenceMapPoints(const std::vector<MapPoint*>& mappoints);
 	void InformNewBigChange();
 	int GetLastBigChangeIdx();
 
@@ -63,17 +63,18 @@ public:
 	std::mutex mMutexPointCreation;
 
 protected:
-	std::set<MapPoint*> mspMapPoints;
-	std::set<KeyFrame*> mspKeyFrames;
 
-	std::vector<MapPoint*> mvpReferenceMapPoints;
+	std::set<MapPoint*> mappoints_;
+	std::set<KeyFrame*> keyframes_;
 
-	long unsigned int mnMaxKFid;
+	std::vector<MapPoint*> referenceMapPoints_;
+
+	int maxKFId_;
 
 	// Index related to a big change in the map (loop closure, global BA)
-	int mnBigChangeIdx;
+	int bigChangeId_;
 
-	std::mutex mMutexMap;
+	std::mutex mutexMap_;
 };
 
 } //namespace ORB_SLAM
