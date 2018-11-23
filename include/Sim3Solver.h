@@ -72,8 +72,8 @@ protected:
 protected:
 
 	// KeyFrames and matches
-	KeyFrame* mpKF1;
-	KeyFrame* mpKF2;
+	//KeyFrame* mpKF1;
+	//KeyFrame* mpKF2;
 
 	std::vector<cv::Mat> mvX3Dc1;
 	std::vector<cv::Mat> mvX3Dc2;
@@ -81,8 +81,8 @@ protected:
 	std::vector<MapPoint*> mvpMapPoints2;
 	std::vector<MapPoint*> mvpMatches12;
 	std::vector<size_t> mvnIndices1;
-	std::vector<size_t> mvSigmaSquare1;
-	std::vector<size_t> mvSigmaSquare2;
+	//std::vector<size_t> mvSigmaSquare1;
+	//std::vector<size_t> mvSigmaSquare2;
 	std::vector<size_t> mvnMaxError1;
 	std::vector<size_t> mvnMaxError2;
 
@@ -96,7 +96,7 @@ protected:
 	cv::Mat mT12i;
 	cv::Mat mT21i;*/
 	std::vector<bool> mvbInliersi;
-	int mnInliersi;
+	//int mnInliersi;
 
 	// Current Ransac State
 	int mnIterations;
@@ -127,8 +127,8 @@ protected:
 	int mRansacMaxIts;
 
 	// Threshold inlier/outlier. e = dist(Pi,T_ij*Pj)^2 < 5.991*mSigma2
-	float mTh;
-	float mSigma2;
+	//float mTh;
+	//float mSigma2;
 
 	// Calibration
 	cv::Mat mK1;
