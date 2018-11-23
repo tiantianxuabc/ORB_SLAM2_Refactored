@@ -366,7 +366,7 @@ void KeyFrame::ChangeParent(KeyFrame* keyframe)
 	keyframe->AddChild(this);
 }
 
-set<KeyFrame*> KeyFrame::GetChilds()
+std::set<KeyFrame*> KeyFrame::GetChildren()
 {
 	LOCK_MUTEX_CONNECTIONS();
 	return children_;
