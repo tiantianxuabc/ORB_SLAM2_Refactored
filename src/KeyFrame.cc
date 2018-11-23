@@ -391,7 +391,7 @@ void KeyFrame::AddLoopEdge(KeyFrame* keyframe)
 	loopEdges_.insert(keyframe);
 }
 
-set<KeyFrame*> KeyFrame::GetLoopEdges()
+std::set<KeyFrame*> KeyFrame::GetLoopEdges()
 {
 	LOCK_MUTEX_CONNECTIONS();
 	return loopEdges_;
