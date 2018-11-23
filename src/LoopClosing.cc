@@ -39,6 +39,7 @@
 #define LOCK_MUTEX_FINISH()     std::unique_lock<std::mutex> lock2(mutexFinish_);
 #define LOCK_MUTEX_RESET()      std::unique_lock<std::mutex> lock3(mutexReset_);
 #define LOCK_MUTEX_GLOBAL_BA()  std::unique_lock<std::mutex> lock4(mutexGBA_);
+#define LOCK_MUTEX_MAP_UPDATE() std::unique_lock<std::mutex> lock5(map_->mMutexMapUpdate);
 
 namespace ORB_SLAM2
 {
@@ -408,7 +409,7 @@ public:
 				}
 
 				// Get Map Mutex
-				unique_lock<mutex> lock(map_->mMutexMapUpdate);
+				LOCK_MUTEX_MAP_UPDATE();
 
 				// Correct keyframes starting at map first keyframe
 				std::list<KeyFrame*> toCheck(std::begin(map_->mvpKeyFrameOrigins), std::end(map_->mvpKeyFrameOrigins));
@@ -579,7 +580,7 @@ public:
 
 		{
 			// Get Map Mutex
-			unique_lock<mutex> lock(map_->mMutexMapUpdate);
+			LOCK_MUTEX_MAP_UPDATE();
 			for (KeyFrame* connectedKF : connectedKFs)
 			{
 				cv::Mat Tiw = connectedKF->GetPose();
@@ -678,7 +679,7 @@ public:
 			matcher.Fuse(connectedKF, cvScw, loopMapPoints, 4, replacePoints);
 
 			// Get Map Mutex
-			unique_lock<mutex> lock(map_->mMutexMapUpdate);
+			LOCK_MUTEX_MAP_UPDATE();
 			for (size_t i = 0; i < loopMapPoints.size(); i++)
 			{
 				MapPoint* mappoint = replacePoints[i];
