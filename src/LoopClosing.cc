@@ -38,7 +38,7 @@
 #define LOCK_MUTEX_LOOP_QUEUE() std::unique_lock<std::mutex> lock1(mutexLoopQueue_);
 #define LOCK_MUTEX_FINISH()     std::unique_lock<std::mutex> lock2(mutexFinish_);
 #define LOCK_MUTEX_RESET()      std::unique_lock<std::mutex> lock3(mutexReset_);
-#define LOCK_MUTEX_GLOBAL_BA()  std::unique_lock<std::mutex> lock4(mMutexGBA);
+#define LOCK_MUTEX_GLOBAL_BA()  std::unique_lock<std::mutex> lock4(mutexGBA_);
 
 namespace ORB_SLAM2
 {
@@ -371,21 +371,20 @@ class GlobalBA
 {
 public:
 
-	GlobalBA(Map* pMap) : mpMap(pMap), mpLocalMapper(nullptr), mbRunningGBA(false),
-		mbFinishedGBA(true), mbStopGBA(false), mnFullBAIdx(0) {}
+	GlobalBA(Map* map) : map_(map), localMapper_(nullptr), running_(false), finished_(true), stop_(false), fullBAIdx_(0) {}
 
-	void SetLocalMapper(LocalMapping *pLocalMapper)
+	void SetLocalMapper(LocalMapping* localMapper)
 	{
-		mpLocalMapper = pLocalMapper;
+		localMapper_ = localMapper;
 	}
 
 	// This function will run in a separate thread
-	void _Run(int nLoopKF)
+	void _Run(int loopKFId)
 	{
 		cout << "Starting Global Bundle Adjustment" << endl;
 
-		int idx = mnFullBAIdx;
-		Optimizer::GlobalBundleAdjustemnt(mpMap, 10, &mbStopGBA, nLoopKF, false);
+		int idx = fullBAIdx_;
+		Optimizer::GlobalBundleAdjustemnt(map_, 10, &stop_, loopKFId, false);
 
 		// Update all MapPoints and KeyFrames
 		// Local Mapping was active during BA, that means that there might be new keyframes
@@ -393,26 +392,26 @@ public:
 		// We need to propagate the correction through the spanning tree
 		{
 			LOCK_MUTEX_GLOBAL_BA();
-			if (idx != mnFullBAIdx)
+			if (idx != fullBAIdx_)
 				return;
 
-			if (!mbStopGBA)
+			if (!stop_)
 			{
 				cout << "Global Bundle Adjustment finished" << endl;
 				cout << "Updating map ..." << endl;
-				mpLocalMapper->RequestStop();
+				localMapper_->RequestStop();
 				// Wait until Local Mapping has effectively stopped
 
-				while (!mpLocalMapper->isStopped() && !mpLocalMapper->isFinished())
+				while (!localMapper_->isStopped() && !localMapper_->isFinished())
 				{
 					usleep(1000);
 				}
 
 				// Get Map Mutex
-				unique_lock<mutex> lock(mpMap->mMutexMapUpdate);
+				unique_lock<mutex> lock(map_->mMutexMapUpdate);
 
 				// Correct keyframes starting at map first keyframe
-				list<KeyFrame*> lpKFtoCheck(mpMap->mvpKeyFrameOrigins.begin(), mpMap->mvpKeyFrameOrigins.end());
+				list<KeyFrame*> lpKFtoCheck(map_->mvpKeyFrameOrigins.begin(), map_->mvpKeyFrameOrigins.end());
 
 				while (!lpKFtoCheck.empty())
 				{
@@ -422,11 +421,11 @@ public:
 					for (set<KeyFrame*>::const_iterator sit = sChilds.begin(); sit != sChilds.end(); sit++)
 					{
 						KeyFrame* pChild = *sit;
-						if (pChild->mnBAGlobalForKF != nLoopKF)
+						if (pChild->mnBAGlobalForKF != loopKFId)
 						{
 							cv::Mat Tchildc = pChild->GetPose()*Twc;
 							pChild->mTcwGBA = Tchildc*pKF->mTcwGBA;//*Tcorc*pKF->mTcwGBA;
-							pChild->mnBAGlobalForKF = nLoopKF;
+							pChild->mnBAGlobalForKF = loopKFId;
 
 						}
 						lpKFtoCheck.push_back(pChild);
@@ -438,7 +437,7 @@ public:
 				}
 
 				// Correct MapPoints
-				const vector<MapPoint*> vpMPs = mpMap->GetAllMapPoints();
+				const vector<MapPoint*> vpMPs = map_->GetAllMapPoints();
 
 				for (size_t i = 0; i < vpMPs.size(); i++)
 				{
@@ -447,7 +446,7 @@ public:
 					if (pMP->isBad())
 						continue;
 
-					if (pMP->mnBAGlobalForKF == nLoopKF)
+					if (pMP->mnBAGlobalForKF == loopKFId)
 					{
 						// If optimized by Global BA, just update
 						pMP->SetWorldPos(pMP->mPosGBA);
@@ -457,7 +456,7 @@ public:
 						// Update according to the correction of its reference keyframe
 						KeyFrame* pRefKF = pMP->GetReferenceKeyFrame();
 
-						if (pRefKF->mnBAGlobalForKF != nLoopKF)
+						if (pRefKF->mnBAGlobalForKF != loopKFId)
 							continue;
 
 						// Map to non-corrected camera
@@ -474,57 +473,57 @@ public:
 					}
 				}
 
-				mpMap->InformNewBigChange();
+				map_->InformNewBigChange();
 
-				mpLocalMapper->Release();
+				localMapper_->Release();
 
 				cout << "Map updated!" << endl;
 			}
 
-			mbFinishedGBA = true;
-			mbRunningGBA = false;
+			finished_ = true;
+			running_ = false;
 		}
 	}
 
-	void Run(int nLoopKF)
+	void Run(int loopKFId)
 	{
-		mbRunningGBA = true;
-		mbFinishedGBA = false;
-		mbStopGBA = false;
-		mpThreadGBA.Reset(&GlobalBA::_Run, this, nLoopKF);
+		running_ = true;
+		finished_ = false;
+		stop_ = false;
+		thread_.Reset(&GlobalBA::_Run, this, loopKFId);
 	}
 
 	void Stop()
 	{
 		LOCK_MUTEX_GLOBAL_BA();
-		mbStopGBA = true;
+		stop_ = true;
 
-		mnFullBAIdx++;
-		mpThreadGBA.Detach();
+		fullBAIdx_++;
+		thread_.Detach();
 	}
 
 	bool isRunningGBA() const
 	{
-		unique_lock<std::mutex> lock(mMutexGBA);
-		return mbRunningGBA;
+		unique_lock<std::mutex> lock(mutexGBA_);
+		return running_;
 	}
 
 	bool isFinishedGBA() const
 	{
-		unique_lock<std::mutex> lock(mMutexGBA);
-		return mbFinishedGBA;
+		unique_lock<std::mutex> lock(mutexGBA_);
+		return finished_;
 	}
 
 private:
 
-	Map* mpMap;
-	LocalMapping* mpLocalMapper;
-	bool mbRunningGBA;
-	bool mbFinishedGBA;
-	bool mbStopGBA;
-	int mnFullBAIdx;
-	mutable std::mutex mMutexGBA;
-	ReusableThread mpThreadGBA;
+	Map* map_;
+	LocalMapping* localMapper_;
+	bool running_;
+	bool finished_;
+	bool stop_;
+	int fullBAIdx_;
+	mutable std::mutex mutexGBA_;
+	ReusableThread thread_;
 };
 
 class LoopCorrector
