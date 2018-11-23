@@ -45,43 +45,40 @@ public:
 	MapPoint(const cv::Mat& Xw, Map* map, Frame* frame, int idx);
 
 	void SetWorldPos(const cv::Mat& Xw);
-	cv::Mat GetWorldPos();
+	cv::Mat GetWorldPos() const;
 
-	cv::Mat GetNormal();
-	KeyFrame* GetReferenceKeyFrame();
+	cv::Mat GetNormal() const;
+	KeyFrame* GetReferenceKeyFrame() const;
 
-	std::map<KeyFrame*, size_t> GetObservations();
-	int Observations();
+	std::map<KeyFrame*, size_t> GetObservations() const;
+	int Observations() const;
 
 	void AddObservation(KeyFrame* keyframe, size_t idx);
 	void EraseObservation(KeyFrame* keyframe);
 
-	int GetIndexInKeyFrame(KeyFrame* keyframe);
-	bool IsInKeyFrame(KeyFrame* keyframe);
+	int GetIndexInKeyFrame(KeyFrame* keyframe) const;
+	bool IsInKeyFrame(KeyFrame* keyframe) const;
 
 	void SetBadFlag();
-	bool isBad();
+	bool isBad() const;
 
 	void Replace(MapPoint* mappoint);
-	MapPoint* GetReplaced();
+	MapPoint* GetReplaced() const;
 
 	void IncreaseVisible(int n = 1);
 	void IncreaseFound(int n = 1);
-	float GetFoundRatio();
-	inline int GetFound() {
-		return nfound_;
-	}
-
+	float GetFoundRatio() const;
+	
 	void ComputeDistinctiveDescriptors();
 
-	cv::Mat GetDescriptor();
+	cv::Mat GetDescriptor() const;
 
 	void UpdateNormalAndDepth();
 
-	float GetMinDistanceInvariance();
-	float GetMaxDistanceInvariance();
-	int PredictScale(float currentDist, KeyFrame*keyframe);
-	int PredictScale(float currentDist, Frame* frame);
+	float GetMinDistanceInvariance() const;
+	float GetMaxDistanceInvariance() const;
+	int PredictScale(float currentDist, const KeyFrame* keyframe) const;
+	int PredictScale(float currentDist, const Frame* frame) const;
 
 public:
 
@@ -146,8 +143,8 @@ protected:
 
 	Map* map_;
 
-	std::mutex mutexPos_;
-	std::mutex mutexFeatures_;
+	mutable std::mutex mutexPos_;
+	mutable std::mutex mutexFeatures_;
 };
 
 } //namespace ORB_SLAM

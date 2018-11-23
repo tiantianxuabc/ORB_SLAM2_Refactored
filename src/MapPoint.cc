@@ -28,7 +28,7 @@
 #define LOCK_MUTEX_POINT_CREATION() std::unique_lock<std::mutex> lock1(map_->mutexPointCreation);
 #define LOCK_MUTEX_POSITION()       std::unique_lock<std::mutex> lock2(mutexPos_);
 #define LOCK_MUTEX_FEATURES()       std::unique_lock<std::mutex> lock3(mutexFeatures_);
-#define LOCK_MUTEX_GLOBAL()         std::unique_lock<std::mutex> lock3(globalMutex_);
+#define LOCK_MUTEX_GLOBAL()         std::unique_lock<std::mutex> lock4(globalMutex_);
 
 namespace ORB_SLAM2
 {
@@ -82,19 +82,19 @@ void MapPoint::SetWorldPos(const cv::Mat& Xw)
 	Xw.copyTo(Xw_);
 }
 
-cv::Mat MapPoint::GetWorldPos()
+cv::Mat MapPoint::GetWorldPos() const
 {
 	LOCK_MUTEX_POSITION();
 	return Xw_.clone();
 }
 
-cv::Mat MapPoint::GetNormal()
+cv::Mat MapPoint::GetNormal() const
 {
 	LOCK_MUTEX_POSITION();
 	return normal_.clone();
 }
 
-KeyFrame* MapPoint::GetReferenceKeyFrame()
+KeyFrame* MapPoint::GetReferenceKeyFrame() const
 {
 	LOCK_MUTEX_FEATURES();
 	return referenceKF_;
@@ -143,13 +143,13 @@ void MapPoint::EraseObservation(KeyFrame* keyframe)
 		SetBadFlag();
 }
 
-std::map<KeyFrame*, size_t> MapPoint::GetObservations()
+std::map<KeyFrame*, size_t> MapPoint::GetObservations() const
 {
 	LOCK_MUTEX_FEATURES();
 	return observations_;
 }
 
-int MapPoint::Observations()
+int MapPoint::Observations() const
 {
 	LOCK_MUTEX_FEATURES();
 	return nobservations_;
@@ -175,7 +175,7 @@ void MapPoint::SetBadFlag()
 	map_->EraseMapPoint(this);
 }
 
-MapPoint* MapPoint::GetReplaced()
+MapPoint* MapPoint::GetReplaced() const
 {
 	LOCK_MUTEX_FEATURES();
 	LOCK_MUTEX_POSITION();
@@ -223,7 +223,7 @@ void MapPoint::Replace(MapPoint* mappoint)
 	map_->EraseMapPoint(this);
 }
 
-bool MapPoint::isBad()
+bool MapPoint::isBad() const
 {
 	LOCK_MUTEX_FEATURES();
 	LOCK_MUTEX_POSITION();
@@ -242,7 +242,7 @@ void MapPoint::IncreaseFound(int n)
 	nfound_ += n;
 }
 
-float MapPoint::GetFoundRatio()
+float MapPoint::GetFoundRatio() const
 {
 	LOCK_MUTEX_FEATURES();
 	return static_cast<float>(nfound_) / nvisible_;
@@ -314,19 +314,19 @@ void MapPoint::ComputeDistinctiveDescriptors()
 	}
 }
 
-cv::Mat MapPoint::GetDescriptor()
+cv::Mat MapPoint::GetDescriptor() const
 {
 	LOCK_MUTEX_FEATURES();
 	return descriptor_.clone();
 }
 
-int MapPoint::GetIndexInKeyFrame(KeyFrame *pKF)
+int MapPoint::GetIndexInKeyFrame(KeyFrame *pKF) const
 {
 	LOCK_MUTEX_FEATURES();
-	return observations_.count(pKF) ? static_cast<int>(observations_[pKF]) : -1;
+	return observations_.count(pKF) ? static_cast<int>(observations_.at(pKF)) : -1;
 }
 
-bool MapPoint::IsInKeyFrame(KeyFrame *pKF)
+bool MapPoint::IsInKeyFrame(KeyFrame *pKF) const
 {
 	LOCK_MUTEX_FEATURES();
 	return observations_.count(pKF) > 0;
@@ -373,19 +373,19 @@ void MapPoint::UpdateNormalAndDepth()
 	}
 }
 
-float MapPoint::GetMinDistanceInvariance()
+float MapPoint::GetMinDistanceInvariance() const
 {
 	LOCK_MUTEX_POSITION();
 	return 0.8f * minDistance_;
 }
 
-float MapPoint::GetMaxDistanceInvariance()
+float MapPoint::GetMaxDistanceInvariance() const
 {
 	LOCK_MUTEX_POSITION();
 	return 1.2f * maxDistance_;
 }
 
-int MapPoint::PredictScale(float dist, KeyFrame* keyframe)
+int MapPoint::PredictScale(float dist, const KeyFrame* keyframe) const
 {
 	float ratio = 1.f;
 	{
@@ -396,7 +396,7 @@ int MapPoint::PredictScale(float dist, KeyFrame* keyframe)
 	return std::max(0, std::min(scale, keyframe->pyramid.nlevels - 1));
 }
 
-int MapPoint::PredictScale(float dist, Frame* frame)
+int MapPoint::PredictScale(float dist, const Frame* frame) const
 {
 	float ratio = 1.f;
 	{
