@@ -88,11 +88,11 @@ public:
 	MapPoint* GetMapPoint(size_t idx);
 
 	// KeyPoint functions
-	std::vector<size_t> GetFeaturesInArea(const float &x, const float  &y, const float  &r) const;
+	std::vector<size_t> GetFeaturesInArea(float x, float y, float r) const;
 	cv::Mat UnprojectStereo(int i);
 
 	// Image
-	bool IsInImage(const float &x, const float &y) const;
+	bool IsInImage(float x, float y) const;
 
 	// Enable/Disable bad flag changes
 	void SetNotErase();

@@ -527,12 +527,12 @@ void KeyFrame::EraseConnection(KeyFrame* keyframe)
 	UpdateBestCovisibles();
 }
 
-vector<size_t> KeyFrame::GetFeaturesInArea(const float &x, const float &y, const float &r) const
+std::vector<size_t> KeyFrame::GetFeaturesInArea(float x, float y, float r) const
 {
 	return grid.GetFeaturesInArea(x, y, r);
 }
 
-bool KeyFrame::IsInImage(const float &x, const float &y) const
+bool KeyFrame::IsInImage(float x, float y) const
 {
 	return imageBounds.Contains(x, y);
 }
