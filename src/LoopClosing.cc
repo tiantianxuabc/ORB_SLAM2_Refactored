@@ -60,117 +60,6 @@ public:
 	LoopDetector(KeyFrameDatabase* keyframeDB, ORBVocabulary* voc, bool fixScale)
 		: keyFrameDB_(keyframeDB), voc_(voc), fixScale_(fixScale), minConsistency_(3) {}
 
-	bool Detect(KeyFrame* currentKF, Loop& loop, int lastLoopKFId)
-	{
-		std::vector<KeyFrame*> candidateKFs;
-		if (!DetectLoop(currentKF, candidateKFs, lastLoopKFId))
-			return false;
-		if (!ComputeSim3(currentKF, candidateKFs, loop))
-			return false;
-
-		return true;
-	}
-
-	bool DetectLoop(KeyFrame* currentKF, std::vector<KeyFrame*>& candidateKFs, int lastLoopKFId)
-	{
-		//If the map contains less than 10 KF or less than 10 KF have passed from last loop detection
-		if (currentKF->mnId < lastLoopKFId + 10)
-		{
-			keyFrameDB_->add(currentKF);
-			currentKF->SetErase();
-			return false;
-		}
-
-		// Compute reference BoW similarity score
-		// This is the lowest score to a connected keyframe in the covisibility graph
-		// We will impose loop candidates to have a higher similarity than this
-		float minScore = 1.f;
-		for (KeyFrame* neighborKF : currentKF->GetVectorCovisibleKeyFrames())
-		{
-			if (neighborKF->isBad())
-				continue;
-
-			const float score = voc_->score(currentKF->mBowVec, neighborKF->mBowVec);
-			minScore = std::min(minScore, score);
-		}
-
-		// Query the database imposing the minimum score
-		const std::vector<KeyFrame*> tmpCandidateKFs = keyFrameDB_->DetectLoopCandidates(currentKF, minScore);
-
-		// If there are no loop candidates, just add new keyframe and return false
-		if (tmpCandidateKFs.empty())
-		{
-			keyFrameDB_->add(currentKF);
-			prevConsistentGroups_.clear();
-			currentKF->SetErase();
-			return false;
-		}
-
-		// For each loop candidate check consistency with previous loop candidates
-		// Each candidate expands a covisibility group (keyframes connected to the loop candidate in the covisibility graph)
-		// A group is consistent with a previous group if they share at least a keyframe
-		// We must detect a consistent loop in several consecutive keyframes to accept it
-		candidateKFs.clear();
-
-		auto IsConsistent = [](const std::set<KeyFrame*>& prevGroup, const std::set<KeyFrame*>& currGroup)
-		{
-			for (KeyFrame* grounpKF : currGroup)
-				if (prevGroup.count(grounpKF))
-					return true;
-			return false;
-		};
-
-		std::vector<ConsistentGroup> currConsistentGroups;
-		std::vector<bool> consistentFound(prevConsistentGroups_.size(), false);
-		for (KeyFrame* candidateKF : tmpCandidateKFs)
-		{
-			std::set<KeyFrame*> currGroup = candidateKF->GetConnectedKeyFrames();
-			currGroup.insert(candidateKF);
-
-			bool candidateFound = false;
-			std::vector<size_t> consistentGroupsIds;
-			for (size_t iG = 0; iG < prevConsistentGroups_.size(); iG++)
-			{
-				const std::set<KeyFrame*>& prevGroup = prevConsistentGroups_[iG].first;
-				if (IsConsistent(prevGroup, currGroup))
-					consistentGroupsIds.push_back(iG);
-			}
-
-			for (size_t iG : consistentGroupsIds)
-			{
-				const int currConsistency = prevConsistentGroups_[iG].second + 1;
-				if (!consistentFound[iG])
-				{
-					currConsistentGroups.push_back(std::make_pair(currGroup, currConsistency));
-					consistentFound[iG] = true; //this avoid to include the same group more than once
-				}
-				if (currConsistency >= minConsistency_ && !candidateFound)
-				{
-					candidateKFs.push_back(candidateKF);
-					candidateFound = true; //this avoid to insert the same candidate more than once
-				}
-			}
-
-			// If the group is not consistent with any previous group insert with consistency counter set to zero
-			if (consistentGroupsIds.empty())
-				currConsistentGroups.push_back(std::make_pair(currGroup, 0));
-		}
-
-		// Update Covisibility Consistent Groups
-		prevConsistentGroups_ = currConsistentGroups;
-
-		// Add Current Keyframe to database
-		keyFrameDB_->add(currentKF);
-
-		if (candidateKFs.empty())
-		{
-			currentKF->SetErase();
-			return false;
-		}
-
-		return true;
-	}
-
 	static bool FindLoopInCandidateKFs(KeyFrame* currentKF, std::vector<KeyFrame*>& candidateKFs, Loop& loop, bool fixScale)
 	{
 		// For each consistent loop candidate we try to compute a Sim3
@@ -275,11 +164,115 @@ public:
 				}
 			}
 		}
+
 		return false;
 	}
 
-	bool ComputeSim3(KeyFrame* currentKF, std::vector<KeyFrame*>& candidateKFs, Loop& loop)
+	bool Detect(KeyFrame* currentKF, Loop& loop, int lastLoopKFId)
 	{
+		///////////////////////////////////////////////////////////////////////////////////////////////////
+		// DetectLoop
+		///////////////////////////////////////////////////////////////////////////////////////////////////
+
+		//If the map contains less than 10 KF or less than 10 KF have passed from last loop detection
+		if ((int)currentKF->mnId < lastLoopKFId + 10)
+		{
+			keyFrameDB_->add(currentKF);
+			currentKF->SetErase();
+			return false;
+		}
+
+		// Compute reference BoW similarity score
+		// This is the lowest score to a connected keyframe in the covisibility graph
+		// We will impose loop candidates to have a higher similarity than this
+		float minScore = 1.f;
+		for (KeyFrame* neighborKF : currentKF->GetVectorCovisibleKeyFrames())
+		{
+			if (neighborKF->isBad())
+				continue;
+
+			const float score = static_cast<float>(voc_->score(currentKF->mBowVec, neighborKF->mBowVec));
+			minScore = std::min(minScore, score);
+		}
+
+		// Query the database imposing the minimum score
+		const std::vector<KeyFrame*> tmpCandidateKFs = keyFrameDB_->DetectLoopCandidates(currentKF, minScore);
+
+		// If there are no loop candidates, just add new keyframe and return false
+		if (tmpCandidateKFs.empty())
+		{
+			keyFrameDB_->add(currentKF);
+			prevConsistentGroups_.clear();
+			currentKF->SetErase();
+			return false;
+		}
+
+		// For each loop candidate check consistency with previous loop candidates
+		// Each candidate expands a covisibility group (keyframes connected to the loop candidate in the covisibility graph)
+		// A group is consistent with a previous group if they share at least a keyframe
+		// We must detect a consistent loop in several consecutive keyframes to accept it
+		std::vector<KeyFrame*> candidateKFs;
+
+		auto IsConsistent = [](const std::set<KeyFrame*>& prevGroup, const std::set<KeyFrame*>& currGroup)
+		{
+			for (KeyFrame* grounpKF : currGroup)
+				if (prevGroup.count(grounpKF))
+					return true;
+			return false;
+		};
+
+		std::vector<ConsistentGroup> currConsistentGroups;
+		std::vector<bool> consistentFound(prevConsistentGroups_.size(), false);
+		for (KeyFrame* candidateKF : tmpCandidateKFs)
+		{
+			std::set<KeyFrame*> currGroup = candidateKF->GetConnectedKeyFrames();
+			currGroup.insert(candidateKF);
+
+			bool candidateFound = false;
+			std::vector<size_t> consistentGroupsIds;
+			for (size_t iG = 0; iG < prevConsistentGroups_.size(); iG++)
+			{
+				const std::set<KeyFrame*>& prevGroup = prevConsistentGroups_[iG].first;
+				if (IsConsistent(prevGroup, currGroup))
+					consistentGroupsIds.push_back(iG);
+			}
+
+			for (size_t iG : consistentGroupsIds)
+			{
+				const int currConsistency = prevConsistentGroups_[iG].second + 1;
+				if (!consistentFound[iG])
+				{
+					currConsistentGroups.push_back(std::make_pair(currGroup, currConsistency));
+					consistentFound[iG] = true; //this avoid to include the same group more than once
+				}
+				if (currConsistency >= minConsistency_ && !candidateFound)
+				{
+					candidateKFs.push_back(candidateKF);
+					candidateFound = true; //this avoid to insert the same candidate more than once
+				}
+			}
+
+			// If the group is not consistent with any previous group insert with consistency counter set to zero
+			if (consistentGroupsIds.empty())
+				currConsistentGroups.push_back(std::make_pair(currGroup, 0));
+		}
+
+		// Update Covisibility Consistent Groups
+		prevConsistentGroups_ = currConsistentGroups;
+
+		// Add Current Keyframe to database
+		keyFrameDB_->add(currentKF);
+
+		if (candidateKFs.empty())
+		{
+			currentKF->SetErase();
+			return false;
+		}
+
+		///////////////////////////////////////////////////////////////////////////////////////////////////
+		// ComputeSim3
+		///////////////////////////////////////////////////////////////////////////////////////////////////
+
 		const bool found = FindLoopInCandidateKFs(currentKF, candidateKFs, loop, fixScale_);
 		if (!found)
 		{
