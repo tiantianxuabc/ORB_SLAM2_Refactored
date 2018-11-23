@@ -159,7 +159,7 @@ public:
 
 		// Update Covisibility Consistent Groups
 		prevConsistentGroups_ = currConsistentGroups;
-		
+
 		// Add Current Keyframe to database
 		keyFrameDB_->add(currentKF);
 
@@ -260,15 +260,15 @@ public:
 					const float s = solver->GetEstimatedScale();
 					matcher.SearchBySim3(currentKF, candidateKF, matches, s, R, t, 7.5f);
 
-					g2o::Sim3 gScm(Converter::toMatrix3d(R), Converter::toVector3d(t), s);
-					const int nInliers = Optimizer::OptimizeSim3(currentKF, candidateKF, matches, gScm, 10, fixScale);
+					g2o::Sim3 Scm(Converter::toMatrix3d(R), Converter::toVector3d(t), s);
+					const int nInliers = Optimizer::OptimizeSim3(currentKF, candidateKF, matches, Scm, 10, fixScale);
 
 					// If optimization is succesful stop ransacs and continue
 					if (nInliers >= 20)
 					{
+						g2o::Sim3 Smw(Converter::toMatrix3d(candidateKF->GetRotation()), Converter::toVector3d(candidateKF->GetTranslation()), 1.0);
 						loop.matchedKF = candidateKF;
-						g2o::Sim3 gSmw(Converter::toMatrix3d(candidateKF->GetRotation()), Converter::toVector3d(candidateKF->GetTranslation()), 1.0);
-						loop.ScwG2O = gScm * gSmw;
+						loop.ScwG2O = Scm * Smw;
 						loop.Scw = Converter::toCvMat(loop.ScwG2O);
 						loop.matchedPoints = matches;
 						return true;
