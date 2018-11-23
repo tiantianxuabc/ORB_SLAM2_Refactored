@@ -172,7 +172,7 @@ public:
 		//If the map contains less than 10 KF or less than 10 KF have passed from last loop detection
 		if ((int)currentKF->mnId < lastLoopKFId + 10)
 		{
-			keyFrameDB_->add(currentKF);
+			//keyFrameDB_->add(currentKF);
 			//currentKF->SetErase();
 			return false;
 		}
@@ -196,7 +196,7 @@ public:
 		// If there are no loop candidates, just add new keyframe and return false
 		if (tmpCandidateKFs.empty())
 		{
-			keyFrameDB_->add(currentKF);
+			//keyFrameDB_->add(currentKF);
 			prevConsistentGroups_.clear();
 			//currentKF->SetErase();
 			return false;
@@ -256,7 +256,7 @@ public:
 		prevConsistentGroups_ = currConsistentGroups;
 
 		// Add Current Keyframe to database
-		keyFrameDB_->add(currentKF);
+		//keyFrameDB_->add(currentKF);
 
 		if (candidateKFs.empty())
 		{
@@ -730,7 +730,7 @@ public:
 
 	LoopClosingImpl(Map *map, KeyFrameDatabase* keyframeDB, ORBVocabulary *voc, bool fixScale)
 		: resetRequested_(false), finishRequested_(false), finished_(true), lastLoopKFId_(0),
-		detector_(keyframeDB, voc, fixScale), GBA_(map), corrector_(map, &GBA_, fixScale)
+		keyframeDB_(keyframeDB), detector_(keyframeDB, voc, fixScale), GBA_(map), corrector_(map, &GBA_, fixScale)
 	{
 	}
 
@@ -769,6 +769,10 @@ public:
 				// In the stereo/RGBD case s=1
 				LoopDetector::Loop loop;
 				const bool found = detector_.Detect(currentKF, loop, lastLoopKFId_);
+
+				// Add Current Keyframe to database
+				keyframeDB_->add(currentKF);
+
 				if (found)
 				{
 					// Perform loop fusion and pose graph optimization
@@ -882,6 +886,7 @@ private:
 	std::list<KeyFrame*> loopKeyFrameQueue_;
 
 	// Loop detector variables
+	KeyFrameDatabase* keyframeDB_;
 	LoopDetector detector_;
 
 	long unsigned int lastLoopKFId_;
