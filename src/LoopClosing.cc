@@ -50,11 +50,11 @@ public:
 
 	struct Loop
 	{
-		KeyFrame* mpMatchedKF;
-		cv::Mat mScw;
-		g2o::Sim3 mg2oScw;
-		std::vector<MapPoint*> mvpCurrentMatchedPoints;
-		std::vector<MapPoint*> mvpLoopMapPoints;
+		KeyFrame* matchedKF;
+		cv::Mat Scw;
+		g2o::Sim3 ScwG2O;
+		std::vector<MapPoint*> matchedPoints;
+		std::vector<MapPoint*> loopMapPoints;
 	};
 
 	LoopDetector(KeyFrameDatabase* keyframeDB, ORBVocabulary* voc, bool fixScale)
@@ -266,11 +266,11 @@ public:
 					// If optimization is succesful stop ransacs and continue
 					if (nInliers >= 20)
 					{
-						loop.mpMatchedKF = candidateKF;
+						loop.matchedKF = candidateKF;
 						g2o::Sim3 gSmw(Converter::toMatrix3d(candidateKF->GetRotation()), Converter::toVector3d(candidateKF->GetTranslation()), 1.0);
-						loop.mg2oScw = gScm * gSmw;
-						loop.mScw = Converter::toCvMat(loop.mg2oScw);
-						loop.mvpCurrentMatchedPoints = matches;
+						loop.ScwG2O = gScm * gSmw;
+						loop.Scw = Converter::toCvMat(loop.ScwG2O);
+						loop.matchedPoints = matches;
 						return true;
 					}
 				}
@@ -293,9 +293,9 @@ public:
 		}
 
 		// Retrieve MapPoints seen in Loop Keyframe and neighbors
-		std::vector<KeyFrame*> vpLoopConnectedKFs = loop.mpMatchedKF->GetVectorCovisibleKeyFrames();
-		vpLoopConnectedKFs.push_back(loop.mpMatchedKF);
-		loop.mvpLoopMapPoints.clear();
+		std::vector<KeyFrame*> vpLoopConnectedKFs = loop.matchedKF->GetVectorCovisibleKeyFrames();
+		vpLoopConnectedKFs.push_back(loop.matchedKF);
+		loop.loopMapPoints.clear();
 		for (vector<KeyFrame*>::iterator vit = vpLoopConnectedKFs.begin(); vit != vpLoopConnectedKFs.end(); vit++)
 		{
 			KeyFrame* pKF = *vit;
@@ -307,7 +307,7 @@ public:
 				{
 					if (!pMP->isBad() && pMP->mnLoopPointForKF != currentKF->mnId)
 					{
-						loop.mvpLoopMapPoints.push_back(pMP);
+						loop.loopMapPoints.push_back(pMP);
 						pMP->mnLoopPointForKF = currentKF->mnId;
 					}
 				}
@@ -316,20 +316,20 @@ public:
 
 		// Find more matches projecting with the computed Sim3
 		ORBmatcher matcher(0.75f, true);
-		matcher.SearchByProjection(currentKF, loop.mScw, loop.mvpLoopMapPoints, loop.mvpCurrentMatchedPoints, 10);
+		matcher.SearchByProjection(currentKF, loop.Scw, loop.loopMapPoints, loop.matchedPoints, 10);
 
 		// If enough matches accept Loop
 		int nTotalMatches = 0;
-		for (size_t i = 0; i < loop.mvpCurrentMatchedPoints.size(); i++)
+		for (size_t i = 0; i < loop.matchedPoints.size(); i++)
 		{
-			if (loop.mvpCurrentMatchedPoints[i])
+			if (loop.matchedPoints[i])
 				nTotalMatches++;
 		}
 
 		if (nTotalMatches >= 40)
 		{
 			for (int i = 0; i < nInitialCandidates; i++)
-				if (candidateKFs[i] != loop.mpMatchedKF)
+				if (candidateKFs[i] != loop.matchedKF)
 					candidateKFs[i]->SetErase();
 			return true;
 		}
@@ -607,10 +607,10 @@ public:
 	{
 		cout << "Loop detected!" << endl;
 
-		KeyFrame* mpMatchedKF = loop.mpMatchedKF;
-		g2o::Sim3& mg2oScw = loop.mg2oScw;
-		std::vector<MapPoint*>& mvpCurrentMatchedPoints = loop.mvpCurrentMatchedPoints;
-		std::vector<MapPoint*>& mvpLoopMapPoints = loop.mvpLoopMapPoints;
+		KeyFrame* mpMatchedKF = loop.matchedKF;
+		g2o::Sim3& mg2oScw = loop.ScwG2O;
+		std::vector<MapPoint*>& mvpCurrentMatchedPoints = loop.matchedPoints;
+		std::vector<MapPoint*>& mvpLoopMapPoints = loop.loopMapPoints;
 
 		// Send a stop signal to Local Mapping
 		// Avoid new keyframes are inserted while correcting the loop
