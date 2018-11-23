@@ -43,8 +43,8 @@ void KeyFrameDatabase::add(KeyFrame* keyframe)
 {
 	LOCK_MUTEX_DATABASE();
 
-	for (const auto& v : keyframe->mBowVec)
-		wordIdToKFs_[v.first].push_back(keyframe);
+	for (const auto& word : keyframe->mBowVec)
+		wordIdToKFs_[word.first].push_back(keyframe);
 }
 
 void KeyFrameDatabase::erase(KeyFrame* keyframe)
@@ -52,10 +52,10 @@ void KeyFrameDatabase::erase(KeyFrame* keyframe)
 	LOCK_MUTEX_DATABASE();
 
 	// Erase elements in the Inverse File for the entry
-	for (const auto& v : keyframe->mBowVec)
+	for (const auto& word : keyframe->mBowVec)
 	{
 		// List of keyframes that share the word
-		std::list<KeyFrame*>& keyframes = wordIdToKFs_[v.first];
+		std::list<KeyFrame*>& keyframes = wordIdToKFs_[word.first];
 		auto it = std::find(std::begin(keyframes), std::end(keyframes), keyframe);
 		if (it != std::end(keyframes))
 			keyframes.erase(it);
@@ -71,16 +71,16 @@ void KeyFrameDatabase::clear()
 std::vector<KeyFrame*> KeyFrameDatabase::DetectLoopCandidates(KeyFrame* keyframe, float minScore)
 {
 	std::set<KeyFrame*> connectedKFs = keyframe->GetConnectedKeyFrames();
-	std::list<KeyFrame*> sharingKFs;
+	std::list<KeyFrame*> wordSharingKFs;
 
 	// Search all keyframes that share a word with current keyframes
 	// Discard keyframes connected to the query keyframe
 	{
 		LOCK_MUTEX_DATABASE();
 
-		for (const auto& v : keyframe->mBowVec)
+		for (const auto& word : keyframe->mBowVec)
 		{
-			for (KeyFrame* sharingKF : wordIdToKFs_[v.first])
+			for (KeyFrame* sharingKF : wordIdToKFs_[word.first])
 			{
 				if (sharingKF->mnLoopQuery != keyframe->mnId)
 				{
@@ -88,7 +88,7 @@ std::vector<KeyFrame*> KeyFrameDatabase::DetectLoopCandidates(KeyFrame* keyframe
 					if (!connectedKFs.count(sharingKF))
 					{
 						sharingKF->mnLoopQuery = keyframe->mnId;
-						sharingKFs.push_back(sharingKF);
+						wordSharingKFs.push_back(sharingKF);
 					}
 				}
 				sharingKF->mnLoopWords++;
@@ -96,7 +96,7 @@ std::vector<KeyFrame*> KeyFrameDatabase::DetectLoopCandidates(KeyFrame* keyframe
 		}
 	}
 
-	if (sharingKFs.empty())
+	if (wordSharingKFs.empty())
 		return std::vector<KeyFrame*>();
 
 	std::list<std::pair<float, KeyFrame*>> scoreAndMatches;
@@ -104,7 +104,7 @@ std::vector<KeyFrame*> KeyFrameDatabase::DetectLoopCandidates(KeyFrame* keyframe
 	// Only compare against those keyframes that share enough words
 	int maxCommonWords = 0;
 	//for (list<KeyFrame*>::iterator lit = sharingKFs.begin(), lend = sharingKFs.end(); lit != lend; lit++)
-	for (KeyFrame* sharingKF : sharingKFs)
+	for (KeyFrame* sharingKF : wordSharingKFs)
 		maxCommonWords = std::max(maxCommonWords, sharingKF->mnLoopWords);
 
 	const int minCommonWords = static_cast<float>(0.8f * maxCommonWords);
@@ -112,7 +112,7 @@ std::vector<KeyFrame*> KeyFrameDatabase::DetectLoopCandidates(KeyFrame* keyframe
 	int nscores = 0;
 
 	// Compute similarity score. Retain the matches whose score is higher than minScore
-	for (KeyFrame* sharingKF : sharingKFs)
+	for (KeyFrame* sharingKF : wordSharingKFs)
 	{
 		if (sharingKF->mnLoopWords > minCommonWords)
 		{
