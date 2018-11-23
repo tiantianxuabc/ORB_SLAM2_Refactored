@@ -103,9 +103,9 @@ KeyFrame* MapPoint::GetReferenceKeyFrame()
 void MapPoint::AddObservation(KeyFrame* pKF, size_t idx)
 {
 	LOCK_MUTEX_FEATURES();
-	if (mObservations.count(pKF))
+	if (observations_.count(pKF))
 		return;
-	mObservations[pKF] = idx;
+	observations_[pKF] = idx;
 
 	if (pKF->uright[idx] >= 0)
 		nobservations_ += 2;
@@ -118,18 +118,18 @@ void MapPoint::EraseObservation(KeyFrame* pKF)
 	bool bBad = false;
 	{
 		LOCK_MUTEX_FEATURES();
-		if (mObservations.count(pKF))
+		if (observations_.count(pKF))
 		{
-			int idx = mObservations[pKF];
+			int idx = observations_[pKF];
 			if (pKF->uright[idx] >= 0)
 				nobservations_ -= 2;
 			else
 				nobservations_--;
 
-			mObservations.erase(pKF);
+			observations_.erase(pKF);
 
 			if (referenceKF_ == pKF)
-				referenceKF_ = mObservations.begin()->first;
+				referenceKF_ = observations_.begin()->first;
 
 			// If only 2 observations or less, discard point
 			if (nobservations_ <= 2)
@@ -144,7 +144,7 @@ void MapPoint::EraseObservation(KeyFrame* pKF)
 std::map<KeyFrame*, size_t> MapPoint::GetObservations()
 {
 	LOCK_MUTEX_FEATURES();
-	return mObservations;
+	return observations_;
 }
 
 int MapPoint::Observations()
@@ -160,8 +160,8 @@ void MapPoint::SetBadFlag()
 		LOCK_MUTEX_FEATURES();
 		LOCK_MUTEX_POSITION();
 		bad_ = true;
-		obs = mObservations;
-		mObservations.clear();
+		obs = observations_;
+		observations_.clear();
 	}
 	for (std::map<KeyFrame*, size_t>::iterator mit = obs.begin(), mend = obs.end(); mit != mend; mit++)
 	{
@@ -189,8 +189,8 @@ void MapPoint::Replace(MapPoint* pMP)
 	{
 		LOCK_MUTEX_FEATURES();
 		LOCK_MUTEX_POSITION();
-		obs = mObservations;
-		mObservations.clear();
+		obs = observations_;
+		observations_.clear();
 		bad_ = true;
 		nvisible = nvisible_;
 		nfound = nfound_;
@@ -255,7 +255,7 @@ void MapPoint::ComputeDistinctiveDescriptors()
 		LOCK_MUTEX_FEATURES();
 		if (bad_)
 			return;
-		observations = mObservations;
+		observations = observations_;
 	}
 
 	if (observations.empty())
@@ -320,8 +320,8 @@ cv::Mat MapPoint::GetDescriptor()
 int MapPoint::GetIndexInKeyFrame(KeyFrame *pKF)
 {
 	LOCK_MUTEX_FEATURES();
-	if (mObservations.count(pKF))
-		return mObservations[pKF];
+	if (observations_.count(pKF))
+		return observations_[pKF];
 	else
 		return -1;
 }
@@ -329,7 +329,7 @@ int MapPoint::GetIndexInKeyFrame(KeyFrame *pKF)
 bool MapPoint::IsInKeyFrame(KeyFrame *pKF)
 {
 	LOCK_MUTEX_FEATURES();
-	return (mObservations.count(pKF));
+	return (observations_.count(pKF));
 }
 
 void MapPoint::UpdateNormalAndDepth()
@@ -342,7 +342,7 @@ void MapPoint::UpdateNormalAndDepth()
 		LOCK_MUTEX_POSITION();
 		if (bad_)
 			return;
-		observations = mObservations;
+		observations = observations_;
 		pRefKF = referenceKF_;
 		Pos = Xw_.clone();
 	}
