@@ -219,8 +219,8 @@ public:
 		localMapper_->SetTracker(tracker_);
 		localMapper_->SetLoopCloser(loopCloser_);
 
-		loopCloser_->SetTracker(tracker_.get());
-		loopCloser_->SetLocalMapper(localMapper_.get());
+		loopCloser_->SetTracker(tracker_);
+		loopCloser_->SetLocalMapper(localMapper_);
 
 		resetManager_ = std::make_shared<ResetManager>(tracker_);
 		modeManager_ = std::make_shared<ModeManager>(tracker_, localMapper_);

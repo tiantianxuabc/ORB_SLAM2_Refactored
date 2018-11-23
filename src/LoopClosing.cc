@@ -721,16 +721,16 @@ public:
 	{
 	}
 
-	void SetTracker(Tracking* tracker) override
+	void SetTracker(const std::shared_ptr<Tracking>& tracker) override
 	{
 		tracker_ = tracker;
 	}
 
-	void SetLocalMapper(LocalMapping* localMapper) override
+	void SetLocalMapper(const std::shared_ptr<LocalMapping>& localMapper) override
 	{
 		localMapper_ = localMapper;
-		GBA_.SetLocalMapper(localMapper);
-		corrector_.SetLocalMapper(localMapper);
+		GBA_.SetLocalMapper(localMapper.get());
+		corrector_.SetLocalMapper(localMapper.get());
 	}
 
 	// Main function
@@ -867,8 +867,8 @@ private:
 	bool finishRequested_;
 	bool finished_;
 
-	Tracking* tracker_;
-	LocalMapping *localMapper_;
+	std::shared_ptr<Tracking> tracker_;
+	std::shared_ptr<LocalMapping> localMapper_;
 
 	std::list<KeyFrame*> keyFrameQueue_;
 

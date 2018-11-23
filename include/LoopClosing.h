@@ -41,9 +41,9 @@ public:
 
 	static std::shared_ptr<LoopClosing> Create(Map* map, KeyFrameDatabase* keyframeDB, ORBVocabulary* voc, bool fixScale);
 	
-	virtual void SetTracker(Tracking* tracker) = 0;
+	virtual void SetTracker(const std::shared_ptr<Tracking>& tracker) = 0;
 
-	virtual void SetLocalMapper(LocalMapping* localMapper) = 0;
+	virtual void SetLocalMapper(const std::shared_ptr<LocalMapping>& localMapper) = 0;
 
 	// Main function
 	virtual void Run() = 0;
