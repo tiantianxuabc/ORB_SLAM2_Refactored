@@ -179,7 +179,29 @@ cv::Mat Sim3Solver::iterate(int nIterations, bool &bNoMore, std::vector<bool> &v
 
 		ComputeSim3(P3Dc1i, P3Dc2i);
 
-		CheckInliers();
+		//CheckInliers();
+		std::vector<cv::Mat> vP1im2, vP2im1;
+		Project(mvX3Dc2, vP2im1, mT12i, mK1);
+		Project(mvX3Dc1, vP1im2, mT21i, mK2);
+
+		mnInliersi = 0;
+
+		for (size_t i = 0; i < mvP1im1.size(); i++)
+		{
+			cv::Mat dist1 = mvP1im1[i] - vP2im1[i];
+			cv::Mat dist2 = vP1im2[i] - mvP2im2[i];
+
+			const float err1 = dist1.dot(dist1);
+			const float err2 = dist2.dot(dist2);
+
+			if (err1 < mvnMaxError1[i] && err2 < mvnMaxError2[i])
+			{
+				mvbInliersi[i] = true;
+				mnInliersi++;
+			}
+			else
+				mvbInliersi[i] = false;
+		}
 
 		if (mnInliersi >= mnBestInliers)
 		{
@@ -336,34 +358,6 @@ void Sim3Solver::ComputeSim3(cv::Mat &P1, cv::Mat &P2)
 	cv::Mat tinv = -sRinv*mt12i;
 	tinv.copyTo(mT21i.rowRange(0, 3).col(3));
 }
-
-
-void Sim3Solver::CheckInliers()
-{
-	std::vector<cv::Mat> vP1im2, vP2im1;
-	Project(mvX3Dc2, vP2im1, mT12i, mK1);
-	Project(mvX3Dc1, vP1im2, mT21i, mK2);
-
-	mnInliersi = 0;
-
-	for (size_t i = 0; i < mvP1im1.size(); i++)
-	{
-		cv::Mat dist1 = mvP1im1[i] - vP2im1[i];
-		cv::Mat dist2 = vP1im2[i] - mvP2im2[i];
-
-		const float err1 = dist1.dot(dist1);
-		const float err2 = dist2.dot(dist2);
-
-		if (err1 < mvnMaxError1[i] && err2 < mvnMaxError2[i])
-		{
-			mvbInliersi[i] = true;
-			mnInliersi++;
-		}
-		else
-			mvbInliersi[i] = false;
-	}
-}
-
 
 cv::Mat Sim3Solver::GetEstimatedRotation()
 {

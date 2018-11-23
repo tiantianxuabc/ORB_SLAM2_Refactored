@@ -55,7 +55,7 @@ protected:
 
 	void ComputeSim3(cv::Mat &P1, cv::Mat &P2);
 
-	void CheckInliers();
+	//void CheckInliers();
 
 	void Project(const std::vector<cv::Mat> &vP3Dw, std::vector<cv::Mat> &vP2D, cv::Mat Tcw, cv::Mat K);
 	void FromCameraToImage(const std::vector<cv::Mat> &vP3Dc, std::vector<cv::Mat> &vP2D, cv::Mat K);
