@@ -40,6 +40,8 @@ link_directories(${PROJECT_SOURCE_DIR}/Thirdparty/g2o/lib)
 
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib)
 
+file(GLOB includes include/*.h)
+
 add_library(${PROJECT_NAME} STATIC
 src/System.cc
 src/Tracking.cc
@@ -62,6 +64,7 @@ src/Initializer.cc
 src/Viewer.cc
 src/Usleep.cc
 src/CameraParameters.cc
+${includes}
 )
 
 target_link_libraries(${PROJECT_NAME}
