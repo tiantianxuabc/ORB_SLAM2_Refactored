@@ -21,9 +21,12 @@
 #ifndef MAPPOINT_H
 #define MAPPOINT_H
 
-#include <opencv2/core/core.hpp>
 #include <map>
 #include <mutex>
+
+#include <opencv2/core/core.hpp>
+
+#include "FrameId.h"
 
 namespace ORB_SLAM2
 {
@@ -35,6 +38,9 @@ class Map;
 class MapPoint
 {
 public:
+
+	using mappointid_t = long unsigned int;
+
 	MapPoint(const cv::Mat &Pos, KeyFrame* pRefKF, Map* pMap);
 	MapPoint(const cv::Mat &Pos, Map* pMap, Frame* pFrame, const int &idxF);
 
@@ -78,10 +84,11 @@ public:
 	int PredictScale(const float &currentDist, Frame* pF);
 
 public:
-	long unsigned int mnId;
-	static long unsigned int nNextId;
-	long int mnFirstKFid;
-	long int mnFirstFrame;
+
+	mappointid_t mnId;
+	static mappointid_t nNextId;
+	int mnFirstKFid;
+	int mnFirstFrame;
 	int nObs;
 
 	// Variables used by the tracking
@@ -91,19 +98,19 @@ public:
 	bool mbTrackInView;
 	int mnTrackScaleLevel;
 	float mTrackViewCos;
-	long unsigned int mnTrackReferenceForFrame;
-	long unsigned int mnLastFrameSeen;
+	frameid_t mnTrackReferenceForFrame;
+	frameid_t mnLastFrameSeen;
 
 	// Variables used by local mapping
-	long unsigned int mnBALocalForKF;
-	long unsigned int mnFuseCandidateForKF;
+	frameid_t mnBALocalForKF;
+	frameid_t mnFuseCandidateForKF;
 
 	// Variables used by loop closing
-	long unsigned int mnLoopPointForKF;
-	long unsigned int mnCorrectedByKF;
-	long unsigned int mnCorrectedReference;
+	frameid_t mnLoopPointForKF;
+	frameid_t mnCorrectedByKF;
+	frameid_t mnCorrectedReference;
 	cv::Mat mPosGBA;
-	long unsigned int mnBAGlobalForKF;
+	frameid_t mnBAGlobalForKF;
 
 
 	static std::mutex mGlobalMutex;

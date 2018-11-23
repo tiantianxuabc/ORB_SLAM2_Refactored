@@ -28,7 +28,7 @@
 namespace ORB_SLAM2
 {
 
-long unsigned int MapPoint::nNextId = 0;
+MapPoint::mappointid_t MapPoint::nNextId = 0;
 std::mutex MapPoint::mGlobalMutex;
 
 MapPoint::MapPoint(const cv::Mat &Pos, KeyFrame *pRefKF, Map* pMap) :
