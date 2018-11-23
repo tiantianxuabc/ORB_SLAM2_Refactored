@@ -23,12 +23,12 @@
 
 #include<vector>
 
-#include "Thirdparty/DBoW2/DBoW2/BowVector.h"
-#include "Thirdparty/DBoW2/DBoW2/FeatureVector.h"
+#include <opencv2/opencv.hpp>
+#include <Thirdparty/DBoW2/DBoW2/BowVector.h>
+#include <Thirdparty/DBoW2/DBoW2/FeatureVector.h>
+
 #include "ORBVocabulary.h"
 #include "CameraParameters.h"
-
-#include <opencv2/opencv.hpp>
 
 namespace ORB_SLAM2
 {
@@ -105,7 +105,7 @@ public:
 	Frame();
 
 	// Copy constructor.
-	Frame(const Frame &frame);
+	Frame(const Frame& frame);
 
 	// Constructor for stereo cameras.
 	Frame(const cv::Mat& imageL, const cv::Mat& imageR, double timestamp, ORBextractor* extractorL, ORBextractor* extractorR,
