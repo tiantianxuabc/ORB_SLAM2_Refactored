@@ -68,7 +68,7 @@ MapPoint::MapPoint(const cv::Mat& Xw, Map* map, Frame* frame, int idx) :
 	maxDistance_ = scaleFactor * dist;
 	minDistance_ = maxDistance_ / frame->pyramid.scaleFactors.back();
 
-	frame->descriptorsL.row(idx).copyTo(mDescriptor);
+	frame->descriptorsL.row(idx).copyTo(descriptor_);
 
 	// MapPoints can be created from Tracking and Local Mapping. This mutex avoid conflicts with id.
 	LOCK_MUTEX_POINT_CREATION();
@@ -251,10 +251,7 @@ float MapPoint::GetFoundRatio()
 void MapPoint::ComputeDistinctiveDescriptors()
 {
 	// Retrieve all observed descriptors
-	std::vector<cv::Mat> vDescriptors;
-
 	std::map<KeyFrame*, size_t> observations;
-
 	{
 		LOCK_MUTEX_FEATURES();
 		if (bad_)
@@ -265,60 +262,62 @@ void MapPoint::ComputeDistinctiveDescriptors()
 	if (observations.empty())
 		return;
 
-	vDescriptors.reserve(observations.size());
+	std::vector<cv::Mat> descriptors;
+	descriptors.reserve(observations.size());
 
-	for (std::map<KeyFrame*, size_t>::iterator mit = observations.begin(), mend = observations.end(); mit != mend; mit++)
+	//for (std::map<KeyFrame*, size_t>::iterator mit = observations.begin(), mend = observations.end(); mit != mend; mit++)
+	for (const auto& observation : observations)
 	{
-		KeyFrame* pKF = mit->first;
-
-		if (!pKF->isBad())
-			vDescriptors.push_back(pKF->descriptorsL.row(mit->second));
+		KeyFrame* keyframe = observation.first;
+		const int idx = static_cast<int>(observation.second);
+		if (!keyframe->isBad())
+			descriptors.push_back(keyframe->descriptorsL.row(idx));
 	}
 
-	if (vDescriptors.empty())
+	if (descriptors.empty())
 		return;
 
 	// Compute distances between them
-	const size_t N = vDescriptors.size();
+	const size_t N = descriptors.size();
 
-	std::vector<std::vector<int>> Distances(N, std::vector<int>(N, 0));
+	std::vector<std::vector<int>> distances(N, std::vector<int>(N, 0));
 	for (size_t i = 0; i < N; i++)
 	{
-		Distances[i][i] = 0;
+		distances[i][i] = 0;
 		for (size_t j = i + 1; j < N; j++)
 		{
-			int distij = ORBmatcher::DescriptorDistance(vDescriptors[i], vDescriptors[j]);
-			Distances[i][j] = distij;
-			Distances[j][i] = distij;
+			const int distij = ORBmatcher::DescriptorDistance(descriptors[i], descriptors[j]);
+			distances[i][j] = distij;
+			distances[j][i] = distij;
 		}
 	}
 
 	// Take the descriptor with least median distance to the rest
-	int BestMedian = INT_MAX;
-	int BestIdx = 0;
+	int bestMedian = std::numeric_limits<int>::max();
+	int bestIdx = 0;
 	for (size_t i = 0; i < N; i++)
 	{
-		std::vector<int> vDists(Distances[i]);
-		std::sort(vDists.begin(), vDists.end());
-		int median = vDists[0.5*(N - 1)];
+		std::vector<int> dists(distances[i]);
+		std::sort(std::begin(dists), std::end(dists));
+		const int median = dists[(N - 1) / 2];
 
-		if (median < BestMedian)
+		if (median < bestMedian)
 		{
-			BestMedian = median;
-			BestIdx = i;
+			bestMedian = median;
+			bestIdx = i;
 		}
 	}
 
 	{
 		LOCK_MUTEX_FEATURES();
-		mDescriptor = vDescriptors[BestIdx].clone();
+		descriptor_ = descriptors[bestIdx].clone();
 	}
 }
 
 cv::Mat MapPoint::GetDescriptor()
 {
 	LOCK_MUTEX_FEATURES();
-	return mDescriptor.clone();
+	return descriptor_.clone();
 }
 
 int MapPoint::GetIndexInKeyFrame(KeyFrame *pKF)
