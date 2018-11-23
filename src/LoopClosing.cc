@@ -548,30 +548,25 @@ public:
 		localMapper_ = pLocalMapper;
 	}
 
-	void SearchAndFuse(const KeyFrameAndPose &CorrectedPosesMap, std::vector<MapPoint*>& mvpLoopMapPoints)
+	void SearchAndFuse(const KeyFrameAndPose &CorrectedSim3, std::vector<MapPoint*>& loopMapPoints)
 	{
-		ORBmatcher matcher(0.8);
-
-		for (KeyFrameAndPose::const_iterator mit = CorrectedPosesMap.begin(), mend = CorrectedPosesMap.end(); mit != mend; mit++)
+		ORBmatcher matcher(0.8f);
+		for (const auto& v : CorrectedSim3)
 		{
-			KeyFrame* pKF = mit->first;
-
-			g2o::Sim3 g2oScw = mit->second;
+			KeyFrame* connectedKF = v.first;
+			g2o::Sim3 g2oScw = v.second;
 			cv::Mat cvScw = Converter::toCvMat(g2oScw);
 
-			vector<MapPoint*> vpReplacePoints(mvpLoopMapPoints.size(), static_cast<MapPoint*>(NULL));
-			matcher.Fuse(pKF, cvScw, mvpLoopMapPoints, 4, vpReplacePoints);
+			std::vector<MapPoint*> replacePoints(loopMapPoints.size(), nullptr);
+			matcher.Fuse(connectedKF, cvScw, loopMapPoints, 4, replacePoints);
 
 			// Get Map Mutex
 			unique_lock<mutex> lock(map_->mMutexMapUpdate);
-			const int nLP = mvpLoopMapPoints.size();
-			for (int i = 0; i < nLP; i++)
+			for (size_t i = 0; i < loopMapPoints.size(); i++)
 			{
-				MapPoint* pRep = vpReplacePoints[i];
-				if (pRep)
-				{
-					pRep->Replace(mvpLoopMapPoints[i]);
-				}
+				MapPoint* mappoint = replacePoints[i];
+				if (mappoint)
+					mappoint->Replace(loopMapPoints[i]);
 			}
 		}
 	}
