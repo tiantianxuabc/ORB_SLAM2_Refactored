@@ -540,35 +540,11 @@ private:
 
 public:
 
-	LoopCorrector(Map* map, GlobalBA* GBA, bool fixScale)
-		: map_(map), GBA_(GBA), fixScale_(fixScale) {}
+	LoopCorrector(Map* map, GlobalBA* GBA, bool fixScale) : map_(map), GBA_(GBA), fixScale_(fixScale) {}
 
 	void SetLocalMapper(LocalMapping *pLocalMapper)
 	{
 		localMapper_ = pLocalMapper;
-	}
-
-	void SearchAndFuse(const KeyFrameAndPose &CorrectedSim3, std::vector<MapPoint*>& loopMapPoints)
-	{
-		ORBmatcher matcher(0.8f);
-		for (const auto& v : CorrectedSim3)
-		{
-			KeyFrame* connectedKF = v.first;
-			g2o::Sim3 g2oScw = v.second;
-			cv::Mat cvScw = Converter::toCvMat(g2oScw);
-
-			std::vector<MapPoint*> replacePoints(loopMapPoints.size(), nullptr);
-			matcher.Fuse(connectedKF, cvScw, loopMapPoints, 4, replacePoints);
-
-			// Get Map Mutex
-			unique_lock<mutex> lock(map_->mMutexMapUpdate);
-			for (size_t i = 0; i < loopMapPoints.size(); i++)
-			{
-				MapPoint* mappoint = replacePoints[i];
-				if (mappoint)
-					mappoint->Replace(loopMapPoints[i]);
-			}
-		}
 	}
 
 	void Correct(KeyFrame* currentKF, LoopDetector::Loop& loop)
@@ -699,7 +675,25 @@ public:
 		// Project MapPoints observed in the neighborhood of the loop keyframe
 		// into the current keyframe and neighbors using corrected poses.
 		// Fuse duplications.
-		SearchAndFuse(CorrectedSim3, loopMapPoints);
+		ORBmatcher matcher(0.8f);
+		for (const auto& v : CorrectedSim3)
+		{
+			KeyFrame* connectedKF = v.first;
+			g2o::Sim3 g2oScw = v.second;
+			cv::Mat cvScw = Converter::toCvMat(g2oScw);
+
+			std::vector<MapPoint*> replacePoints(loopMapPoints.size(), nullptr);
+			matcher.Fuse(connectedKF, cvScw, loopMapPoints, 4, replacePoints);
+
+			// Get Map Mutex
+			unique_lock<mutex> lock(map_->mMutexMapUpdate);
+			for (size_t i = 0; i < loopMapPoints.size(); i++)
+			{
+				MapPoint* mappoint = replacePoints[i];
+				if (mappoint)
+					mappoint->Replace(loopMapPoints[i]);
+			}
+		}
 
 		// After the MapPoint fusion, new links in the covisibility graph will appear attaching both sides of the loop
 		std::map<KeyFrame*, std::set<KeyFrame*>> LoopConnections;
