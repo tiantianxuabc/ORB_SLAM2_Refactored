@@ -69,7 +69,7 @@ public:
 	void AddChild(KeyFrame* pKF);
 	void EraseChild(KeyFrame* pKF);
 	void ChangeParent(KeyFrame* pKF);
-	std::set<KeyFrame*> GetChilds();
+	std::set<KeyFrame*> GetChildren();
 	KeyFrame* GetParent();
 	bool hasChild(KeyFrame* pKF);
 

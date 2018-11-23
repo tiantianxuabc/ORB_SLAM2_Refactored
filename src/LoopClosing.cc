@@ -404,7 +404,7 @@ public:
 				{
 					KeyFrame* keyframe = toCheck.front();
 					cv::Mat Twc = keyframe->GetPoseInverse();
-					for (KeyFrame* child : keyframe->GetChilds())
+					for (KeyFrame* child : keyframe->GetChildren())
 					{
 						if (child->BAGlobalForKF != loopKFId)
 						{

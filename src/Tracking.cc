@@ -156,7 +156,7 @@ struct LocalMap
 				}
 			}
 
-			for (KeyFrame* childKF : keyframe->GetChilds())
+			for (KeyFrame* childKF : keyframe->GetChildren())
 			{
 				if (!childKF->isBad() && childKF->trackReferenceForFrame != currFrame.id)
 				{
