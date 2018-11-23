@@ -121,10 +121,10 @@ void KeyFrame::AddConnection(KeyFrame *pKF, const int &weight)
 {
 	{
 		LOCK_MUTEX_CONNECTIONS();
-		if (!connectedKeyFrameWeights_.count(pKF))
-			connectedKeyFrameWeights_[pKF] = weight;
-		else if (connectedKeyFrameWeights_[pKF] != weight)
-			connectedKeyFrameWeights_[pKF] = weight;
+		if (!connectionTo_.count(pKF))
+			connectionTo_[pKF] = weight;
+		else if (connectionTo_[pKF] != weight)
+			connectionTo_[pKF] = weight;
 		else
 			return;
 	}
@@ -136,8 +136,8 @@ void KeyFrame::UpdateBestCovisibles()
 {
 	LOCK_MUTEX_CONNECTIONS();
 	vector<pair<int, KeyFrame*> > vPairs;
-	vPairs.reserve(connectedKeyFrameWeights_.size());
-	for (map<KeyFrame*, int>::iterator mit = connectedKeyFrameWeights_.begin(), mend = connectedKeyFrameWeights_.end(); mit != mend; mit++)
+	vPairs.reserve(connectionTo_.size());
+	for (map<KeyFrame*, int>::iterator mit = connectionTo_.begin(), mend = connectionTo_.end(); mit != mend; mit++)
 		vPairs.push_back(make_pair(mit->second, mit->first));
 
 	sort(vPairs.begin(), vPairs.end());
@@ -157,7 +157,7 @@ set<KeyFrame*> KeyFrame::GetConnectedKeyFrames()
 {
 	LOCK_MUTEX_CONNECTIONS();
 	set<KeyFrame*> s;
-	for (map<KeyFrame*, int>::iterator mit = connectedKeyFrameWeights_.begin(); mit != connectedKeyFrameWeights_.end(); mit++)
+	for (map<KeyFrame*, int>::iterator mit = connectionTo_.begin(); mit != connectionTo_.end(); mit++)
 		s.insert(mit->first);
 	return s;
 }
@@ -198,8 +198,8 @@ vector<KeyFrame*> KeyFrame::GetCovisiblesByWeight(const int &w)
 int KeyFrame::GetWeight(KeyFrame *pKF)
 {
 	LOCK_MUTEX_CONNECTIONS();
-	if (connectedKeyFrameWeights_.count(pKF))
-		return connectedKeyFrameWeights_[pKF];
+	if (connectionTo_.count(pKF))
+		return connectionTo_[pKF];
 	else
 		return 0;
 }
@@ -361,7 +361,7 @@ void KeyFrame::UpdateConnections()
 		LOCK_MUTEX_CONNECTIONS();
 
 		// mspConnectedKeyFrames = spConnectedKeyFrames;
-		connectedKeyFrameWeights_ = KFcounter;
+		connectionTo_ = KFcounter;
 		orderedConnectedKeyFrames_ = vector<KeyFrame*>(lKFs.begin(), lKFs.end());
 		orderedWeights_ = vector<int>(lWs.begin(), lWs.end());
 
@@ -460,7 +460,7 @@ void KeyFrame::SetBadFlag()
 		}
 	}
 
-	for (map<KeyFrame*, int>::iterator mit = connectedKeyFrameWeights_.begin(), mend = connectedKeyFrameWeights_.end(); mit != mend; mit++)
+	for (map<KeyFrame*, int>::iterator mit = connectionTo_.begin(), mend = connectionTo_.end(); mit != mend; mit++)
 		mit->first->EraseConnection(this);
 
 	for (size_t i = 0; i < mappoints_.size(); i++)
@@ -470,7 +470,7 @@ void KeyFrame::SetBadFlag()
 		LOCK_MUTEX_CONNECTIONS();
 		LOCK_MUTEX_FEATURES();
 
-		connectedKeyFrameWeights_.clear();
+		connectionTo_.clear();
 		orderedConnectedKeyFrames_.clear();
 
 		// Update Spanning Tree
@@ -552,9 +552,9 @@ void KeyFrame::EraseConnection(KeyFrame* pKF)
 	bool bUpdate = false;
 	{
 		LOCK_MUTEX_CONNECTIONS();
-		if (connectedKeyFrameWeights_.count(pKF))
+		if (connectionTo_.count(pKF))
 		{
-			connectedKeyFrameWeights_.erase(pKF);
+			connectionTo_.erase(pKF);
 			bUpdate = true;
 		}
 	}
