@@ -1766,7 +1766,7 @@ public:
 		cout << " done" << endl;
 
 		// Clear Map (this erase MapPoints and KeyFrames)
-		map_->clear();
+		map_->Clear();
 
 		KeyFrame::nextId = 0;
 		Frame::nextId = 0;

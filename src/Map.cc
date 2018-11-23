@@ -119,11 +119,11 @@ frameid_t Map::GetMaxKFid() const
 
 void Map::Clear()
 {
-	for (std::set<MapPoint*>::iterator sit = mappoints_.begin(), send = mappoints_.end(); sit != send; sit++)
-		delete *sit;
+	for (MapPoint* mappoint : mappoints_)
+		delete mappoint;
 
-	for (std::set<KeyFrame*>::iterator sit = keyframes_.begin(), send = keyframes_.end(); sit != send; sit++)
-		delete *sit;
+	for (KeyFrame* keyframes : keyframes_)
+		delete keyframes;
 
 	mappoints_.clear();
 	keyframes_.clear();
