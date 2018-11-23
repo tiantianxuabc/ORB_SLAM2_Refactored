@@ -39,12 +39,11 @@ KeyFrameDatabase::KeyFrameDatabase(const ORBVocabulary &voc) : voc_(&voc)
 }
 
 
-void KeyFrameDatabase::add(KeyFrame *pKF)
+void KeyFrameDatabase::add(KeyFrame* keyframe)
 {
 	LOCK_MUTEX_DATABASE();
-
-	for (DBoW2::BowVector::const_iterator vit = pKF->mBowVec.begin(), vend = pKF->mBowVec.end(); vit != vend; vit++)
-		wordIdToKFs_[vit->first].push_back(pKF);
+	for (const auto& v : keyframe->mBowVec)
+		wordIdToKFs_[v.first].push_back(keyframe);
 }
 
 void KeyFrameDatabase::erase(KeyFrame* pKF)
