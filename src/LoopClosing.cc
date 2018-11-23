@@ -273,11 +273,11 @@ public:
 		{
 			for (MapPoint* mappoint : connectedKF->GetMapPointMatches())
 			{
-				if (!mappoint || mappoint->isBad() || mappoint->mnLoopPointForKF == currentKF->id)
+				if (!mappoint || mappoint->isBad() || mappoint->loopPointForKF == currentKF->id)
 					continue;
 
 				loop.loopMapPoints.push_back(mappoint);
-				mappoint->mnLoopPointForKF = currentKF->id;
+				mappoint->loopPointForKF = currentKF->id;
 			}
 		}
 
@@ -427,7 +427,7 @@ public:
 					if (mappoint->isBad())
 						continue;
 
-					if (mappoint->mnBAGlobalForKF == loopKFId)
+					if (mappoint->BAGlobalForKF == loopKFId)
 					{
 						// If optimized by Global BA, just update
 						mappoint->SetWorldPos(mappoint->mPosGBA);
@@ -600,7 +600,7 @@ public:
 
 				for (MapPoint* mappiont : connectedKF->GetMapPointMatches())
 				{
-					if (!mappiont || mappiont->isBad() || mappiont->mnCorrectedByKF == currentKF->id)
+					if (!mappiont || mappiont->isBad() || mappiont->correctedByKF == currentKF->id)
 						continue;
 					
 					// Project with non-corrected pose and project back with corrected pose
@@ -610,8 +610,8 @@ public:
 
 					cv::Mat cvCorrectedP3Dw = Converter::toCvMat(eigCorrectedP3Dw);
 					mappiont->SetWorldPos(cvCorrectedP3Dw);
-					mappiont->mnCorrectedByKF = currentKF->id;
-					mappiont->mnCorrectedReference = connectedKF->id;
+					mappiont->correctedByKF = currentKF->id;
+					mappiont->correctedReference = connectedKF->id;
 					mappiont->UpdateNormalAndDepth();
 				}
 

@@ -193,11 +193,11 @@ struct LocalMap
 		{
 			for (MapPoint* mappoint : keyframe->GetMapPointMatches())
 			{
-				if (!mappoint || mappoint->mnTrackReferenceForFrame == currFrame.id || mappoint->isBad())
+				if (!mappoint || mappoint->trackReferenceForFrame == currFrame.id || mappoint->isBad())
 					continue;
 
 				mappoints.push_back(mappoint);
-				mappoint->mnTrackReferenceForFrame = currFrame.id;
+				mappoint->trackReferenceForFrame = currFrame.id;
 			}
 		}
 	}
@@ -224,7 +224,7 @@ static int DiscardOutliers(Frame& currFrame)
 			currFrame.outlier[i] = false;
 
 			mappoint->mbTrackInView = false;
-			mappoint->mnLastFrameSeen = currFrame.id;
+			mappoint->lastFrameSeen = currFrame.id;
 		}
 		else if (currFrame.mappoints[i]->Observations() > 0)
 		{
@@ -481,7 +481,7 @@ static void SearchLocalPoints(const LocalMap& localMap, Frame& currFrame, float 
 		else
 		{
 			mappoint->IncreaseVisible();
-			mappoint->mnLastFrameSeen = currFrame.id;
+			mappoint->lastFrameSeen = currFrame.id;
 			mappoint->mbTrackInView = false;
 		}
 	}
@@ -491,7 +491,7 @@ static void SearchLocalPoints(const LocalMap& localMap, Frame& currFrame, float 
 	// Project points in frame and check its visibility
 	for (MapPoint* mappoint : localMap.mappoints)
 	{
-		if (mappoint->mnLastFrameSeen == currFrame.id || mappoint->isBad())
+		if (mappoint->lastFrameSeen == currFrame.id || mappoint->isBad())
 			continue;
 
 		// Project (this fills MapPoint variables for matching)

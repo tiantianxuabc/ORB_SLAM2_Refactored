@@ -69,7 +69,7 @@ public:
 	void IncreaseFound(int n = 1);
 	float GetFoundRatio();
 	inline int GetFound() {
-		return mnFound;
+		return nfound_;
 	}
 
 	void ComputeDistinctiveDescriptors();
@@ -85,11 +85,11 @@ public:
 
 public:
 
-	mappointid_t mnId;
-	static mappointid_t nNextId;
-	int mnFirstKFid;
-	int mnFirstFrame;
-	int nObs;
+	mappointid_t id;
+	static mappointid_t nextId_;
+	int firstKFid;
+	int firstFrame;
+	int nobservations;
 
 	// Variables used by the tracking
 	float mTrackProjX;
@@ -98,19 +98,19 @@ public:
 	bool mbTrackInView;
 	int mnTrackScaleLevel;
 	float mTrackViewCos;
-	frameid_t mnTrackReferenceForFrame;
-	frameid_t mnLastFrameSeen;
+	frameid_t trackReferenceForFrame;
+	frameid_t lastFrameSeen;
 
 	// Variables used by local mapping
-	frameid_t mnBALocalForKF;
-	frameid_t mnFuseCandidateForKF;
+	frameid_t BALocalForKF;
+	frameid_t fuseCandidateForKF;
 
 	// Variables used by loop closing
-	frameid_t mnLoopPointForKF;
-	frameid_t mnCorrectedByKF;
-	frameid_t mnCorrectedReference;
+	frameid_t loopPointForKF;
+	frameid_t correctedByKF;
+	frameid_t correctedReference;
 	cv::Mat mPosGBA;
-	frameid_t mnBAGlobalForKF;
+	frameid_t BAGlobalForKF;
 
 
 	static std::mutex mGlobalMutex;
@@ -118,33 +118,33 @@ public:
 protected:
 
 	// Position in absolute coordinates
-	cv::Mat mWorldPos;
+	cv::Mat Xw_;
 
 	// Keyframes observing the point and associated index in keyframe
 	std::map<KeyFrame*, size_t> mObservations;
 
 	// Mean viewing direction
-	cv::Mat mNormalVector;
+	cv::Mat normal_;
 
 	// Best descriptor to fast matching
 	cv::Mat mDescriptor;
 
 	// Reference KeyFrame
-	KeyFrame* mpRefKF;
+	KeyFrame* referenceKF_;
 
 	// Tracking counters
-	int mnVisible;
-	int mnFound;
+	int nvisible_;
+	int nfound_;
 
 	// Bad flag (we do not currently erase MapPoint from memory)
-	bool mbBad;
-	MapPoint* mpReplaced;
+	bool bad_;
+	MapPoint* replaced_;
 
 	// Scale invariance distances
-	float mfMinDistance;
-	float mfMaxDistance;
+	float minDistance_;
+	float maxDistance_;
 
-	Map* mpMap;
+	Map* map_;
 
 	std::mutex mMutexPos;
 	std::mutex mMutexFeatures;

@@ -343,7 +343,7 @@ private:
 		for (auto it = std::begin(recentAddedMapPoints_); it != std::end(recentAddedMapPoints_);)
 		{
 			MapPoint* mappoint = *it;
-			const int firstKFId = mappoint->mnFirstKFid;
+			const int firstKFId = mappoint->firstKFid;
 			if (mappoint->isBad())
 			{
 				it = recentAddedMapPoints_.erase(it);
@@ -655,10 +655,10 @@ private:
 		{
 			for (MapPoint* mappoint : targetKF->GetMapPointMatches())
 			{
-				if (!mappoint || mappoint->isBad() || mappoint->mnFuseCandidateForKF == currKeyFrame_->id)
+				if (!mappoint || mappoint->isBad() || mappoint->fuseCandidateForKF == currKeyFrame_->id)
 					continue;
 
-				mappoint->mnFuseCandidateForKF = currKeyFrame_->id;
+				mappoint->fuseCandidateForKF = currKeyFrame_->id;
 				fuseCandidates.push_back(mappoint);
 			}
 		}
