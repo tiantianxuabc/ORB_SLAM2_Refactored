@@ -213,7 +213,7 @@ cv::Mat Sim3Solver::find(std::vector<bool> &vbInliers12, int &nInliers)
 	return iterate(mRansacMaxIts, bFlag, vbInliers12, nInliers);
 }
 
-void Sim3Solver::ComputeCentroid(cv::Mat &P, cv::Mat &Pr, cv::Mat &C)
+static void ComputeCentroid(cv::Mat &P, cv::Mat &Pr, cv::Mat &C)
 {
 	cv::reduce(P, C, 1, CV_REDUCE_SUM);
 	C = C / P.cols;

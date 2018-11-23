@@ -51,7 +51,7 @@ public:
 
 protected:
 
-	void ComputeCentroid(cv::Mat &P, cv::Mat &Pr, cv::Mat &C);
+	//void ComputeCentroid(cv::Mat &P, cv::Mat &Pr, cv::Mat &C);
 
 	void ComputeSim3(cv::Mat &P1, cv::Mat &P2);
 
