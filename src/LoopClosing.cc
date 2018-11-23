@@ -72,7 +72,7 @@ public:
 		return true;
 	}
 
-	bool DetectLoop(KeyFrame* currentKF, std::vector<KeyFrame*>& loopCandidates, int lastLoopKFId)
+	bool DetectLoop(KeyFrame* currentKF, std::vector<KeyFrame*>& candidateKFs, int lastLoopKFId)
 	{
 		//If the map contains less than 10 KF or less than 10 KF have passed from last loop detection
 		if (currentKF->mnId < lastLoopKFId + 10)
@@ -96,10 +96,10 @@ public:
 		}
 
 		// Query the database imposing the minimum score
-		const std::vector<KeyFrame*> candidateKFs = keyFrameDB_->DetectLoopCandidates(currentKF, minScore);
+		const std::vector<KeyFrame*> tmpCandidateKFs = keyFrameDB_->DetectLoopCandidates(currentKF, minScore);
 
 		// If there are no loop candidates, just add new keyframe and return false
-		if (candidateKFs.empty())
+		if (tmpCandidateKFs.empty())
 		{
 			keyFrameDB_->add(currentKF);
 			prevConsistentGroups_.clear();
@@ -111,7 +111,7 @@ public:
 		// Each candidate expands a covisibility group (keyframes connected to the loop candidate in the covisibility graph)
 		// A group is consistent with a previous group if they share at least a keyframe
 		// We must detect a consistent loop in several consecutive keyframes to accept it
-		loopCandidates.clear();
+		candidateKFs.clear();
 
 		auto IsConsistent = [](const std::set<KeyFrame*>& prevGroup, const std::set<KeyFrame*>& currGroup)
 		{
@@ -123,7 +123,7 @@ public:
 
 		std::vector<ConsistentGroup> currConsistentGroups;
 		std::vector<bool> consistentFound(prevConsistentGroups_.size(), false);
-		for (KeyFrame* candidateKF : candidateKFs)
+		for (KeyFrame* candidateKF : tmpCandidateKFs)
 		{
 			std::set<KeyFrame*> currGroup = candidateKF->GetConnectedKeyFrames();
 			currGroup.insert(candidateKF);
@@ -147,7 +147,7 @@ public:
 				}
 				if (currConsistency >= minConsistency_ && !candidateFound)
 				{
-					loopCandidates.push_back(candidateKF);
+					candidateKFs.push_back(candidateKF);
 					candidateFound = true; //this avoid to insert the same candidate more than once
 				}
 			}
@@ -163,7 +163,7 @@ public:
 		// Add Current Keyframe to database
 		keyFrameDB_->add(currentKF);
 
-		if (loopCandidates.empty())
+		if (candidateKFs.empty())
 		{
 			currentKF->SetErase();
 			return false;
@@ -172,102 +172,102 @@ public:
 		return true;
 	}
 
-	bool ComputeSim3(KeyFrame* mpCurrentKF, std::vector<KeyFrame*>& mvpEnoughConsistentCandidates, Loop& loop)
+	bool ComputeSim3(KeyFrame* currentKF, std::vector<KeyFrame*>& candidateKFs, Loop& loop)
 	{
 		// For each consistent loop candidate we try to compute a Sim3
 
-		const int nInitialCandidates = mvpEnoughConsistentCandidates.size();
+		const int nInitialCandidates = static_cast<int>(candidateKFs.size());
 
 		// We compute first ORB matches for each candidate
 		// If enough matches are found, we setup a Sim3Solver
-		ORBmatcher matcher(0.75, true);
+		ORBmatcher matcher(0.75f, true);
 
-		vector<Sim3Solver*> vpSim3Solvers;
-		vpSim3Solvers.resize(nInitialCandidates);
+		std::vector<Sim3Solver*> solvers;
+		solvers.resize(nInitialCandidates);
 
-		vector<vector<MapPoint*> > vvpMapPointMatches;
-		vvpMapPointMatches.resize(nInitialCandidates);
+		std::vector<vector<MapPoint*>> vmatches;
+		vmatches.resize(nInitialCandidates);
 
-		vector<bool> vbDiscarded;
-		vbDiscarded.resize(nInitialCandidates);
+		std::vector<bool> discarded;
+		discarded.resize(nInitialCandidates);
 
-		int nCandidates = 0; //candidates with enough matches
+		int ncandidates = 0; //candidates with enough matches
 
 		for (int i = 0; i < nInitialCandidates; i++)
 		{
-			KeyFrame* pKF = mvpEnoughConsistentCandidates[i];
+			KeyFrame* candidateKF = candidateKFs[i];
 
 			// avoid that local mapping erase it while it is being processed in this thread
-			pKF->SetNotErase();
+			candidateKF->SetNotErase();
 
-			if (pKF->isBad())
+			if (candidateKF->isBad())
 			{
-				vbDiscarded[i] = true;
+				discarded[i] = true;
 				continue;
 			}
 
-			int nmatches = matcher.SearchByBoW(mpCurrentKF, pKF, vvpMapPointMatches[i]);
+			const int nmatches = matcher.SearchByBoW(currentKF, candidateKF, vmatches[i]);
 
 			if (nmatches < 20)
 			{
-				vbDiscarded[i] = true;
+				discarded[i] = true;
 				continue;
 			}
 			else
 			{
-				Sim3Solver* pSolver = new Sim3Solver(mpCurrentKF, pKF, vvpMapPointMatches[i], fixScale_);
-				pSolver->SetRansacParameters(0.99, 20, 300);
-				vpSim3Solvers[i] = pSolver;
+				Sim3Solver* solver = new Sim3Solver(currentKF, candidateKF, vmatches[i], fixScale_);
+				solver->SetRansacParameters(0.99, 20, 300);
+				solvers[i] = solver;
 			}
 
-			nCandidates++;
+			ncandidates++;
 		}
 
 		bool bMatch = false;
 
 		// Perform alternatively RANSAC iterations for each candidate
 		// until one is succesful or all fail
-		while (nCandidates > 0 && !bMatch)
+		while (ncandidates > 0 && !bMatch)
 		{
 			for (int i = 0; i < nInitialCandidates; i++)
 			{
-				if (vbDiscarded[i])
+				if (discarded[i])
 					continue;
 
-				KeyFrame* pKF = mvpEnoughConsistentCandidates[i];
+				KeyFrame* pKF = candidateKFs[i];
 
 				// Perform 5 Ransac Iterations
 				vector<bool> vbInliers;
 				int nInliers;
 				bool bNoMore;
 
-				Sim3Solver* pSolver = vpSim3Solvers[i];
+				Sim3Solver* pSolver = solvers[i];
 				cv::Mat Scm = pSolver->iterate(5, bNoMore, vbInliers, nInliers);
 
 				// If Ransac reachs max. iterations discard keyframe
 				if (bNoMore)
 				{
-					vbDiscarded[i] = true;
-					nCandidates--;
+					discarded[i] = true;
+					ncandidates--;
 				}
 
 				// If RANSAC returns a Sim3, perform a guided matching and optimize with all correspondences
 				if (!Scm.empty())
 				{
-					vector<MapPoint*> vpMapPointMatches(vvpMapPointMatches[i].size(), static_cast<MapPoint*>(NULL));
+					vector<MapPoint*> vpMapPointMatches(vmatches[i].size(), static_cast<MapPoint*>(NULL));
 					for (size_t j = 0, jend = vbInliers.size(); j < jend; j++)
 					{
 						if (vbInliers[j])
-							vpMapPointMatches[j] = vvpMapPointMatches[i][j];
+							vpMapPointMatches[j] = vmatches[i][j];
 					}
 
 					cv::Mat R = pSolver->GetEstimatedRotation();
 					cv::Mat t = pSolver->GetEstimatedTranslation();
 					const float s = pSolver->GetEstimatedScale();
-					matcher.SearchBySim3(mpCurrentKF, pKF, vpMapPointMatches, s, R, t, 7.5);
+					matcher.SearchBySim3(currentKF, pKF, vpMapPointMatches, s, R, t, 7.5);
 
 					g2o::Sim3 gScm(Converter::toMatrix3d(R), Converter::toVector3d(t), s);
-					const int nInliers = Optimizer::OptimizeSim3(mpCurrentKF, pKF, vpMapPointMatches, gScm, 10, fixScale_);
+					const int nInliers = Optimizer::OptimizeSim3(currentKF, pKF, vpMapPointMatches, gScm, 10, fixScale_);
 
 					// If optimization is succesful stop ransacs and continue
 					if (nInliers >= 20)
@@ -288,13 +288,13 @@ public:
 		if (!bMatch)
 		{
 			for (int i = 0; i < nInitialCandidates; i++)
-				mvpEnoughConsistentCandidates[i]->SetErase();
-			mpCurrentKF->SetErase();
+				candidateKFs[i]->SetErase();
+			currentKF->SetErase();
 			return false;
 		}
 
 		// Retrieve MapPoints seen in Loop Keyframe and neighbors
-		vector<KeyFrame*> vpLoopConnectedKFs = loop.mpMatchedKF->GetVectorCovisibleKeyFrames();
+		std::vector<KeyFrame*> vpLoopConnectedKFs = loop.mpMatchedKF->GetVectorCovisibleKeyFrames();
 		vpLoopConnectedKFs.push_back(loop.mpMatchedKF);
 		loop.mvpLoopMapPoints.clear();
 		for (vector<KeyFrame*>::iterator vit = vpLoopConnectedKFs.begin(); vit != vpLoopConnectedKFs.end(); vit++)
@@ -306,17 +306,17 @@ public:
 				MapPoint* pMP = vpMapPoints[i];
 				if (pMP)
 				{
-					if (!pMP->isBad() && pMP->mnLoopPointForKF != mpCurrentKF->mnId)
+					if (!pMP->isBad() && pMP->mnLoopPointForKF != currentKF->mnId)
 					{
 						loop.mvpLoopMapPoints.push_back(pMP);
-						pMP->mnLoopPointForKF = mpCurrentKF->mnId;
+						pMP->mnLoopPointForKF = currentKF->mnId;
 					}
 				}
 			}
 		}
 
 		// Find more matches projecting with the computed Sim3
-		matcher.SearchByProjection(mpCurrentKF, loop.mScw, loop.mvpLoopMapPoints, loop.mvpCurrentMatchedPoints, 10);
+		matcher.SearchByProjection(currentKF, loop.mScw, loop.mvpLoopMapPoints, loop.mvpCurrentMatchedPoints, 10);
 
 		// If enough matches accept Loop
 		int nTotalMatches = 0;
@@ -329,15 +329,15 @@ public:
 		if (nTotalMatches >= 40)
 		{
 			for (int i = 0; i < nInitialCandidates; i++)
-				if (mvpEnoughConsistentCandidates[i] != loop.mpMatchedKF)
-					mvpEnoughConsistentCandidates[i]->SetErase();
+				if (candidateKFs[i] != loop.mpMatchedKF)
+					candidateKFs[i]->SetErase();
 			return true;
 		}
 		else
 		{
 			for (int i = 0; i < nInitialCandidates; i++)
-				mvpEnoughConsistentCandidates[i]->SetErase();
-			mpCurrentKF->SetErase();
+				candidateKFs[i]->SetErase();
+			currentKF->SetErase();
 			return false;
 		}
 
