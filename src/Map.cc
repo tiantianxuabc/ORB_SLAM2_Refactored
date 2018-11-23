@@ -20,10 +20,10 @@
 
 #include "Map.h"
 
+#include <mutex>
+
 #include "MapPoint.h"
 #include "KeyFrame.h"
-
-#include<mutex>
 
 namespace ORB_SLAM2
 {

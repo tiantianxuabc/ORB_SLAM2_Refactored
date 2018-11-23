@@ -21,13 +21,9 @@
 #ifndef MAP_H
 #define MAP_H
 
-//#include "MapPoint.h"
-//#include "KeyFrame.h"
 #include <set>
 #include <vector>
 #include <mutex>
-
-
 
 namespace ORB_SLAM2
 {
