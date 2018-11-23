@@ -143,7 +143,7 @@ void MapDrawer::DrawKeyFrames(const bool bDrawKF, const bool bDrawGraph)
             {
                 for(std::vector<KeyFrame*>::const_iterator vit=vCovKFs.begin(), vend=vCovKFs.end(); vit!=vend; vit++)
                 {
-                    if((*vit)->mnId<vpKFs[i]->mnId)
+                    if((*vit)->id<vpKFs[i]->id)
                         continue;
                     cv::Mat Ow2 = (*vit)->GetCameraCenter();
                     glVertex3f(Ow.at<float>(0),Ow.at<float>(1),Ow.at<float>(2));
@@ -164,7 +164,7 @@ void MapDrawer::DrawKeyFrames(const bool bDrawKF, const bool bDrawGraph)
 			std::set<KeyFrame*> sLoopKFs = vpKFs[i]->GetLoopEdges();
             for(std::set<KeyFrame*>::iterator sit=sLoopKFs.begin(), send=sLoopKFs.end(); sit!=send; sit++)
             {
-                if((*sit)->mnId<vpKFs[i]->mnId)
+                if((*sit)->id<vpKFs[i]->id)
                     continue;
                 cv::Mat Owl = (*sit)->GetCameraCenter();
                 glVertex3f(Ow.at<float>(0),Ow.at<float>(1),Ow.at<float>(2));

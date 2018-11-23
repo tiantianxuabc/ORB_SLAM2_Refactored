@@ -110,64 +110,64 @@ public:
     }
 
     static bool lId(KeyFrame* pKF1, KeyFrame* pKF2){
-        return pKF1->mnId<pKF2->mnId;
+        return pKF1->id<pKF2->id;
     }
 
 
     // The following variables are accesed from only 1 thread or never change (no mutex needed).
 public:
 
-    static long unsigned int nNextId;
-    long unsigned int mnId;
-    const long unsigned int mnFrameId;
+    static long unsigned int nextId;
+    long unsigned int id;
+    const long unsigned int frameId;
 
-    const double mTimeStamp;
+    const double timestamp;
 
     // Grid (to speed up feature matching)
 	FeaturesGrid grid;
     
     // Variables used by the tracking
-    long unsigned int mnTrackReferenceForFrame;
-    long unsigned int mnFuseTargetForKF;
+    long unsigned int trackReferenceForFrame;
+    long unsigned int fuseTargetForKF;
 
     // Variables used by the local mapping
-    long unsigned int mnBALocalForKF;
-    long unsigned int mnBAFixedForKF;
+    long unsigned int BALocalForKF;
+    long unsigned int BAFixedForKF;
 
     // Variables used by the keyframe database
-    long unsigned int mnLoopQuery;
-    int mnLoopWords;
-    float mLoopScore;
-    long unsigned int mnRelocQuery;
-    int mnRelocWords;
-    float mRelocScore;
+    long unsigned int loopQuery;
+    int loopWords;
+    float loopScore;
+    long unsigned int relocQuery;
+    int relocWords;
+    float relocScore;
 
     // Variables used by loop closing
-    cv::Mat mTcwGBA;
-    cv::Mat mTcwBefGBA;
-    long unsigned int mnBAGlobalForKF;
+    cv::Mat TcwGBA;
+    cv::Mat TcwBefGBA;
+    long unsigned int BAGlobalForKF;
 
     // Calibration parameters
 	const CameraParams camera;
-	const float mThDepth;
+	const float thDepth;
     //const float fx, fy, cx, cy, invfx, invfy, mbf, mb, mThDepth;
 
     // Number of KeyPoints
     const int N;
 
     // KeyPoints, stereo coordinate and descriptors (all associated by an index)
-    const std::vector<cv::KeyPoint> mvKeys;
-    const std::vector<cv::KeyPoint> mvKeysUn;
-    const std::vector<float> mvuRight; // negative value for monocular points
-    const std::vector<float> mvDepth; // negative value for monocular points
-    const cv::Mat mDescriptors;
+    const std::vector<cv::KeyPoint> keypointsL;
+    const std::vector<cv::KeyPoint> keypointsUn;
+    const std::vector<float> uright; // negative value for monocular points
+    const std::vector<float> depth; // negative value for monocular points
+    const cv::Mat descriptorsL;
 
     //BoW
-    DBoW2::BowVector mBowVec;
-    DBoW2::FeatureVector mFeatVec;
+    DBoW2::BowVector bowVector;
+    DBoW2::FeatureVector featureVector;
 
     // Pose relative to parent (this is computed when bad flag is activated)
-    cv::Mat mTcp;
+    cv::Mat Tcp;
 
     // Scale
 	ScalePyramidInfo pyramid;
@@ -186,37 +186,37 @@ protected:
     cv::Mat Cw; // Stereo middel point. Only for visualization
 
     // MapPoints associated to keypoints
-    std::vector<MapPoint*> mvpMapPoints;
+    std::vector<MapPoint*> mappoints_;
 
     // BoW
-    KeyFrameDatabase* mpKeyFrameDB;
-    ORBVocabulary* mpORBvocabulary;
+    KeyFrameDatabase* keyFrameDB_;
+    ORBVocabulary* voc_;
 
     // Grid over the image to speed up feature matching
-    std::vector< std::vector <std::vector<size_t> > > mGrid;
+    //std::vector<std::vector <std::vector<size_t>>> mGrid;
 
-    std::map<KeyFrame*,int> mConnectedKeyFrameWeights;
-    std::vector<KeyFrame*> mvpOrderedConnectedKeyFrames;
-    std::vector<int> mvOrderedWeights;
+    std::map<KeyFrame*,int> connectedKeyFrameWeights_;
+    std::vector<KeyFrame*> orderedConnectedKeyFrames_;
+    std::vector<int> orderedWeights_;
 
     // Spanning Tree and Loop Edges
-    bool mbFirstConnection;
-    KeyFrame* mpParent;
-    std::set<KeyFrame*> mspChildrens;
-    std::set<KeyFrame*> mspLoopEdges;
+    bool firstConnection_;
+    KeyFrame* parent_;
+    std::set<KeyFrame*> children_;
+    std::set<KeyFrame*> loopEdges_;
 
     // Bad flags
-    bool mbNotErase;
-    bool mbToBeErased;
-    bool mbBad;    
+    bool notErase_;
+    bool toBeErased_;
+    bool bad_;    
 
-    float mHalfBaseline; // Only for visualization
+    float halfBaseline_; // Only for visualization
 
-    Map* mpMap;
+    Map* map_;
 
-    std::mutex mMutexPose;
-    std::mutex mMutexConnections;
-    std::mutex mMutexFeatures;
+    std::mutex mutexPose_;
+    std::mutex mutexConnections_;
+    std::mutex mutexFeatures_;
 };
 
 } //namespace ORB_SLAM

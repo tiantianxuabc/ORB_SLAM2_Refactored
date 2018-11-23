@@ -30,7 +30,7 @@ long unsigned int MapPoint::nNextId=0;
 std::mutex MapPoint::mGlobalMutex;
 
 MapPoint::MapPoint(const cv::Mat &Pos, KeyFrame *pRefKF, Map* pMap):
-    mnFirstKFid(pRefKF->mnId), mnFirstFrame(pRefKF->mnFrameId), nObs(0), mnTrackReferenceForFrame(0),
+    mnFirstKFid(pRefKF->id), mnFirstFrame(pRefKF->frameId), nObs(0), mnTrackReferenceForFrame(0),
     mnLastFrameSeen(0), mnBALocalForKF(0), mnFuseCandidateForKF(0), mnLoopPointForKF(0), mnCorrectedByKF(0),
     mnCorrectedReference(0), mnBAGlobalForKF(0), mpRefKF(pRefKF), mnVisible(1), mnFound(1), mbBad(false),
     mpReplaced(static_cast<MapPoint*>(NULL)), mfMinDistance(0), mfMaxDistance(0), mpMap(pMap)
@@ -102,7 +102,7 @@ void MapPoint::AddObservation(KeyFrame* pKF, size_t idx)
         return;
     mObservations[pKF]=idx;
 
-    if(pKF->mvuRight[idx]>=0)
+    if(pKF->uright[idx]>=0)
         nObs+=2;
     else
         nObs++;
@@ -116,7 +116,7 @@ void MapPoint::EraseObservation(KeyFrame* pKF)
         if(mObservations.count(pKF))
         {
             int idx = mObservations[pKF];
-            if(pKF->mvuRight[idx]>=0)
+            if(pKF->uright[idx]>=0)
                 nObs-=2;
             else
                 nObs--;
@@ -263,7 +263,7 @@ void MapPoint::ComputeDistinctiveDescriptors()
         KeyFrame* pKF = mit->first;
 
         if(!pKF->isBad())
-            vDescriptors.push_back(pKF->mDescriptors.row(mit->second));
+            vDescriptors.push_back(pKF->descriptorsL.row(mit->second));
     }
 
     if(vDescriptors.empty())
@@ -358,7 +358,7 @@ void MapPoint::UpdateNormalAndDepth()
 
     cv::Mat PC = Pos - pRefKF->GetCameraCenter();
     const float dist = cv::norm(PC);
-    const int level = pRefKF->mvKeysUn[observations[pRefKF]].octave;
+    const int level = pRefKF->keypointsUn[observations[pRefKF]].octave;
     const float levelScaleFactor =  pRefKF->pyramid.scaleFactors[level];
     const int nLevels = pRefKF->pyramid.nlevels;
 

@@ -40,7 +40,7 @@ void KeyFrameDatabase::add(KeyFrame* keyframe)
 {
 	LOCK_MUTEX_DATABASE();
 
-	for (const auto& word : keyframe->mBowVec)
+	for (const auto& word : keyframe->bowVector)
 		wordIdToKFs_[word.first].push_back(keyframe);
 }
 
@@ -49,7 +49,7 @@ void KeyFrameDatabase::erase(KeyFrame* keyframe)
 	LOCK_MUTEX_DATABASE();
 
 	// Erase elements in the Inverse File for the entry
-	for (const auto& word : keyframe->mBowVec)
+	for (const auto& word : keyframe->bowVector)
 	{
 		// List of keyframes that share the word
 		std::list<KeyFrame*>& keyframes = wordIdToKFs_[word.first];
@@ -75,20 +75,20 @@ std::vector<KeyFrame*> KeyFrameDatabase::DetectLoopCandidates(KeyFrame* keyframe
 	{
 		LOCK_MUTEX_DATABASE();
 
-		for (const auto& word : keyframe->mBowVec)
+		for (const auto& word : keyframe->bowVector)
 		{
 			for (KeyFrame* sharingKF : wordIdToKFs_[word.first])
 			{
-				if (sharingKF->mnLoopQuery != keyframe->mnId)
+				if (sharingKF->loopQuery != keyframe->id)
 				{
-					sharingKF->mnLoopWords = 0;
+					sharingKF->loopWords = 0;
 					if (!connectedKFs.count(sharingKF))
 					{
-						sharingKF->mnLoopQuery = keyframe->mnId;
+						sharingKF->loopQuery = keyframe->id;
 						wordSharingKFs.push_back(sharingKF);
 					}
 				}
-				sharingKF->mnLoopWords++;
+				sharingKF->loopWords++;
 			}
 		}
 	}
@@ -102,7 +102,7 @@ std::vector<KeyFrame*> KeyFrameDatabase::DetectLoopCandidates(KeyFrame* keyframe
 	int maxCommonWords = 0;
 	//for (list<KeyFrame*>::iterator lit = sharingKFs.begin(), lend = sharingKFs.end(); lit != lend; lit++)
 	for (KeyFrame* sharingKF : wordSharingKFs)
-		maxCommonWords = std::max(maxCommonWords, sharingKF->mnLoopWords);
+		maxCommonWords = std::max(maxCommonWords, sharingKF->loopWords);
 
 	const int minCommonWords = static_cast<float>(0.8f * maxCommonWords);
 
@@ -111,12 +111,12 @@ std::vector<KeyFrame*> KeyFrameDatabase::DetectLoopCandidates(KeyFrame* keyframe
 	// Compute similarity score. Retain the matches whose score is higher than minScore
 	for (KeyFrame* sharingKF : wordSharingKFs)
 	{
-		if (sharingKF->mnLoopWords > minCommonWords)
+		if (sharingKF->loopWords > minCommonWords)
 		{
 			nscores++;
 
-			const float score = static_cast<float>(voc_->score(keyframe->mBowVec, sharingKF->mBowVec));
-			sharingKF->mLoopScore = score;
+			const float score = static_cast<float>(voc_->score(keyframe->bowVector, sharingKF->bowVector));
+			sharingKF->loopScore = score;
 			if (score >= minScore)
 				scoreAndMatches.push_back(std::make_pair(score, sharingKF));
 		}
@@ -139,13 +139,13 @@ std::vector<KeyFrame*> KeyFrameDatabase::DetectLoopCandidates(KeyFrame* keyframe
 
 		for (KeyFrame* neighborKF : sharingKF->GetBestCovisibilityKeyFrames(10))
 		{
-			if (neighborKF->mnLoopQuery == keyframe->mnId && neighborKF->mnLoopWords > minCommonWords)
+			if (neighborKF->loopQuery == keyframe->id && neighborKF->loopWords > minCommonWords)
 			{
-				accScore += neighborKF->mLoopScore;
-				if (neighborKF->mLoopScore > bestScore)
+				accScore += neighborKF->loopScore;
+				if (neighborKF->loopScore > bestScore)
 				{
 					bestKF = neighborKF;
-					bestScore = neighborKF->mLoopScore;
+					bestScore = neighborKF->loopScore;
 				}
 			}
 		}
@@ -183,13 +183,13 @@ std::vector<KeyFrame*> KeyFrameDatabase::DetectRelocalizationCandidates(Frame* f
 		{
 			for (KeyFrame* sharingKF : wordIdToKFs_[word.first])
 			{
-				if (sharingKF->mnRelocQuery != frame->id)
+				if (sharingKF->relocQuery != frame->id)
 				{
-					sharingKF->mnRelocWords = 0;
-					sharingKF->mnRelocQuery = frame->id;
+					sharingKF->relocWords = 0;
+					sharingKF->relocQuery = frame->id;
 					wordSharingKFs.push_back(sharingKF);
 				}
-				sharingKF->mnRelocWords++;
+				sharingKF->relocWords++;
 			}
 		}
 	}
@@ -200,7 +200,7 @@ std::vector<KeyFrame*> KeyFrameDatabase::DetectRelocalizationCandidates(Frame* f
 	// Only compare against those keyframes that share enough words
 	int maxCommonWords = 0;
 	for (KeyFrame* sharingKF : wordSharingKFs)
-		maxCommonWords = std::max(maxCommonWords, sharingKF->mnRelocWords);
+		maxCommonWords = std::max(maxCommonWords, sharingKF->relocWords);
 
 	const int minCommonWords = static_cast<int>(0.8f * maxCommonWords);
 
@@ -211,11 +211,11 @@ std::vector<KeyFrame*> KeyFrameDatabase::DetectRelocalizationCandidates(Frame* f
 	// Compute similarity score.
 	for (KeyFrame* sharingKF : wordSharingKFs)
 	{
-		if (sharingKF->mnRelocWords > minCommonWords)
+		if (sharingKF->relocWords > minCommonWords)
 		{
 			nscores++;
-			const float score = static_cast<float>(voc_->score(frame->bowVector, sharingKF->mBowVec));
-			sharingKF->mRelocScore = score;
+			const float score = static_cast<float>(voc_->score(frame->bowVector, sharingKF->bowVector));
+			sharingKF->relocScore = score;
 			scoreAndMatches.push_back(std::make_pair(score, sharingKF));
 		}
 	}
@@ -237,14 +237,14 @@ std::vector<KeyFrame*> KeyFrameDatabase::DetectRelocalizationCandidates(Frame* f
 
 		for (KeyFrame* neighborKF : sharingKF->GetBestCovisibilityKeyFrames(10))
 		{
-			if (neighborKF->mnRelocQuery != frame->id)
+			if (neighborKF->relocQuery != frame->id)
 				continue;
 
-			accScore += neighborKF->mRelocScore;
-			if (neighborKF->mRelocScore > bestScore)
+			accScore += neighborKF->relocScore;
+			if (neighborKF->relocScore > bestScore)
 			{
 				bestKF = neighborKF;
-				bestScore = neighborKF->mRelocScore;
+				bestScore = neighborKF->relocScore;
 			}
 		}
 

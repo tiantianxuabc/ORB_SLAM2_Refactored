@@ -170,7 +170,7 @@ public:
 		///////////////////////////////////////////////////////////////////////////////////////////////////
 
 		//If the map contains less than 10 KF or less than 10 KF have passed from last loop detection
-		if ((int)currentKF->mnId < lastLoopKFId + 10)
+		if ((int)currentKF->id < lastLoopKFId + 10)
 			return false;
 
 		// Compute reference BoW similarity score
@@ -182,7 +182,7 @@ public:
 			if (neighborKF->isBad())
 				continue;
 
-			const float score = static_cast<float>(voc_->score(currentKF->mBowVec, neighborKF->mBowVec));
+			const float score = static_cast<float>(voc_->score(currentKF->bowVector, neighborKF->bowVector));
 			minScore = std::min(minScore, score);
 		}
 
@@ -273,11 +273,11 @@ public:
 		{
 			for (MapPoint* mappoint : connectedKF->GetMapPointMatches())
 			{
-				if (!mappoint || mappoint->isBad() || mappoint->mnLoopPointForKF == currentKF->mnId)
+				if (!mappoint || mappoint->isBad() || mappoint->mnLoopPointForKF == currentKF->id)
 					continue;
 
 				loop.loopMapPoints.push_back(mappoint);
-				mappoint->mnLoopPointForKF = currentKF->mnId;
+				mappoint->mnLoopPointForKF = currentKF->id;
 			}
 		}
 
@@ -406,18 +406,18 @@ public:
 					cv::Mat Twc = keyframe->GetPoseInverse();
 					for (KeyFrame* child : keyframe->GetChilds())
 					{
-						if (child->mnBAGlobalForKF != loopKFId)
+						if (child->BAGlobalForKF != loopKFId)
 						{
 							cv::Mat Tchildc = child->GetPose() * Twc;
-							child->mTcwGBA = Tchildc * keyframe->mTcwGBA;//*Tcorc*pKF->mTcwGBA;
-							child->mnBAGlobalForKF = loopKFId;
+							child->TcwGBA = Tchildc * keyframe->TcwGBA;//*Tcorc*pKF->mTcwGBA;
+							child->BAGlobalForKF = loopKFId;
 
 						}
 						toCheck.push_back(child);
 					}
 
-					keyframe->mTcwBefGBA = keyframe->GetPose();
-					keyframe->SetPose(keyframe->mTcwGBA);
+					keyframe->TcwBefGBA = keyframe->GetPose();
+					keyframe->SetPose(keyframe->TcwGBA);
 					toCheck.pop_front();
 				}
 
@@ -437,12 +437,12 @@ public:
 						// Update according to the correction of its reference keyframe
 						KeyFrame* referenceKF = mappoint->GetReferenceKeyFrame();
 
-						if (referenceKF->mnBAGlobalForKF != loopKFId)
+						if (referenceKF->BAGlobalForKF != loopKFId)
 							continue;
 
 						// Map to non-corrected camera
-						cv::Mat Rcw = referenceKF->mTcwBefGBA.rowRange(0, 3).colRange(0, 3);
-						cv::Mat tcw = referenceKF->mTcwBefGBA.rowRange(0, 3).col(3);
+						cv::Mat Rcw = referenceKF->TcwBefGBA.rowRange(0, 3).colRange(0, 3);
+						cv::Mat tcw = referenceKF->TcwBefGBA.rowRange(0, 3).col(3);
 						cv::Mat Xc = Rcw*mappoint->GetWorldPos() + tcw;
 
 						// Backproject using corrected camera
@@ -600,7 +600,7 @@ public:
 
 				for (MapPoint* mappiont : connectedKF->GetMapPointMatches())
 				{
-					if (!mappiont || mappiont->isBad() || mappiont->mnCorrectedByKF == currentKF->mnId)
+					if (!mappiont || mappiont->isBad() || mappiont->mnCorrectedByKF == currentKF->id)
 						continue;
 					
 					// Project with non-corrected pose and project back with corrected pose
@@ -610,8 +610,8 @@ public:
 
 					cv::Mat cvCorrectedP3Dw = Converter::toCvMat(eigCorrectedP3Dw);
 					mappiont->SetWorldPos(cvCorrectedP3Dw);
-					mappiont->mnCorrectedByKF = currentKF->mnId;
-					mappiont->mnCorrectedReference = connectedKF->mnId;
+					mappiont->mnCorrectedByKF = currentKF->id;
+					mappiont->mnCorrectedReference = connectedKF->id;
 					mappiont->UpdateNormalAndDepth();
 				}
 
@@ -703,7 +703,7 @@ public:
 		currentKF->AddLoopEdge(matchedKF);
 
 		// Launch a new thread to perform Global Bundle Adjustment
-		GBA_->Run(currentKF->mnId);
+		GBA_->Run(currentKF->id);
 
 		// Loop closed. Release Local Mapping.
 		localMapper_->Release();
@@ -764,7 +764,7 @@ public:
 				{
 					// Perform loop fusion and pose graph optimization
 					corrector_.Correct(currentKF, loop);
-					lastLoopKFId_ = currentKF->mnId;
+					lastLoopKFId_ = currentKF->id;
 				}
 				else
 				{
@@ -786,7 +786,7 @@ public:
 	void InsertKeyFrame(KeyFrame* keyframe) override
 	{
 		LOCK_MUTEX_LOOP_QUEUE();
-		if (keyframe->mnId != 0)
+		if (keyframe->id != 0)
 			keyFrameQueue_.push_back(keyframe);
 	}
 

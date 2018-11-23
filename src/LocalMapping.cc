@@ -336,7 +336,7 @@ private:
 	void MapPointCulling(KeyFrame* currKeyFrame_)
 	{
 		// Check Recent Added MapPoints
-		const int currKFId = static_cast<int>(currKeyFrame_->mnId);
+		const int currKFId = static_cast<int>(currKeyFrame_->id);
 
 		const int minObservation = monocular_ ? 2 : 3;
 
@@ -460,12 +460,12 @@ private:
 				const int idx1 = static_cast<int>(matchIndices[ikp].first);
 				const int idx2 = static_cast<int>(matchIndices[ikp].second);
 
-				const cv::KeyPoint& keypoint1 = keyframe1->mvKeysUn[idx1];
-				const float ur1 = keyframe1->mvuRight[idx1];
+				const cv::KeyPoint& keypoint1 = keyframe1->keypointsUn[idx1];
+				const float ur1 = keyframe1->uright[idx1];
 				const bool stereo1 = ur1 >= 0;
 
-				const cv::KeyPoint& keypoint2 = keyframe2->mvKeysUn[idx2];
-				const float ur2 = keyframe2->mvuRight[idx2];
+				const cv::KeyPoint& keypoint2 = keyframe2->keypointsUn[idx2];
+				const float ur2 = keyframe2->uright[idx2];
 				const bool stereo2 = ur2 >= 0;
 
 				// Check parallax between rays
@@ -481,9 +481,9 @@ private:
 				float cosParallaxStereo2 = cosParallaxStereo;
 
 				if (stereo1)
-					cosParallaxStereo1 = cosf(Parallax(keyframe1->camera.baseline, keyframe1->mvDepth[idx1]));
+					cosParallaxStereo1 = cosf(Parallax(keyframe1->camera.baseline, keyframe1->depth[idx1]));
 				else if (stereo2)
-					cosParallaxStereo2 = cosf(Parallax(keyframe2->camera.baseline, keyframe2->mvDepth[idx2]));
+					cosParallaxStereo2 = cosf(Parallax(keyframe2->camera.baseline, keyframe2->depth[idx2]));
 
 				cosParallaxStereo = min(cosParallaxStereo1, cosParallaxStereo2);
 
@@ -626,16 +626,16 @@ private:
 		std::vector<KeyFrame*> targetKFs;
 		for (KeyFrame* neighborKF : currKeyFrame_->GetBestCovisibilityKeyFrames(nneighbors))
 		{
-			if (neighborKF->isBad() || neighborKF->mnFuseTargetForKF == currKeyFrame_->mnId)
+			if (neighborKF->isBad() || neighborKF->fuseTargetForKF == currKeyFrame_->id)
 				continue;
 
 			targetKFs.push_back(neighborKF);
-			neighborKF->mnFuseTargetForKF = currKeyFrame_->mnId;
+			neighborKF->fuseTargetForKF = currKeyFrame_->id;
 
 			// Extend to some second neighbors
 			for (KeyFrame* secondKF : neighborKF->GetBestCovisibilityKeyFrames(5))
 			{
-				if (secondKF->isBad() || secondKF->mnFuseTargetForKF == currKeyFrame_->mnId || secondKF->mnId == currKeyFrame_->mnId)
+				if (secondKF->isBad() || secondKF->fuseTargetForKF == currKeyFrame_->id || secondKF->id == currKeyFrame_->id)
 					continue;
 				targetKFs.push_back(secondKF);
 			}
@@ -655,10 +655,10 @@ private:
 		{
 			for (MapPoint* mappoint : targetKF->GetMapPointMatches())
 			{
-				if (!mappoint || mappoint->isBad() || mappoint->mnFuseCandidateForKF == currKeyFrame_->mnId)
+				if (!mappoint || mappoint->isBad() || mappoint->mnFuseCandidateForKF == currKeyFrame_->id)
 					continue;
 
-				mappoint->mnFuseCandidateForKF = currKeyFrame_->mnId;
+				mappoint->mnFuseCandidateForKF = currKeyFrame_->id;
 				fuseCandidates.push_back(mappoint);
 			}
 		}
@@ -688,7 +688,7 @@ private:
 		// We only consider close stereo points
 		for (KeyFrame* keyframe : currKeyFrame_->GetVectorCovisibleKeyFrames())
 		{
-			if (keyframe->mnId == 0)
+			if (keyframe->id == 0)
 				continue;
 
 			const std::vector<MapPoint*> mappoints = keyframe->GetMapPointMatches();
@@ -707,14 +707,14 @@ private:
 
 				if (!monocular_)
 				{
-					if (keyframe->mvDepth[i] > keyframe->mThDepth || keyframe->mvDepth[i] < 0)
+					if (keyframe->depth[i] > keyframe->thDepth || keyframe->depth[i] < 0)
 						continue;
 				}
 
 				npoints++;
 				if (mappoint->Observations() > thObs)
 				{
-					const int scaleLevel = keyframe->mvKeysUn[i].octave;
+					const int scaleLevel = keyframe->keypointsUn[i].octave;
 					const map<KeyFrame*, size_t> observations = mappoint->GetObservations();
 					int nObs = 0;
 					for (map<KeyFrame*, size_t>::const_iterator mit = observations.begin(), mend = observations.end(); mit != mend; mit++)
@@ -722,7 +722,7 @@ private:
 						KeyFrame* pKFi = mit->first;
 						if (pKFi == keyframe)
 							continue;
-						const int scaleLeveli = pKFi->mvKeysUn[mit->second].octave;
+						const int scaleLeveli = pKFi->keypointsUn[mit->second].octave;
 
 						if (scaleLeveli <= scaleLevel + 1)
 						{

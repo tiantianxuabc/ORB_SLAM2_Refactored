@@ -400,7 +400,7 @@ public:
 			// If the reference keyframe was culled, traverse the spanning tree to get a suitable keyframe.
 			while (keyframe->isBad())
 			{
-				Trw = Trw * keyframe->mTcp;
+				Trw = Trw * keyframe->Tcp;
 				keyframe = keyframe->GetParent();
 			}
 
@@ -448,7 +448,7 @@ public:
 			const cv::Mat1f R = keyframe->GetRotation().t();
 			std::vector<float> q = Converter::toQuaternion(R);
 			const cv::Mat1f t = keyframe->GetCameraCenter();
-			ofs << std::setprecision(6) << keyframe->mTimeStamp << " ";
+			ofs << std::setprecision(6) << keyframe->timestamp << " ";
 			ofs << std::setprecision(7) << t(0) << " " << t(1) << " " << t(2) << " ";
 			ofs << q[0] << " " << q[1] << " " << q[2] << " " << q[3] << std::endl;
 
@@ -495,7 +495,7 @@ public:
 			while (keyframe->isBad())
 			{
 				//  std::cout << "bad parent" << std::endl;
-				Trw = Trw * keyframe->mTcp;
+				Trw = Trw * keyframe->Tcp;
 				keyframe = keyframe->GetParent();
 			}
 

@@ -136,7 +136,7 @@ struct LocalMap
 			}
 
 			keyframes.push_back(keyframe);
-			keyframe->mnTrackReferenceForFrame = currFrame.id;
+			keyframe->trackReferenceForFrame = currFrame.id;
 		}
 
 		// Include also some not-already-included keyframes that are neighbors to already-included keyframes
@@ -148,20 +148,20 @@ struct LocalMap
 
 			for (KeyFrame* neighborKF : keyframe->GetBestCovisibilityKeyFrames(10))
 			{
-				if (!neighborKF->isBad() && neighborKF->mnTrackReferenceForFrame != currFrame.id)
+				if (!neighborKF->isBad() && neighborKF->trackReferenceForFrame != currFrame.id)
 				{
 					keyframes.push_back(neighborKF);
-					neighborKF->mnTrackReferenceForFrame = currFrame.id;
+					neighborKF->trackReferenceForFrame = currFrame.id;
 					break;
 				}
 			}
 
 			for (KeyFrame* childKF : keyframe->GetChilds())
 			{
-				if (!childKF->isBad() && childKF->mnTrackReferenceForFrame != currFrame.id)
+				if (!childKF->isBad() && childKF->trackReferenceForFrame != currFrame.id)
 				{
 					keyframes.push_back(childKF);
-					childKF->mnTrackReferenceForFrame = currFrame.id;
+					childKF->trackReferenceForFrame = currFrame.id;
 					break;
 				}
 			}
@@ -169,10 +169,10 @@ struct LocalMap
 			KeyFrame* parentKF = keyframe->GetParent();
 			if (parentKF)
 			{
-				if (parentKF->mnTrackReferenceForFrame != currFrame.id)
+				if (parentKF->trackReferenceForFrame != currFrame.id)
 				{
 					keyframes.push_back(parentKF);
-					parentKF->mnTrackReferenceForFrame = currFrame.id;
+					parentKF->trackReferenceForFrame = currFrame.id;
 					break;
 				}
 			}
@@ -1128,7 +1128,7 @@ public:
 
 		lastFrame_ = Frame(currFrame);
 		lastKeyFrame_ = keyframe;
-		CV_Assert(lastKeyFrame_->mnFrameId == currFrame.id);
+		CV_Assert(lastKeyFrame_->frameId == currFrame.id);
 
 		localMap_.keyframes.push_back(keyframe);
 		localMap_.mappoints = map_->GetAllMapPoints();
@@ -1300,7 +1300,7 @@ public:
 
 		currFrame.SetPose(pKFcur->GetPose());
 		lastKeyFrame_ = pKFcur;
-		CV_Assert(lastKeyFrame_->mnFrameId == currFrame.id);
+		CV_Assert(lastKeyFrame_->frameId == currFrame.id);
 
 		localMap_.keyframes.push_back(pKFcur);
 		localMap_.keyframes.push_back(pKFini);
@@ -1362,7 +1362,7 @@ public:
 		if (!localization_)
 			success = trackerIni_.TrackNormal(currFrame, lastFrame_, velocity_, state_);
 		else
-			success = trackerIni_.TrackLocalization(currFrame, lastFrame_, velocity_, state_, lastKeyFrame_->mnFrameId);
+			success = trackerIni_.TrackLocalization(currFrame, lastFrame_, velocity_, state_, lastKeyFrame_->frameId);
 
 		currFrame.referenceKF = localMap_.referenceKF;
 
@@ -1423,7 +1423,7 @@ public:
 
 			// Check if we need to insert a new keyframe
 			if (!localization_ && newKeyFrameCondition_.Satisfy(currFrame, localMapper_, matchesInliers_,
-				relocalizer_.GetLastRelocFrameId(), lastKeyFrame_->mnFrameId))
+				relocalizer_.GetLastRelocFrameId(), lastKeyFrame_->frameId))
 			{
 				if (localMapper_->SetNotStop(true))
 				{
@@ -1437,7 +1437,7 @@ public:
 					localMapper_->InsertKeyFrame(keyframe);
 					localMapper_->SetNotStop(false);
 					lastKeyFrame_ = keyframe;
-					CV_Assert(lastKeyFrame_->mnFrameId == currFrame.id);
+					CV_Assert(lastKeyFrame_->frameId == currFrame.id);
 				}
 			}
 
@@ -1768,7 +1768,7 @@ public:
 		// Clear Map (this erase MapPoints and KeyFrames)
 		map_->clear();
 
-		KeyFrame::nNextId = 0;
+		KeyFrame::nextId = 0;
 		Frame::nextId = 0;
 
 		tracker_->Clear();
