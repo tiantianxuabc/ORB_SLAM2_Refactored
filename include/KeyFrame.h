@@ -103,7 +103,7 @@ public:
 	bool isBad();
 
 	// Compute Scene Depth (q=2 median). Used in monocular.
-	float ComputeSceneMedianDepth(const int q);
+	float ComputeSceneMedianDepth(int q);
 
 	static bool lId(KeyFrame* pKF1, KeyFrame* pKF2) {
 		return pKF1->id < pKF2->id;

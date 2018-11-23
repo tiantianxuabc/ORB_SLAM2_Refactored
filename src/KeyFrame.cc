@@ -558,36 +558,37 @@ cv::Mat KeyFrame::UnprojectStereo(int i)
 	return GetR(Twc) * x3Dc + Gett(Twc);
 }
 
-float KeyFrame::ComputeSceneMedianDepth(const int q)
+float KeyFrame::ComputeSceneMedianDepth(int q)
 {
-	vector<MapPoint*> vpMapPoints;
+	std::vector<MapPoint*> mappoints;
 	cv::Mat Tcw_;
 	{
 		LOCK_MUTEX_FEATURES();
 		LOCK_MUTEX_POSE();
-		vpMapPoints = mappoints_;
+		mappoints = mappoints_;
 		Tcw_ = Tcw.clone();
 	}
 
-	vector<float> vDepths;
-	vDepths.reserve(N);
+	std::vector<float> depths;
+	depths.reserve(N);
+
 	cv::Mat Rcw2 = Tcw_.row(2).colRange(0, 3);
 	Rcw2 = Rcw2.t();
-	float zcw = Tcw_.at<float>(2, 3);
-	for (int i = 0; i < N; i++)
+
+	const float zcw = Tcw_.at<float>(2, 3);
+	for (MapPoint* mappoint : mappoints)
 	{
-		if (mappoints_[i])
+		if (mappoint)
 		{
-			MapPoint* pMP = mappoints_[i];
-			cv::Mat x3Dw = pMP->GetWorldPos();
-			float z = Rcw2.dot(x3Dw) + zcw;
-			vDepths.push_back(z);
+			const cv::Mat x3Dw = mappoint->GetWorldPos();
+			const float Z = Rcw2.dot(x3Dw) + zcw;
+			depths.push_back(Z);
 		}
 	}
 
-	sort(vDepths.begin(), vDepths.end());
+	std::sort(std::begin(depths), std::end(depths));
 
-	return vDepths[(vDepths.size() - 1) / q];
+	return depths[(depths.size() - 1) / q];
 }
 
 } //namespace ORB_SLAM
