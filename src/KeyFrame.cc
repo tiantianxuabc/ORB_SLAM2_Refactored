@@ -193,10 +193,10 @@ std::vector<KeyFrame*> KeyFrame::GetCovisiblesByWeight(int w)
 	return std::vector<KeyFrame*>(std::begin(orderedConnectedKeyFrames_), std::begin(orderedConnectedKeyFrames_) + n);
 }
 
-int KeyFrame::GetWeight(KeyFrame *pKF)
+int KeyFrame::GetWeight(KeyFrame* keyframe)
 {
 	LOCK_MUTEX_CONNECTIONS();
-	return connectionTo_.count(pKF) ? connectionTo_[pKF] : 0;
+	return connectionTo_.count(keyframe) ? connectionTo_[keyframe] : 0;
 }
 
 void KeyFrame::AddMapPoint(MapPoint *pMP, const size_t &idx)
