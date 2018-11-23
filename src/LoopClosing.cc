@@ -502,13 +502,13 @@ public:
 		thread_.Detach();
 	}
 
-	bool isRunningGBA() const
+	bool Running() const
 	{
 		LOCK_MUTEX_GLOBAL_BA();
 		return running_;
 	}
 
-	bool isFinishedGBA() const
+	bool Finished() const
 	{
 		LOCK_MUTEX_GLOBAL_BA();
 		return finished_;
@@ -560,7 +560,7 @@ public:
 		localMapper_->RequestStop();
 
 		// If a Global Bundle Adjustment is running, abort it
-		if (GBA_->isRunningGBA())
+		if (GBA_->Running())
 		{
 			GBA_->Stop();
 		}
@@ -821,12 +821,12 @@ public:
 
 	bool isRunningGBA() const override
 	{
-		return GBA_.isRunningGBA();
+		return GBA_.Running();
 	}
 
 	bool isFinishedGBA() const override
 	{
-		return GBA_.isFinishedGBA();
+		return GBA_.Finished();
 	}
 
 	void RequestFinish() override
