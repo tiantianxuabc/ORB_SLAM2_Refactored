@@ -20,10 +20,11 @@
 
 #include "KeyFrameDatabase.h"
 
-#include "KeyFrame.h"
-#include "Thirdparty/DBoW2/DBoW2/BowVector.h"
+#include <mutex>
 
-#include<mutex>
+#include <Thirdparty/DBoW2/DBoW2/BowVector.h>
+
+#include "KeyFrame.h"
 
 using namespace std;
 
@@ -31,29 +32,29 @@ namespace ORB_SLAM2
 {
 
 KeyFrameDatabase::KeyFrameDatabase(const ORBVocabulary &voc) :
-	mpVoc(&voc)
+	voc_(&voc)
 {
-	mvInvertedFile.resize(voc.size());
+	wordIdToKFs_.resize(voc.size());
 }
 
 
 void KeyFrameDatabase::add(KeyFrame *pKF)
 {
-	unique_lock<mutex> lock(mMutex);
+	unique_lock<mutex> lock(mutex_);
 
 	for (DBoW2::BowVector::const_iterator vit = pKF->mBowVec.begin(), vend = pKF->mBowVec.end(); vit != vend; vit++)
-		mvInvertedFile[vit->first].push_back(pKF);
+		wordIdToKFs_[vit->first].push_back(pKF);
 }
 
 void KeyFrameDatabase::erase(KeyFrame* pKF)
 {
-	unique_lock<mutex> lock(mMutex);
+	unique_lock<mutex> lock(mutex_);
 
 	// Erase elements in the Inverse File for the entry
 	for (DBoW2::BowVector::const_iterator vit = pKF->mBowVec.begin(), vend = pKF->mBowVec.end(); vit != vend; vit++)
 	{
 		// List of keyframes that share the word
-		list<KeyFrame*> &lKFs = mvInvertedFile[vit->first];
+		list<KeyFrame*> &lKFs = wordIdToKFs_[vit->first];
 
 		for (list<KeyFrame*>::iterator lit = lKFs.begin(), lend = lKFs.end(); lit != lend; lit++)
 		{
@@ -68,8 +69,8 @@ void KeyFrameDatabase::erase(KeyFrame* pKF)
 
 void KeyFrameDatabase::clear()
 {
-	mvInvertedFile.clear();
-	mvInvertedFile.resize(mpVoc->size());
+	wordIdToKFs_.clear();
+	wordIdToKFs_.resize(voc_->size());
 }
 
 
@@ -81,11 +82,11 @@ vector<KeyFrame*> KeyFrameDatabase::DetectLoopCandidates(KeyFrame* pKF, float mi
 	// Search all keyframes that share a word with current keyframes
 	// Discard keyframes connected to the query keyframe
 	{
-		unique_lock<mutex> lock(mMutex);
+		unique_lock<mutex> lock(mutex_);
 
 		for (DBoW2::BowVector::const_iterator vit = pKF->mBowVec.begin(), vend = pKF->mBowVec.end(); vit != vend; vit++)
 		{
-			list<KeyFrame*> &lKFs = mvInvertedFile[vit->first];
+			list<KeyFrame*> &lKFs = wordIdToKFs_[vit->first];
 
 			for (list<KeyFrame*>::iterator lit = lKFs.begin(), lend = lKFs.end(); lit != lend; lit++)
 			{
@@ -130,7 +131,7 @@ vector<KeyFrame*> KeyFrameDatabase::DetectLoopCandidates(KeyFrame* pKF, float mi
 		{
 			nscores++;
 
-			float si = mpVoc->score(pKF->mBowVec, pKFi->mBowVec);
+			float si = voc_->score(pKF->mBowVec, pKFi->mBowVec);
 
 			pKFi->mLoopScore = si;
 			if (si >= minScore)
@@ -202,11 +203,11 @@ vector<KeyFrame*> KeyFrameDatabase::DetectRelocalizationCandidates(Frame *F)
 
 	// Search all keyframes that share a word with current frame
 	{
-		unique_lock<mutex> lock(mMutex);
+		unique_lock<mutex> lock(mutex_);
 
 		for (DBoW2::BowVector::const_iterator vit = F->bowVector.begin(), vend = F->bowVector.end(); vit != vend; vit++)
 		{
-			list<KeyFrame*> &lKFs = mvInvertedFile[vit->first];
+			list<KeyFrame*> &lKFs = wordIdToKFs_[vit->first];
 
 			for (list<KeyFrame*>::iterator lit = lKFs.begin(), lend = lKFs.end(); lit != lend; lit++)
 			{
@@ -246,7 +247,7 @@ vector<KeyFrame*> KeyFrameDatabase::DetectRelocalizationCandidates(Frame *F)
 		if (pKFi->mnRelocWords > minCommonWords)
 		{
 			nscores++;
-			float si = mpVoc->score(F->bowVector, pKFi->mBowVec);
+			float si = voc_->score(F->bowVector, pKFi->mBowVec);
 			pKFi->mRelocScore = si;
 			lScoreAndMatch.push_back(make_pair(si, pKFi));
 		}
