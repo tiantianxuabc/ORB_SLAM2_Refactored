@@ -171,11 +171,7 @@ public:
 
 		//If the map contains less than 10 KF or less than 10 KF have passed from last loop detection
 		if ((int)currentKF->mnId < lastLoopKFId + 10)
-		{
-			//keyFrameDB_->add(currentKF);
-			//currentKF->SetErase();
 			return false;
-		}
 
 		// Compute reference BoW similarity score
 		// This is the lowest score to a connected keyframe in the covisibility graph
@@ -196,9 +192,7 @@ public:
 		// If there are no loop candidates, just add new keyframe and return false
 		if (tmpCandidateKFs.empty())
 		{
-			//keyFrameDB_->add(currentKF);
 			prevConsistentGroups_.clear();
-			//currentKF->SetErase();
 			return false;
 		}
 
@@ -255,14 +249,8 @@ public:
 		// Update Covisibility Consistent Groups
 		prevConsistentGroups_ = currConsistentGroups;
 
-		// Add Current Keyframe to database
-		//keyFrameDB_->add(currentKF);
-
 		if (candidateKFs.empty())
-		{
-			//currentKF->SetErase();
 			return false;
-		}
 
 		///////////////////////////////////////////////////////////////////////////////////////////////////
 		// ComputeSim3
@@ -312,7 +300,6 @@ public:
 		{
 			for (KeyFrame* candidateKF : candidateKFs)
 				candidateKF->SetErase();
-			//currentKF->SetErase();
 			return false;
 		}
 	}
