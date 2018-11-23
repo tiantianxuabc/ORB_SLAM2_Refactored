@@ -539,24 +539,23 @@ bool KeyFrame::IsInImage(float x, float y) const
 
 cv::Mat KeyFrame::UnprojectStereo(int i)
 {
-	const float z = depth[i];
+	const float Zc = depth[i];
+	if (Zc <= 0.f)
+		return cv::Mat();
+
 	const float invfx = 1.f / camera.fx;
 	const float invfy = 1.f / camera.fy;
-	const float cx = camera.cx;
-	const float cy = camera.cy;
-	if (z > 0)
-	{
-		const float u = keypointsL[i].pt.x;
-		const float v = keypointsL[i].pt.y;
-		const float x = (u - cx)*z*invfx;
-		const float y = (v - cy)*z*invfy;
-		cv::Mat x3Dc = (cv::Mat_<float>(3, 1) << x, y, z);
 
-		LOCK_MUTEX_POSE();
-		return GetR(Twc) * x3Dc + Gett(Twc);
-	}
-	else
-		return cv::Mat();
+	const float u = keypointsL[i].pt.x;
+	const float v = keypointsL[i].pt.y;
+
+	const float Xc = (u - camera.cx) * Zc * invfx;
+	const float Yc = (v - camera.cy) * Zc * invfy;
+
+	cv::Mat x3Dc = (cv::Mat_<float>(3, 1) << Xc, Yc, Zc);
+
+	LOCK_MUTEX_POSE();
+	return GetR(Twc) * x3Dc + Gett(Twc);
 }
 
 float KeyFrame::ComputeSceneMedianDepth(const int q)
