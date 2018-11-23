@@ -504,13 +504,13 @@ public:
 
 	bool isRunningGBA() const
 	{
-		unique_lock<std::mutex> lock(mutexGBA_);
+		LOCK_MUTEX_GLOBAL_BA();
 		return running_;
 	}
 
 	bool isFinishedGBA() const
 	{
-		unique_lock<std::mutex> lock(mutexGBA_);
+		LOCK_MUTEX_GLOBAL_BA();
 		return finished_;
 	}
 
