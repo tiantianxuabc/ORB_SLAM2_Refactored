@@ -39,7 +39,7 @@
 #define LOCK_MUTEX_FINISH()     std::unique_lock<std::mutex> lock2(mutexFinish_);
 #define LOCK_MUTEX_RESET()      std::unique_lock<std::mutex> lock3(mutexReset_);
 #define LOCK_MUTEX_GLOBAL_BA()  std::unique_lock<std::mutex> lock4(mutexGBA_);
-#define LOCK_MUTEX_MAP_UPDATE() std::unique_lock<std::mutex> lock5(map_->mMutexMapUpdate);
+#define LOCK_MUTEX_MAP_UPDATE() std::unique_lock<std::mutex> lock5(map_->mutexMapUpdate);
 
 namespace ORB_SLAM2
 {
