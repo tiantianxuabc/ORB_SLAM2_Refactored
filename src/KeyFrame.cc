@@ -158,12 +158,12 @@ void KeyFrame::UpdateBestCovisibles()
 	Split(pairs, orderedWeights_, orderedConnectedKeyFrames_);
 }
 
-set<KeyFrame*> KeyFrame::GetConnectedKeyFrames()
+std::set<KeyFrame*> KeyFrame::GetConnectedKeyFrames()
 {
 	LOCK_MUTEX_CONNECTIONS();
-	set<KeyFrame*> s;
-	for (map<KeyFrame*, int>::iterator mit = connectionTo_.begin(); mit != connectionTo_.end(); mit++)
-		s.insert(mit->first);
+	std::set<KeyFrame*> s;
+	for (const auto& v : connectionTo_)
+		s.insert(v.first);
 	return s;
 }
 
