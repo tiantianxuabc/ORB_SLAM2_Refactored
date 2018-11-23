@@ -378,17 +378,17 @@ KeyFrame* KeyFrame::GetParent()
 	return parent_;
 }
 
-bool KeyFrame::hasChild(KeyFrame *pKF)
+bool KeyFrame::hasChild(KeyFrame* keyframe)
 {
 	LOCK_MUTEX_CONNECTIONS();
-	return children_.count(pKF);
+	return children_.count(keyframe);
 }
 
-void KeyFrame::AddLoopEdge(KeyFrame *pKF)
+void KeyFrame::AddLoopEdge(KeyFrame* keyframe)
 {
 	LOCK_MUTEX_CONNECTIONS();
 	notErase_ = true;
-	loopEdges_.insert(pKF);
+	loopEdges_.insert(keyframe);
 }
 
 set<KeyFrame*> KeyFrame::GetLoopEdges()
