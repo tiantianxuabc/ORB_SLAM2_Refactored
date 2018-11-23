@@ -21,7 +21,7 @@
 #ifndef FRAME_H
 #define FRAME_H
 
-#include<vector>
+#include <vector>
 
 #include <opencv2/opencv.hpp>
 #include <Thirdparty/DBoW2/DBoW2/BowVector.h>
@@ -102,6 +102,9 @@ private:
 class Frame
 {
 public:
+
+	using frameid_t = int;
+
 	Frame();
 
 	// Copy constructor.
@@ -133,7 +136,7 @@ public:
 	// Backprojects a keypoint (if stereo/depth info available) into 3D world coordinates.
 	cv::Mat UnprojectStereo(int i) const;
 
-	int PassedFrom(int from) const;
+	int PassedFrom(frameid_t from) const;
 
 public:
 	// Vocabulary used for relocalization.
@@ -183,8 +186,8 @@ public:
 	CameraPose pose;
 
 	// Current and Next Frame id.
-	static int nextId;
-	int id;
+	static frameid_t nextId;
+	frameid_t id;
 
 	// Reference Keyframe.
 	KeyFrame* referenceKF;

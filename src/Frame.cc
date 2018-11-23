@@ -611,7 +611,7 @@ cv::Mat Frame::UnprojectStereo(int i) const
 	return pose.Rwc * x3Dc + pose.Ow;
 }
 
-int Frame::PassedFrom(int from) const
+int Frame::PassedFrom(frameid_t from) const
 {
 	return id - from;
 }
