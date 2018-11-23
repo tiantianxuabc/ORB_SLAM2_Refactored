@@ -385,38 +385,26 @@ float MapPoint::GetMaxDistanceInvariance()
 	return 1.2f * maxDistance_;
 }
 
-int MapPoint::PredictScale(const float &currentDist, KeyFrame* pKF)
+int MapPoint::PredictScale(float dist, KeyFrame* keyframe)
 {
-	float ratio;
+	float ratio = 1.f;
 	{
 		LOCK_MUTEX_POSITION();
-		ratio = maxDistance_ / currentDist;
+		ratio = maxDistance_ / dist;
 	}
-
-	int nScale = ceil(log(ratio) / pKF->pyramid.logScaleFactor);
-	if (nScale < 0)
-		nScale = 0;
-	else if (nScale >= pKF->pyramid.nlevels)
-		nScale = pKF->pyramid.nlevels - 1;
-
-	return nScale;
+	const int scale = static_cast<int>(ceil(log(ratio) / keyframe->pyramid.logScaleFactor));
+	return std::max(0, std::min(scale, keyframe->pyramid.nlevels - 1));
 }
 
-int MapPoint::PredictScale(const float &currentDist, Frame* pF)
+int MapPoint::PredictScale(float dist, Frame* frame)
 {
-	float ratio;
+	float ratio = 1.f;
 	{
 		LOCK_MUTEX_POSITION();
-		ratio = maxDistance_ / currentDist;
+		ratio = maxDistance_ / dist;
 	}
-
-	int nScale = ceil(log(ratio) / pF->pyramid.logScaleFactor);
-	if (nScale < 0)
-		nScale = 0;
-	else if (nScale >= pF->pyramid.nlevels)
-		nScale = pF->pyramid.nlevels - 1;
-
-	return nScale;
+	const int scale = static_cast<int>(ceil(log(ratio) / frame->pyramid.logScaleFactor));
+	return std::max(0, std::min(scale, frame->pyramid.nlevels - 1));
 }
 
 

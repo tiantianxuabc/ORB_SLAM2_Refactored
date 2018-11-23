@@ -80,8 +80,8 @@ public:
 
 	float GetMinDistanceInvariance();
 	float GetMaxDistanceInvariance();
-	int PredictScale(const float &currentDist, KeyFrame*pKF);
-	int PredictScale(const float &currentDist, Frame* pF);
+	int PredictScale(float currentDist, KeyFrame*pKF);
+	int PredictScale(float currentDist, Frame* pF);
 
 public:
 
