@@ -19,11 +19,17 @@
 */
 
 #include "KeyFrame.h"
+
+#include <mutex>
+
 #include "Converter.h"
 #include "ORBmatcher.h"
 #include "ORBVocabulary.h"
 #include "KeyFrameDatabase.h"
-#include<mutex>
+
+#define LOCK_MUTEX_POSE()        std::unique_lock<std::mutex> lock1(mutexPose_);
+#define LOCK_MUTEX_CONNECTIONS() std::unique_lock<std::mutex> lock2(mutexConnections_);
+#define LOCK_MUTEX_FEATURES()    std::unique_lock<std::mutex> lock3(mutexFeatures_);
 
 namespace ORB_SLAM2
 {
@@ -57,7 +63,7 @@ void KeyFrame::ComputeBoW()
 
 void KeyFrame::SetPose(const cv::Mat &Tcw_)
 {
-	unique_lock<mutex> lock(mutexPose_);
+	LOCK_MUTEX_POSE();
 	Tcw_.copyTo(Tcw);
 	cv::Mat Rcw = Tcw.rowRange(0, 3).colRange(0, 3);
 	cv::Mat tcw = Tcw.rowRange(0, 3).col(3);
@@ -73,45 +79,45 @@ void KeyFrame::SetPose(const cv::Mat &Tcw_)
 
 cv::Mat KeyFrame::GetPose()
 {
-	unique_lock<mutex> lock(mutexPose_);
+	LOCK_MUTEX_POSE();
 	return Tcw.clone();
 }
 
 cv::Mat KeyFrame::GetPoseInverse()
 {
-	unique_lock<mutex> lock(mutexPose_);
+	LOCK_MUTEX_POSE();
 	return Twc.clone();
 }
 
 cv::Mat KeyFrame::GetCameraCenter()
 {
-	unique_lock<mutex> lock(mutexPose_);
+	LOCK_MUTEX_POSE();
 	return Ow.clone();
 }
 
 cv::Mat KeyFrame::GetStereoCenter()
 {
-	unique_lock<mutex> lock(mutexPose_);
+	LOCK_MUTEX_POSE();
 	return Cw.clone();
 }
 
 
 cv::Mat KeyFrame::GetRotation()
 {
-	unique_lock<mutex> lock(mutexPose_);
+	LOCK_MUTEX_POSE();
 	return Tcw.rowRange(0, 3).colRange(0, 3).clone();
 }
 
 cv::Mat KeyFrame::GetTranslation()
 {
-	unique_lock<mutex> lock(mutexPose_);
+	LOCK_MUTEX_POSE();
 	return Tcw.rowRange(0, 3).col(3).clone();
 }
 
 void KeyFrame::AddConnection(KeyFrame *pKF, const int &weight)
 {
 	{
-		unique_lock<mutex> lock(mutexConnections_);
+		LOCK_MUTEX_CONNECTIONS();
 		if (!connectedKeyFrameWeights_.count(pKF))
 			connectedKeyFrameWeights_[pKF] = weight;
 		else if (connectedKeyFrameWeights_[pKF] != weight)
@@ -125,7 +131,7 @@ void KeyFrame::AddConnection(KeyFrame *pKF, const int &weight)
 
 void KeyFrame::UpdateBestCovisibles()
 {
-	unique_lock<mutex> lock(mutexConnections_);
+	LOCK_MUTEX_CONNECTIONS();
 	vector<pair<int, KeyFrame*> > vPairs;
 	vPairs.reserve(connectedKeyFrameWeights_.size());
 	for (map<KeyFrame*, int>::iterator mit = connectedKeyFrameWeights_.begin(), mend = connectedKeyFrameWeights_.end(); mit != mend; mit++)
@@ -146,7 +152,7 @@ void KeyFrame::UpdateBestCovisibles()
 
 set<KeyFrame*> KeyFrame::GetConnectedKeyFrames()
 {
-	unique_lock<mutex> lock(mutexConnections_);
+	LOCK_MUTEX_CONNECTIONS();
 	set<KeyFrame*> s;
 	for (map<KeyFrame*, int>::iterator mit = connectedKeyFrameWeights_.begin(); mit != connectedKeyFrameWeights_.end(); mit++)
 		s.insert(mit->first);
@@ -155,13 +161,13 @@ set<KeyFrame*> KeyFrame::GetConnectedKeyFrames()
 
 vector<KeyFrame*> KeyFrame::GetVectorCovisibleKeyFrames()
 {
-	unique_lock<mutex> lock(mutexConnections_);
+	LOCK_MUTEX_CONNECTIONS();
 	return orderedConnectedKeyFrames_;
 }
 
 vector<KeyFrame*> KeyFrame::GetBestCovisibilityKeyFrames(const int &N)
 {
-	unique_lock<mutex> lock(mutexConnections_);
+	LOCK_MUTEX_CONNECTIONS();
 	if ((int)orderedConnectedKeyFrames_.size() < N)
 		return orderedConnectedKeyFrames_;
 	else
@@ -171,7 +177,7 @@ vector<KeyFrame*> KeyFrame::GetBestCovisibilityKeyFrames(const int &N)
 
 vector<KeyFrame*> KeyFrame::GetCovisiblesByWeight(const int &w)
 {
-	unique_lock<mutex> lock(mutexConnections_);
+	LOCK_MUTEX_CONNECTIONS();
 
 	if (orderedConnectedKeyFrames_.empty())
 		return vector<KeyFrame*>();
@@ -188,7 +194,7 @@ vector<KeyFrame*> KeyFrame::GetCovisiblesByWeight(const int &w)
 
 int KeyFrame::GetWeight(KeyFrame *pKF)
 {
-	unique_lock<mutex> lock(mutexConnections_);
+	LOCK_MUTEX_CONNECTIONS();
 	if (connectedKeyFrameWeights_.count(pKF))
 		return connectedKeyFrameWeights_[pKF];
 	else
@@ -197,13 +203,13 @@ int KeyFrame::GetWeight(KeyFrame *pKF)
 
 void KeyFrame::AddMapPoint(MapPoint *pMP, const size_t &idx)
 {
-	unique_lock<mutex> lock(mutexFeatures_);
+	LOCK_MUTEX_FEATURES();
 	mappoints_[idx] = pMP;
 }
 
 void KeyFrame::EraseMapPointMatch(const size_t &idx)
 {
-	unique_lock<mutex> lock(mutexFeatures_);
+	LOCK_MUTEX_FEATURES();
 	mappoints_[idx] = static_cast<MapPoint*>(NULL);
 }
 
@@ -222,7 +228,7 @@ void KeyFrame::ReplaceMapPointMatch(const size_t &idx, MapPoint* pMP)
 
 set<MapPoint*> KeyFrame::GetMapPoints()
 {
-	unique_lock<mutex> lock(mutexFeatures_);
+	LOCK_MUTEX_FEATURES();
 	set<MapPoint*> s;
 	for (size_t i = 0, iend = mappoints_.size(); i < iend; i++)
 	{
@@ -237,7 +243,7 @@ set<MapPoint*> KeyFrame::GetMapPoints()
 
 int KeyFrame::TrackedMapPoints(const int &minObs)
 {
-	unique_lock<mutex> lock(mutexFeatures_);
+	LOCK_MUTEX_FEATURES();
 
 	int nPoints = 0;
 	const bool bCheckObs = minObs > 0;
@@ -264,13 +270,13 @@ int KeyFrame::TrackedMapPoints(const int &minObs)
 
 vector<MapPoint*> KeyFrame::GetMapPointMatches()
 {
-	unique_lock<mutex> lock(mutexFeatures_);
+	LOCK_MUTEX_FEATURES();
 	return mappoints_;
 }
 
 MapPoint* KeyFrame::GetMapPoint(const size_t &idx)
 {
-	unique_lock<mutex> lock(mutexFeatures_);
+	LOCK_MUTEX_FEATURES();
 	return mappoints_[idx];
 }
 
@@ -281,7 +287,7 @@ void KeyFrame::UpdateConnections()
 	vector<MapPoint*> vpMP;
 
 	{
-		unique_lock<mutex> lockMPs(mutexFeatures_);
+		LOCK_MUTEX_FEATURES();
 		vpMP = mappoints_;
 	}
 
@@ -349,7 +355,7 @@ void KeyFrame::UpdateConnections()
 	}
 
 	{
-		unique_lock<mutex> lockCon(mutexConnections_);
+		LOCK_MUTEX_CONNECTIONS();
 
 		// mspConnectedKeyFrames = spConnectedKeyFrames;
 		connectedKeyFrameWeights_ = KFcounter;
@@ -368,64 +374,64 @@ void KeyFrame::UpdateConnections()
 
 void KeyFrame::AddChild(KeyFrame *pKF)
 {
-	unique_lock<mutex> lockCon(mutexConnections_);
+	LOCK_MUTEX_CONNECTIONS();
 	children_.insert(pKF);
 }
 
 void KeyFrame::EraseChild(KeyFrame *pKF)
 {
-	unique_lock<mutex> lockCon(mutexConnections_);
+	LOCK_MUTEX_CONNECTIONS();
 	children_.erase(pKF);
 }
 
 void KeyFrame::ChangeParent(KeyFrame *pKF)
 {
-	unique_lock<mutex> lockCon(mutexConnections_);
+	LOCK_MUTEX_CONNECTIONS();
 	parent_ = pKF;
 	pKF->AddChild(this);
 }
 
 set<KeyFrame*> KeyFrame::GetChilds()
 {
-	unique_lock<mutex> lockCon(mutexConnections_);
+	LOCK_MUTEX_CONNECTIONS();
 	return children_;
 }
 
 KeyFrame* KeyFrame::GetParent()
 {
-	unique_lock<mutex> lockCon(mutexConnections_);
+	LOCK_MUTEX_CONNECTIONS();
 	return parent_;
 }
 
 bool KeyFrame::hasChild(KeyFrame *pKF)
 {
-	unique_lock<mutex> lockCon(mutexConnections_);
+	LOCK_MUTEX_CONNECTIONS();
 	return children_.count(pKF);
 }
 
 void KeyFrame::AddLoopEdge(KeyFrame *pKF)
 {
-	unique_lock<mutex> lockCon(mutexConnections_);
+	LOCK_MUTEX_CONNECTIONS();
 	notErase_ = true;
 	loopEdges_.insert(pKF);
 }
 
 set<KeyFrame*> KeyFrame::GetLoopEdges()
 {
-	unique_lock<mutex> lockCon(mutexConnections_);
+	LOCK_MUTEX_CONNECTIONS();
 	return loopEdges_;
 }
 
 void KeyFrame::SetNotErase()
 {
-	unique_lock<mutex> lock(mutexConnections_);
+	LOCK_MUTEX_CONNECTIONS();
 	notErase_ = true;
 }
 
 void KeyFrame::SetErase()
 {
 	{
-		unique_lock<mutex> lock(mutexConnections_);
+		LOCK_MUTEX_CONNECTIONS();
 		if (loopEdges_.empty())
 		{
 			notErase_ = false;
@@ -441,7 +447,7 @@ void KeyFrame::SetErase()
 void KeyFrame::SetBadFlag()
 {
 	{
-		unique_lock<mutex> lock(mutexConnections_);
+		LOCK_MUTEX_CONNECTIONS();
 		if (id == 0)
 			return;
 		else if (notErase_)
@@ -458,8 +464,8 @@ void KeyFrame::SetBadFlag()
 		if (mappoints_[i])
 			mappoints_[i]->EraseObservation(this);
 	{
-		unique_lock<mutex> lock(mutexConnections_);
-		unique_lock<mutex> lock1(mutexFeatures_);
+		LOCK_MUTEX_CONNECTIONS();
+		LOCK_MUTEX_FEATURES();
 
 		connectedKeyFrameWeights_.clear();
 		orderedConnectedKeyFrames_.clear();
@@ -534,7 +540,7 @@ void KeyFrame::SetBadFlag()
 
 bool KeyFrame::isBad()
 {
-	unique_lock<mutex> lock(mutexConnections_);
+	LOCK_MUTEX_CONNECTIONS();
 	return bad_;
 }
 
@@ -542,7 +548,7 @@ void KeyFrame::EraseConnection(KeyFrame* pKF)
 {
 	bool bUpdate = false;
 	{
-		unique_lock<mutex> lock(mutexConnections_);
+		LOCK_MUTEX_CONNECTIONS();
 		if (connectedKeyFrameWeights_.count(pKF))
 		{
 			connectedKeyFrameWeights_.erase(pKF);
@@ -579,7 +585,7 @@ cv::Mat KeyFrame::UnprojectStereo(int i)
 		const float y = (v - cy)*z*invfy;
 		cv::Mat x3Dc = (cv::Mat_<float>(3, 1) << x, y, z);
 
-		unique_lock<mutex> lock(mutexPose_);
+		LOCK_MUTEX_POSE();
 		return Twc.rowRange(0, 3).colRange(0, 3)*x3Dc + Twc.rowRange(0, 3).col(3);
 	}
 	else
@@ -591,8 +597,8 @@ float KeyFrame::ComputeSceneMedianDepth(const int q)
 	vector<MapPoint*> vpMapPoints;
 	cv::Mat Tcw_;
 	{
-		unique_lock<mutex> lock(mutexFeatures_);
-		unique_lock<mutex> lock2(mutexPose_);
+		LOCK_MUTEX_FEATURES();
+		LOCK_MUTEX_POSE();
 		vpMapPoints = mappoints_;
 		Tcw_ = Tcw.clone();
 	}
