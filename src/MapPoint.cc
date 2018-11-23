@@ -376,13 +376,13 @@ void MapPoint::UpdateNormalAndDepth()
 float MapPoint::GetMinDistanceInvariance()
 {
 	LOCK_MUTEX_POSITION();
-	return 0.8f*minDistance_;
+	return 0.8f * minDistance_;
 }
 
 float MapPoint::GetMaxDistanceInvariance()
 {
 	LOCK_MUTEX_POSITION();
-	return 1.2f*maxDistance_;
+	return 1.2f * maxDistance_;
 }
 
 int MapPoint::PredictScale(const float &currentDist, KeyFrame* pKF)
