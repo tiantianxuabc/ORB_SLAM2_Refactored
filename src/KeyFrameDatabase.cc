@@ -42,28 +42,23 @@ KeyFrameDatabase::KeyFrameDatabase(const ORBVocabulary &voc) : voc_(&voc)
 void KeyFrameDatabase::add(KeyFrame* keyframe)
 {
 	LOCK_MUTEX_DATABASE();
+
 	for (const auto& v : keyframe->mBowVec)
 		wordIdToKFs_[v.first].push_back(keyframe);
 }
 
-void KeyFrameDatabase::erase(KeyFrame* pKF)
+void KeyFrameDatabase::erase(KeyFrame* keyframe)
 {
 	LOCK_MUTEX_DATABASE();
 
 	// Erase elements in the Inverse File for the entry
-	for (DBoW2::BowVector::const_iterator vit = pKF->mBowVec.begin(), vend = pKF->mBowVec.end(); vit != vend; vit++)
+	for (const auto& v : keyframe->mBowVec)
 	{
 		// List of keyframes that share the word
-		list<KeyFrame*> &lKFs = wordIdToKFs_[vit->first];
-
-		for (list<KeyFrame*>::iterator lit = lKFs.begin(), lend = lKFs.end(); lit != lend; lit++)
-		{
-			if (pKF == *lit)
-			{
-				lKFs.erase(lit);
-				break;
-			}
-		}
+		std::list<KeyFrame*>& keyframes = wordIdToKFs_[v.first];
+		auto it = std::find(std::begin(keyframes), std::end(keyframes), keyframe);
+		if (it != std::end(keyframes))
+			keyframes.erase(it);
 	}
 }
 
