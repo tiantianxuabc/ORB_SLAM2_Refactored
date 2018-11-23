@@ -45,27 +45,27 @@ MapPoint::MapPoint(const cv::Mat& Xw, KeyFrame* referenceKF, Map* map) :
 	id = nextId_++;
 }
 
-MapPoint::MapPoint(const cv::Mat &Pos, Map* pMap, Frame* pFrame, const int &idxF) :
-	firstKFid(-1), firstFrame(pFrame->id), nobservations(0), trackReferenceForFrame(0), lastFrameSeen(0),
+MapPoint::MapPoint(const cv::Mat& Xw, Map* map, Frame* frame, const int &idxF) :
+	firstKFid(-1), firstFrame(frame->id), nobservations(0), trackReferenceForFrame(0), lastFrameSeen(0),
 	BALocalForKF(0), fuseCandidateForKF(0), loopPointForKF(0), correctedByKF(0),
-	correctedReference(0), BAGlobalForKF(0), referenceKF_(static_cast<KeyFrame*>(NULL)), nvisible_(1),
-	nfound_(1), bad_(false), replaced_(NULL), map_(pMap)
+	correctedReference(0), BAGlobalForKF(0), referenceKF_(nullptr), nvisible_(1),
+	nfound_(1), bad_(false), replaced_(nullptr), map_(map)
 {
-	Pos.copyTo(Xw_);
-	cv::Mat Ow = pFrame->GetCameraCenter();
+	Xw.copyTo(Xw_);
+	cv::Mat Ow = frame->GetCameraCenter();
 	normal_ = Xw_ - Ow;
 	normal_ = normal_ / cv::norm(normal_);
 
-	cv::Mat PC = Pos - Ow;
+	cv::Mat PC = Xw - Ow;
 	const float dist = cv::norm(PC);
-	const int level = pFrame->keypointsUn[idxF].octave;
-	const float levelScaleFactor = pFrame->pyramid.scaleFactors[level];
-	const int nLevels = pFrame->pyramid.nlevels;
+	const int level = frame->keypointsUn[idxF].octave;
+	const float levelScaleFactor = frame->pyramid.scaleFactors[level];
+	const int nLevels = frame->pyramid.nlevels;
 
 	maxDistance_ = dist*levelScaleFactor;
-	minDistance_ = maxDistance_ / pFrame->pyramid.scaleFactors[nLevels - 1];
+	minDistance_ = maxDistance_ / frame->pyramid.scaleFactors[nLevels - 1];
 
-	pFrame->descriptorsL.row(idxF).copyTo(mDescriptor);
+	frame->descriptorsL.row(idxF).copyTo(mDescriptor);
 
 	// MapPoints can be created from Tracking and Local Mapping. This mutex avoid conflicts with id.
 	std::unique_lock<std::mutex> lock(map_->mutexPointCreation);
