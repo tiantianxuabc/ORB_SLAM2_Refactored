@@ -61,14 +61,12 @@ MapPoint::MapPoint(const cv::Mat& Xw, Map* map, Frame* frame, int idx) :
 	normal_ = Xw_ - Ow;
 	normal_ = normal_ / cv::norm(normal_);
 
-	cv::Mat PC = Xw - Ow;
-	const float dist = cv::norm(PC);
+	const float dist = static_cast<float>(cv::norm(Xw - Ow));
 	const int level = frame->keypointsUn[idx].octave;
-	const float levelScaleFactor = frame->pyramid.scaleFactors[level];
-	const int nLevels = frame->pyramid.nlevels;
-
-	maxDistance_ = dist*levelScaleFactor;
-	minDistance_ = maxDistance_ / frame->pyramid.scaleFactors[nLevels - 1];
+	const float scaleFactor = frame->pyramid.scaleFactors[level];
+	
+	maxDistance_ = scaleFactor * dist;
+	minDistance_ = maxDistance_ / frame->pyramid.scaleFactors.back();
 
 	frame->descriptorsL.row(idx).copyTo(mDescriptor);
 
