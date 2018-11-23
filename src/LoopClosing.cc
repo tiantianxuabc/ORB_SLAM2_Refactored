@@ -236,13 +236,13 @@ public:
 				// Perform 5 Ransac Iterations
 				std::vector<bool> isInlier;
 				int nInliers;
-				bool bNoMore;
+				bool terminate;
 
 				Sim3Solver* solver = solvers[i];
-				cv::Mat Scm = solver->iterate(5, bNoMore, isInlier, nInliers);
+				cv::Mat Scm = solver->iterate(5, terminate, isInlier, nInliers);
 
 				// If Ransac reachs max. iterations discard keyframe
-				if (bNoMore)
+				if (terminate)
 				{
 					discarded[i] = true;
 					ncandidates--;
