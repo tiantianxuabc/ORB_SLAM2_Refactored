@@ -173,7 +173,7 @@ public:
 		if ((int)currentKF->mnId < lastLoopKFId + 10)
 		{
 			keyFrameDB_->add(currentKF);
-			currentKF->SetErase();
+			//currentKF->SetErase();
 			return false;
 		}
 
@@ -198,7 +198,7 @@ public:
 		{
 			keyFrameDB_->add(currentKF);
 			prevConsistentGroups_.clear();
-			currentKF->SetErase();
+			//currentKF->SetErase();
 			return false;
 		}
 
@@ -260,7 +260,7 @@ public:
 
 		if (candidateKFs.empty())
 		{
-			currentKF->SetErase();
+			//currentKF->SetErase();
 			return false;
 		}
 
@@ -312,7 +312,7 @@ public:
 		{
 			for (KeyFrame* candidateKF : candidateKFs)
 				candidateKF->SetErase();
-			currentKF->SetErase();
+			//currentKF->SetErase();
 			return false;
 		}
 	}
@@ -774,6 +774,10 @@ public:
 					// Perform loop fusion and pose graph optimization
 					corrector_.Correct(currentKF, loop);
 					lastLoopKFId_ = currentKF->mnId;
+				}
+				else
+				{
+					currentKF->SetErase();
 				}
 			}
 
