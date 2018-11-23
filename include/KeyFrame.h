@@ -62,7 +62,7 @@ public:
 	std::set<KeyFrame *> GetConnectedKeyFrames();
 	std::vector<KeyFrame* > GetVectorCovisibleKeyFrames();
 	std::vector<KeyFrame*> GetBestCovisibilityKeyFrames(int N);
-	std::vector<KeyFrame*> GetCovisiblesByWeight(const int &w);
+	std::vector<KeyFrame*> GetCovisiblesByWeight(int w);
 	int GetWeight(KeyFrame* pKF);
 
 	// Spanning tree functions
@@ -104,10 +104,6 @@ public:
 
 	// Compute Scene Depth (q=2 median). Used in monocular.
 	float ComputeSceneMedianDepth(const int q);
-
-	static bool weightComp(int a, int b) {
-		return a > b;
-	}
 
 	static bool lId(KeyFrame* pKF1, KeyFrame* pKF2) {
 		return pKF1->id < pKF2->id;

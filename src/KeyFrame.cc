@@ -20,8 +20,6 @@
 
 #include "KeyFrame.h"
 
-#include <mutex>
-
 #include "Converter.h"
 #include "ORBmatcher.h"
 #include "ORBVocabulary.h"
@@ -153,7 +151,7 @@ void KeyFrame::UpdateBestCovisibles()
 
 	for (const auto& v : connectionTo_)
 		pairs.push_back(std::make_pair(v.second, v.first));
-	
+
 	std::sort(std::begin(pairs), std::end(pairs), std::greater<WeightAndKeyFrame>());
 	Split(pairs, orderedWeights_, orderedConnectedKeyFrames_);
 }
@@ -180,21 +178,19 @@ std::vector<KeyFrame*> KeyFrame::GetBestCovisibilityKeyFrames(int N)
 	return std::vector<KeyFrame*>(std::begin(orderedConnectedKeyFrames_), std::begin(orderedConnectedKeyFrames_) + N);
 }
 
-vector<KeyFrame*> KeyFrame::GetCovisiblesByWeight(const int &w)
+std::vector<KeyFrame*> KeyFrame::GetCovisiblesByWeight(int w)
 {
 	LOCK_MUTEX_CONNECTIONS();
 
 	if (orderedConnectedKeyFrames_.empty())
-		return vector<KeyFrame*>();
+		return std::vector<KeyFrame*>();
 
-	vector<int>::iterator it = upper_bound(orderedWeights_.begin(), orderedWeights_.end(), w, KeyFrame::weightComp);
-	if (it == orderedWeights_.end())
-		return vector<KeyFrame*>();
-	else
-	{
-		int n = it - orderedWeights_.begin();
-		return vector<KeyFrame*>(orderedConnectedKeyFrames_.begin(), orderedConnectedKeyFrames_.begin() + n);
-	}
+	auto it = std::upper_bound(std::begin(orderedWeights_), std::end(orderedWeights_), w, std::greater<int>());
+	if (it == std::end(orderedWeights_))
+		return std::vector<KeyFrame*>();
+
+	const auto n = std::distance(std::begin(orderedWeights_), it);
+	return std::vector<KeyFrame*>(std::begin(orderedConnectedKeyFrames_), std::begin(orderedConnectedKeyFrames_) + n);
 }
 
 int KeyFrame::GetWeight(KeyFrame *pKF)
