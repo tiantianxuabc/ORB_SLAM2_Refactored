@@ -105,9 +105,8 @@ public:
 	frameid_t loopPointForKF;
 	frameid_t correctedByKF;
 	frameid_t correctedReference;
-	cv::Mat mPosGBA;
+	cv::Mat posGBA;
 	frameid_t BAGlobalForKF;
-
 
 	static std::mutex globalMutex_;
 

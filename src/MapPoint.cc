@@ -407,6 +407,4 @@ int MapPoint::PredictScale(float dist, const Frame* frame) const
 	return std::max(0, std::min(scale, frame->pyramid.nlevels - 1));
 }
 
-
-
 } //namespace ORB_SLAM

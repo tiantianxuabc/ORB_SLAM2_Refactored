@@ -430,7 +430,7 @@ public:
 					if (mappoint->BAGlobalForKF == loopKFId)
 					{
 						// If optimized by Global BA, just update
-						mappoint->SetWorldPos(mappoint->mPosGBA);
+						mappoint->SetWorldPos(mappoint->posGBA);
 					}
 					else
 					{
