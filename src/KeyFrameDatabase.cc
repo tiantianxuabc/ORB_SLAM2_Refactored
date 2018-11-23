@@ -26,8 +26,6 @@
 
 #include "KeyFrame.h"
 
-using namespace std;
-
 #define LOCK_MUTEX_DATABASE() std::unique_lock<std::mutex> lock(mutex_);
 
 namespace ORB_SLAM2
@@ -37,7 +35,6 @@ KeyFrameDatabase::KeyFrameDatabase(const ORBVocabulary &voc) : voc_(&voc)
 {
 	wordIdToKFs_.resize(voc.size());
 }
-
 
 void KeyFrameDatabase::add(KeyFrame* keyframe)
 {
