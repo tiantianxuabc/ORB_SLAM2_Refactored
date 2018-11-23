@@ -223,18 +223,13 @@ void KeyFrame::ReplaceMapPointMatch(size_t idx, MapPoint* mappiont)
 	mappoints_[idx] = mappiont;
 }
 
-set<MapPoint*> KeyFrame::GetMapPoints()
+std::set<MapPoint*> KeyFrame::GetMapPoints()
 {
 	LOCK_MUTEX_FEATURES();
-	set<MapPoint*> s;
-	for (size_t i = 0, iend = mappoints_.size(); i < iend; i++)
-	{
-		if (!mappoints_[i])
-			continue;
-		MapPoint* pMP = mappoints_[i];
-		if (!pMP->isBad())
-			s.insert(pMP);
-	}
+	std::set<MapPoint*> s;
+	for (MapPoint* mappint : mappoints_)
+		if (mappint && !mappint->isBad())
+			s.insert(mappint);
 	return s;
 }
 
