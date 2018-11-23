@@ -115,31 +115,31 @@ void MapPoint::AddObservation(KeyFrame* keyframe, size_t idx)
 		nobservations_++;
 }
 
-void MapPoint::EraseObservation(KeyFrame* pKF)
+void MapPoint::EraseObservation(KeyFrame* keyframe)
 {
-	bool bBad = false;
+	bool bad = false;
 	{
 		LOCK_MUTEX_FEATURES();
-		if (observations_.count(pKF))
+		if (observations_.count(keyframe))
 		{
-			int idx = observations_[pKF];
-			if (pKF->uright[idx] >= 0)
+			const int idx = observations_[keyframe];
+			if (keyframe->uright[idx] >= 0)
 				nobservations_ -= 2;
 			else
 				nobservations_--;
 
-			observations_.erase(pKF);
+			observations_.erase(keyframe);
 
-			if (referenceKF_ == pKF)
-				referenceKF_ = observations_.begin()->first;
+			if (referenceKF_ == keyframe)
+				referenceKF_ = !observations_.empty() ? std::begin(observations_)->first : nullptr;
 
 			// If only 2 observations or less, discard point
 			if (nobservations_ <= 2)
-				bBad = true;
+				bad = true;
 		}
 	}
 
-	if (bBad)
+	if (bad)
 		SetBadFlag();
 }
 

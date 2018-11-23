@@ -120,7 +120,7 @@ protected:
 	cv::Mat Xw_;
 
 	// Keyframes observing the point and associated index in keyframe
-	std::map<KeyFrame*, size_t> mObservations;
+	std::map<KeyFrame*, size_t> observations_;
 	int nobservations_;
 
 	// Mean viewing direction
