@@ -335,16 +335,16 @@ bool MapPoint::IsInKeyFrame(KeyFrame *pKF)
 void MapPoint::UpdateNormalAndDepth()
 {
 	std::map<KeyFrame*, size_t> observations;
-	KeyFrame* pRefKF;
-	cv::Mat Pos;
+	KeyFrame* referenceKF;
+	cv::Mat Xw;
 	{
 		LOCK_MUTEX_FEATURES();
 		LOCK_MUTEX_POSITION();
 		if (bad_)
 			return;
 		observations = observations_;
-		pRefKF = referenceKF_;
-		Pos = Xw_.clone();
+		referenceKF = referenceKF_;
+		Xw = Xw_.clone();
 	}
 
 	if (observations.empty())
@@ -352,25 +352,23 @@ void MapPoint::UpdateNormalAndDepth()
 
 	cv::Mat normal = cv::Mat::zeros(3, 1, CV_32F);
 	int n = 0;
-	for (std::map<KeyFrame*, size_t>::iterator mit = observations.begin(), mend = observations.end(); mit != mend; mit++)
+	for (const auto& observation : observations)
 	{
-		KeyFrame* pKF = mit->first;
-		cv::Mat Owi = pKF->GetCameraCenter();
-		cv::Mat normali = Xw_ - Owi;
+		KeyFrame* keyframe = observation.first;
+		cv::Mat normali = Xw_ - keyframe->GetCameraCenter();
 		normal = normal + normali / cv::norm(normali);
 		n++;
 	}
 
-	cv::Mat PC = Pos - pRefKF->GetCameraCenter();
-	const float dist = cv::norm(PC);
-	const int level = pRefKF->keypointsUn[observations[pRefKF]].octave;
-	const float levelScaleFactor = pRefKF->pyramid.scaleFactors[level];
-	const int nLevels = pRefKF->pyramid.nlevels;
+	cv::Mat PC = Xw - referenceKF->GetCameraCenter();
+	const float dist = static_cast<float>(cv::norm(PC));
+	const int octave = referenceKF->keypointsUn[observations[referenceKF]].octave;
+	const float scaleFactor = referenceKF->pyramid.scaleFactors[octave];
 
 	{
 		LOCK_MUTEX_POSITION();
-		maxDistance_ = dist*levelScaleFactor;
-		minDistance_ = maxDistance_ / pRefKF->pyramid.scaleFactors[nLevels - 1];
+		maxDistance_ = scaleFactor * dist;
+		minDistance_ = maxDistance_ / referenceKF->pyramid.scaleFactors.back();
 		normal_ = normal / n;
 	}
 }

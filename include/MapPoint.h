@@ -127,7 +127,7 @@ protected:
 	cv::Mat normal_;
 
 	// Best descriptor to fast matching
-	cv::Mat mDescriptor;
+	cv::Mat descriptor_;
 
 	// Reference KeyFrame
 	KeyFrame* referenceKF_;
