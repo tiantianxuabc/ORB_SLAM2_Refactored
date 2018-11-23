@@ -113,51 +113,48 @@ public:
 		// We must detect a consistent loop in several consecutive keyframes to accept it
 		loopCandidates.clear();
 
+		auto IsConsistent = [](const std::set<KeyFrame*>& prevGroup, const std::set<KeyFrame*>& currGroup)
+		{
+			for (KeyFrame* grounpKF : currGroup)
+				if (prevGroup.count(grounpKF))
+					return true;
+			return false;
+		};
+
 		std::vector<ConsistentGroup> currConsistentGroups;
-		std::vector<bool> isConsistentGroup(prevConsistentGroups_.size(), false);
+		std::vector<bool> consistentFound(prevConsistentGroups_.size(), false);
 		for (KeyFrame* candidateKF : candidateKFs)
 		{
-			std::set<KeyFrame*> candidateGroup = candidateKF->GetConnectedKeyFrames();
-			candidateGroup.insert(candidateKF);
+			std::set<KeyFrame*> currGroup = candidateKF->GetConnectedKeyFrames();
+			currGroup.insert(candidateKF);
 
 			bool candidateFound = false;
-			bool consistentForSomeGroup = false;
-			for (size_t iG = 0, iendG = prevConsistentGroups_.size(); iG < iendG; iG++)
+			std::vector<size_t> consistentGroupsIds;
+			for (size_t iG = 0; iG < prevConsistentGroups_.size(); iG++)
 			{
-				std::set<KeyFrame*> sPreviousGroup = prevConsistentGroups_[iG].first;
+				const std::set<KeyFrame*>& prevGroup = prevConsistentGroups_[iG].first;
+				if (IsConsistent(prevGroup, currGroup))
+					consistentGroupsIds.push_back(iG);
+			}
 
-				bool isConsistent = false;
-				for (KeyFrame* grounpKF : candidateGroup)
+			for (size_t iG : consistentGroupsIds)
+			{
+				const int currConsistency = prevConsistentGroups_[iG].second + 1;
+				if (!consistentFound[iG])
 				{
-					if (sPreviousGroup.count(grounpKF))
-					{
-						isConsistent = true;
-						consistentForSomeGroup = true;
-						break;
-					}
+					currConsistentGroups.push_back(std::make_pair(currGroup, currConsistency));
+					consistentFound[iG] = true; //this avoid to include the same group more than once
 				}
-
-				if (isConsistent)
+				if (currConsistency >= minConsistency_ && !candidateFound)
 				{
-					const int currConsistency = prevConsistentGroups_[iG].second + 1;
-					if (!isConsistentGroup[iG])
-					{
-						currConsistentGroups.push_back(std::make_pair(candidateGroup, currConsistency));
-						isConsistentGroup[iG] = true; //this avoid to include the same group more than once
-					}
-					if (currConsistency >= minConsistency_ && !candidateFound)
-					{
-						loopCandidates.push_back(candidateKF);
-						candidateFound = true; //this avoid to insert the same candidate more than once
-					}
+					loopCandidates.push_back(candidateKF);
+					candidateFound = true; //this avoid to insert the same candidate more than once
 				}
 			}
 
 			// If the group is not consistent with any previous group insert with consistency counter set to zero
-			if (!consistentForSomeGroup)
-			{
-				currConsistentGroups.push_back(std::make_pair(candidateGroup, 0));
-			}
+			if (consistentGroupsIds.empty())
+				currConsistentGroups.push_back(std::make_pair(currGroup, 0));
 		}
 
 		// Update Covisibility Consistent Groups
