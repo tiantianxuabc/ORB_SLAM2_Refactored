@@ -78,14 +78,14 @@ public:
 	std::set<KeyFrame*> GetLoopEdges();
 
 	// MapPoint observation functions
-	void AddMapPoint(MapPoint* pMP, const size_t &idx);
-	void EraseMapPointMatch(const size_t &idx);
+	void AddMapPoint(MapPoint* pMP, size_t idx);
+	void EraseMapPointMatch(size_t idx);
 	void EraseMapPointMatch(MapPoint* pMP);
-	void ReplaceMapPointMatch(const size_t &idx, MapPoint* pMP);
+	void ReplaceMapPointMatch(size_t idx, MapPoint* pMP);
 	std::set<MapPoint*> GetMapPoints();
 	std::vector<MapPoint*> GetMapPointMatches();
 	int TrackedMapPoints(const int &minObs);
-	MapPoint* GetMapPoint(const size_t &idx);
+	MapPoint* GetMapPoint(size_t idx);
 
 	// KeyPoint functions
 	std::vector<size_t> GetFeaturesInArea(const float &x, const float  &y, const float  &r) const;
