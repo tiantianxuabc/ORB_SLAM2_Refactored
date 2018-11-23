@@ -168,13 +168,8 @@ public:
 			currentKF->SetErase();
 			return false;
 		}
-		else
-		{
-			return true;
-		}
 
-		currentKF->SetErase();
-		return false;
+		return true;
 	}
 
 	bool ComputeSim3(KeyFrame* mpCurrentKF, std::vector<KeyFrame*>& mvpEnoughConsistentCandidates, Loop& loop)
