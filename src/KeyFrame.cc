@@ -167,7 +167,7 @@ std::set<KeyFrame*> KeyFrame::GetConnectedKeyFrames()
 	return s;
 }
 
-vector<KeyFrame*> KeyFrame::GetVectorCovisibleKeyFrames()
+std::vector<KeyFrame*> KeyFrame::GetVectorCovisibleKeyFrames()
 {
 	LOCK_MUTEX_CONNECTIONS();
 	return orderedConnectedKeyFrames_;
