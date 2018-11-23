@@ -176,24 +176,24 @@ public:
 	{
 		// For each consistent loop candidate we try to compute a Sim3
 
-		const int nInitialCandidates = static_cast<int>(candidateKFs.size());
+		const int ninitialCandidates = static_cast<int>(candidateKFs.size());
 
 		// We compute first ORB matches for each candidate
 		// If enough matches are found, we setup a Sim3Solver
 		ORBmatcher matcher(0.75f, true);
 
 		std::vector<Sim3Solver*> solvers;
-		solvers.resize(nInitialCandidates);
+		solvers.resize(ninitialCandidates);
 
 		std::vector<vector<MapPoint*>> vmatches;
-		vmatches.resize(nInitialCandidates);
+		vmatches.resize(ninitialCandidates);
 
 		std::vector<bool> discarded;
-		discarded.resize(nInitialCandidates);
+		discarded.resize(ninitialCandidates);
 
 		int ncandidates = 0; //candidates with enough matches
 
-		for (int i = 0; i < nInitialCandidates; i++)
+		for (int i = 0; i < ninitialCandidates; i++)
 		{
 			KeyFrame* candidateKF = candidateKFs[i];
 
@@ -207,7 +207,6 @@ public:
 			}
 
 			const int nmatches = matcher.SearchByBoW(currentKF, candidateKF, vmatches[i]);
-
 			if (nmatches < 20)
 			{
 				discarded[i] = true;
@@ -227,20 +226,20 @@ public:
 		// until one is succesful or all fail
 		while (ncandidates > 0)
 		{
-			for (int i = 0; i < nInitialCandidates; i++)
+			for (int i = 0; i < ninitialCandidates; i++)
 			{
 				if (discarded[i])
 					continue;
 
-				KeyFrame* pKF = candidateKFs[i];
+				KeyFrame* candidateKF = candidateKFs[i];
 
 				// Perform 5 Ransac Iterations
-				vector<bool> vbInliers;
+				std::vector<bool> isInlier;
 				int nInliers;
 				bool bNoMore;
 
-				Sim3Solver* pSolver = solvers[i];
-				cv::Mat Scm = pSolver->iterate(5, bNoMore, vbInliers, nInliers);
+				Sim3Solver* solver = solvers[i];
+				cv::Mat Scm = solver->iterate(5, bNoMore, isInlier, nInliers);
 
 				// If Ransac reachs max. iterations discard keyframe
 				if (bNoMore)
@@ -252,29 +251,26 @@ public:
 				// If RANSAC returns a Sim3, perform a guided matching and optimize with all correspondences
 				if (!Scm.empty())
 				{
-					vector<MapPoint*> vpMapPointMatches(vmatches[i].size(), static_cast<MapPoint*>(NULL));
-					for (size_t j = 0, jend = vbInliers.size(); j < jend; j++)
-					{
-						if (vbInliers[j])
-							vpMapPointMatches[j] = vmatches[i][j];
-					}
+					std::vector<MapPoint*> matches(vmatches[i].size());
+					for (size_t j = 0; j < isInlier.size(); j++)
+						matches[j] = isInlier[j] ? vmatches[i][j] : nullptr;
 
-					cv::Mat R = pSolver->GetEstimatedRotation();
-					cv::Mat t = pSolver->GetEstimatedTranslation();
-					const float s = pSolver->GetEstimatedScale();
-					matcher.SearchBySim3(currentKF, pKF, vpMapPointMatches, s, R, t, 7.5);
+					const cv::Mat R = solver->GetEstimatedRotation();
+					const cv::Mat t = solver->GetEstimatedTranslation();
+					const float s = solver->GetEstimatedScale();
+					matcher.SearchBySim3(currentKF, candidateKF, matches, s, R, t, 7.5f);
 
 					g2o::Sim3 gScm(Converter::toMatrix3d(R), Converter::toVector3d(t), s);
-					const int nInliers = Optimizer::OptimizeSim3(currentKF, pKF, vpMapPointMatches, gScm, 10, fixScale);
+					const int nInliers = Optimizer::OptimizeSim3(currentKF, candidateKF, matches, gScm, 10, fixScale);
 
 					// If optimization is succesful stop ransacs and continue
 					if (nInliers >= 20)
 					{
-						loop.mpMatchedKF = pKF;
-						g2o::Sim3 gSmw(Converter::toMatrix3d(pKF->GetRotation()), Converter::toVector3d(pKF->GetTranslation()), 1.0);
-						loop.mg2oScw = gScm*gSmw;
+						loop.mpMatchedKF = candidateKF;
+						g2o::Sim3 gSmw(Converter::toMatrix3d(candidateKF->GetRotation()), Converter::toVector3d(candidateKF->GetTranslation()), 1.0);
+						loop.mg2oScw = gScm * gSmw;
 						loop.mScw = Converter::toCvMat(loop.mg2oScw);
-						loop.mvpCurrentMatchedPoints = vpMapPointMatches;
+						loop.mvpCurrentMatchedPoints = matches;
 						return true;
 					}
 				}
