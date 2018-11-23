@@ -26,6 +26,7 @@
 #include <iomanip>
 #include <Eigen/Geometry>
 
+#include "KeyFrame.h"
 #include "Tracking.h"
 #include "FrameDrawer.h"
 #include "MapDrawer.h"

@@ -18,6 +18,7 @@
 * along with ORB-SLAM2. If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "Map.h"
 #include "MapDrawer.h"
 #include "MapPoint.h"
 #include "KeyFrame.h"

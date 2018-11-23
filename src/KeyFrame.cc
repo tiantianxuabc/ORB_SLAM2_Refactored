@@ -20,6 +20,7 @@
 
 #include "KeyFrame.h"
 
+#include "Map.h"
 #include "Converter.h"
 #include "ORBmatcher.h"
 #include "ORBVocabulary.h"
