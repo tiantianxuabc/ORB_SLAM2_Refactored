@@ -199,29 +199,28 @@ int KeyFrame::GetWeight(KeyFrame* keyframe)
 	return connectionTo_.count(keyframe) ? connectionTo_[keyframe] : 0;
 }
 
-void KeyFrame::AddMapPoint(MapPoint *pMP, size_t idx)
+void KeyFrame::AddMapPoint(MapPoint* mappiont, size_t idx)
 {
 	LOCK_MUTEX_FEATURES();
-	mappoints_[idx] = pMP;
+	mappoints_[idx] = mappiont;
 }
 
 void KeyFrame::EraseMapPointMatch(size_t idx)
 {
 	LOCK_MUTEX_FEATURES();
-	mappoints_[idx] = static_cast<MapPoint*>(NULL);
+	mappoints_[idx] = nullptr;
 }
 
-void KeyFrame::EraseMapPointMatch(MapPoint* pMP)
+void KeyFrame::EraseMapPointMatch(MapPoint* mappiont)
 {
-	int idx = pMP->GetIndexInKeyFrame(this);
+	const int idx = mappiont->GetIndexInKeyFrame(this);
 	if (idx >= 0)
-		mappoints_[idx] = static_cast<MapPoint*>(NULL);
+		mappoints_[idx] = nullptr;
 }
 
-
-void KeyFrame::ReplaceMapPointMatch(size_t idx, MapPoint* pMP)
+void KeyFrame::ReplaceMapPointMatch(size_t idx, MapPoint* mappiont)
 {
-	mappoints_[idx] = pMP;
+	mappoints_[idx] = mappiont;
 }
 
 set<MapPoint*> KeyFrame::GetMapPoints()
