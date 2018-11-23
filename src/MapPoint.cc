@@ -323,10 +323,7 @@ cv::Mat MapPoint::GetDescriptor()
 int MapPoint::GetIndexInKeyFrame(KeyFrame *pKF)
 {
 	LOCK_MUTEX_FEATURES();
-	if (observations_.count(pKF))
-		return observations_[pKF];
-	else
-		return -1;
+	return observations_.count(pKF) ? observations_[pKF] : -1;
 }
 
 bool MapPoint::IsInKeyFrame(KeyFrame *pKF)
