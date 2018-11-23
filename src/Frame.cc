@@ -42,7 +42,7 @@ std::vector<cv::Mat> toDescriptorVector(const cv::Mat &Descriptors);
 
 } // namespace Converter
 
-int Frame::nextId = 0;
+Frame::frameid_t Frame::nextId = 0;
 bool Frame::initialComputation = true;
 ImageBounds Frame::imageBounds;
 

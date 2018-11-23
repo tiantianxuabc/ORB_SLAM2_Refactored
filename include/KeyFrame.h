@@ -41,6 +41,8 @@ class KeyFrame
 {
 public:
 
+	using frameid_t = Frame::frameid_t;
+
 	KeyFrame(const Frame& frame, Map* map, KeyFrameDatabase* keyframeDB);
 
 	// Pose functions
@@ -114,9 +116,9 @@ public:
 	// The following variables are accesed from only 1 thread or never change (no mutex needed).
 public:
 
-	static long unsigned int nextId;
-	long unsigned int id;
-	const long unsigned int frameId;
+	static frameid_t nextId;
+	frameid_t id;
+	const frameid_t frameId;
 
 	const double timestamp;
 
@@ -124,25 +126,25 @@ public:
 	FeaturesGrid grid;
 
 	// Variables used by the tracking
-	long unsigned int trackReferenceForFrame;
-	long unsigned int fuseTargetForKF;
+	frameid_t trackReferenceForFrame;
+	frameid_t fuseTargetForKF;
 
 	// Variables used by the local mapping
-	long unsigned int BALocalForKF;
-	long unsigned int BAFixedForKF;
+	frameid_t BALocalForKF;
+	frameid_t BAFixedForKF;
 
 	// Variables used by the keyframe database
-	long unsigned int loopQuery;
+	frameid_t loopQuery;
 	int loopWords;
 	float loopScore;
-	long unsigned int relocQuery;
+	frameid_t relocQuery;
 	int relocWords;
 	float relocScore;
 
 	// Variables used by loop closing
 	cv::Mat TcwGBA;
 	cv::Mat TcwBefGBA;
-	long unsigned int BAGlobalForKF;
+	frameid_t BAGlobalForKF;
 
 	// Calibration parameters
 	const CameraParams camera;
