@@ -172,7 +172,7 @@ public:
 		return true;
 	}
 
-	bool ComputeSim3(KeyFrame* currentKF, std::vector<KeyFrame*>& candidateKFs, Loop& loop)
+	static bool FindLoopInCandidateKFs(KeyFrame* currentKF, std::vector<KeyFrame*>& candidateKFs, Loop& loop, bool fixScale)
 	{
 		// For each consistent loop candidate we try to compute a Sim3
 
@@ -215,7 +215,7 @@ public:
 			}
 			else
 			{
-				Sim3Solver* solver = new Sim3Solver(currentKF, candidateKF, vmatches[i], fixScale_);
+				Sim3Solver* solver = new Sim3Solver(currentKF, candidateKF, vmatches[i], fixScale);
 				solver->SetRansacParameters(0.99, 20, 300);
 				solvers[i] = solver;
 			}
@@ -223,11 +223,9 @@ public:
 			ncandidates++;
 		}
 
-		bool bMatch = false;
-
 		// Perform alternatively RANSAC iterations for each candidate
 		// until one is succesful or all fail
-		while (ncandidates > 0 && !bMatch)
+		while (ncandidates > 0)
 		{
 			for (int i = 0; i < nInitialCandidates; i++)
 			{
@@ -267,23 +265,28 @@ public:
 					matcher.SearchBySim3(currentKF, pKF, vpMapPointMatches, s, R, t, 7.5);
 
 					g2o::Sim3 gScm(Converter::toMatrix3d(R), Converter::toVector3d(t), s);
-					const int nInliers = Optimizer::OptimizeSim3(currentKF, pKF, vpMapPointMatches, gScm, 10, fixScale_);
+					const int nInliers = Optimizer::OptimizeSim3(currentKF, pKF, vpMapPointMatches, gScm, 10, fixScale);
 
 					// If optimization is succesful stop ransacs and continue
 					if (nInliers >= 20)
 					{
-						bMatch = true;
 						loop.mpMatchedKF = pKF;
 						g2o::Sim3 gSmw(Converter::toMatrix3d(pKF->GetRotation()), Converter::toVector3d(pKF->GetTranslation()), 1.0);
 						loop.mg2oScw = gScm*gSmw;
 						loop.mScw = Converter::toCvMat(loop.mg2oScw);
-
 						loop.mvpCurrentMatchedPoints = vpMapPointMatches;
-						break;
+						return true;
 					}
 				}
 			}
 		}
+		return false;
+	}
+
+	bool ComputeSim3(KeyFrame* currentKF, std::vector<KeyFrame*>& candidateKFs, Loop& loop)
+	{
+		const int nInitialCandidates = static_cast<int>(candidateKFs.size());
+		const bool bMatch = FindLoopInCandidateKFs(currentKF, candidateKFs, loop, fixScale_);
 
 		if (!bMatch)
 		{
@@ -316,6 +319,7 @@ public:
 		}
 
 		// Find more matches projecting with the computed Sim3
+		ORBmatcher matcher(0.75f, true);
 		matcher.SearchByProjection(currentKF, loop.mScw, loop.mvpLoopMapPoints, loop.mvpCurrentMatchedPoints, 10);
 
 		// If enough matches accept Loop
