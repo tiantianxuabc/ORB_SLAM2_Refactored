@@ -514,20 +514,17 @@ bool KeyFrame::isBad()
 	return bad_;
 }
 
-void KeyFrame::EraseConnection(KeyFrame* pKF)
+void KeyFrame::EraseConnection(KeyFrame* keyframe)
 {
-	bool bUpdate = false;
 	{
 		LOCK_MUTEX_CONNECTIONS();
-		if (connectionTo_.count(pKF))
-		{
-			connectionTo_.erase(pKF);
-			bUpdate = true;
-		}
+		if (connectionTo_.count(keyframe))
+			connectionTo_.erase(keyframe);
+		else
+			return;
 	}
 
-	if (bUpdate)
-		UpdateBestCovisibles();
+	UpdateBestCovisibles();
 }
 
 vector<size_t> KeyFrame::GetFeaturesInArea(const float &x, const float &y, const float &r) const
