@@ -34,6 +34,131 @@
 namespace ORB_SLAM2
 {
 
+using Sim3 = Sim3Solver::Sim3;
+
+static void ComputeCentroid(const cv::Mat &P, cv::Mat &Pr, cv::Mat &C)
+{
+	cv::reduce(P, C, 1, CV_REDUCE_SUM);
+	C = C / P.cols;
+
+	for (int i = 0; i < P.cols; i++)
+	{
+		Pr.col(i) = P.col(i) - C;
+	}
+}
+
+static void ComputeSim3(const cv::Mat &P1, const cv::Mat &P2, Sim3& S12, Sim3& S21, bool mbFixScale)
+{
+	// Custom implementation of:
+	// Horn 1987, Closed-form solution of absolute orientataion using unit quaternions
+
+	// Step 1: Centroid and relative coordinates
+
+	cv::Mat Pr1(P1.size(), P1.type()); // Relative coordinates to centroid (set 1)
+	cv::Mat Pr2(P2.size(), P2.type()); // Relative coordinates to centroid (set 2)
+	cv::Mat O1(3, 1, Pr1.type()); // Centroid of P1
+	cv::Mat O2(3, 1, Pr2.type()); // Centroid of P2
+
+	ComputeCentroid(P1, Pr1, O1);
+	ComputeCentroid(P2, Pr2, O2);
+
+	// Step 2: Compute M matrix
+
+	cv::Mat M = Pr2*Pr1.t();
+
+	// Step 3: Compute N matrix
+
+	double N11, N12, N13, N14, N22, N23, N24, N33, N34, N44;
+
+	cv::Mat N(4, 4, P1.type());
+
+	N11 = M.at<float>(0, 0) + M.at<float>(1, 1) + M.at<float>(2, 2);
+	N12 = M.at<float>(1, 2) - M.at<float>(2, 1);
+	N13 = M.at<float>(2, 0) - M.at<float>(0, 2);
+	N14 = M.at<float>(0, 1) - M.at<float>(1, 0);
+	N22 = M.at<float>(0, 0) - M.at<float>(1, 1) - M.at<float>(2, 2);
+	N23 = M.at<float>(0, 1) + M.at<float>(1, 0);
+	N24 = M.at<float>(2, 0) + M.at<float>(0, 2);
+	N33 = -M.at<float>(0, 0) + M.at<float>(1, 1) - M.at<float>(2, 2);
+	N34 = M.at<float>(1, 2) + M.at<float>(2, 1);
+	N44 = -M.at<float>(0, 0) - M.at<float>(1, 1) + M.at<float>(2, 2);
+
+	N = (cv::Mat_<float>(4, 4) << N11, N12, N13, N14,
+		N12, N22, N23, N24,
+		N13, N23, N33, N34,
+		N14, N24, N34, N44);
+
+
+	// Step 4: Eigenvector of the highest eigenvalue
+
+	cv::Mat eval, evec;
+
+	cv::eigen(N, eval, evec); //evec[0] is the quaternion of the desired rotation
+
+	cv::Mat vec(1, 3, evec.type());
+	(evec.row(0).colRange(1, 4)).copyTo(vec); //extract imaginary part of the quaternion (sin*axis)
+
+											  // Rotation angle. sin is the norm of the imaginary part, cos is the real part
+	double ang = atan2(norm(vec), evec.at<float>(0, 0));
+
+	vec = 2 * ang*vec / norm(vec); //Angle-axis representation. quaternion angle is the half
+
+	S12.R.create(3, 3, P1.type());
+
+	cv::Rodrigues(vec, S12.R); // computes the rotation matrix from angle-axis
+
+							   // Step 5: Rotate set 2
+
+	cv::Mat P3 = S12.R*Pr2;
+
+	// Step 6: Scale
+
+	if (!mbFixScale)
+	{
+		double nom = Pr1.dot(P3);
+		cv::Mat aux_P3(P3.size(), P3.type());
+		aux_P3 = P3;
+		cv::pow(P3, 2, aux_P3);
+		double den = 0;
+
+		for (int i = 0; i < aux_P3.rows; i++)
+		{
+			for (int j = 0; j < aux_P3.cols; j++)
+			{
+				den += aux_P3.at<float>(i, j);
+			}
+		}
+
+		S12.scale = nom / den;
+	}
+	else
+		S12.scale = 1.0f;
+
+	// Step 7: Translation
+
+	S12.t.create(1, 3, P1.type());
+	S12.t = O1 - S12.scale*S12.R*O2;
+
+	// Step 8: Transformation
+
+	// Step 8.1 T12
+	S12.T = cv::Mat::eye(4, 4, P1.type());
+
+	cv::Mat sR = S12.scale*S12.R;
+
+	sR.copyTo(S12.T.rowRange(0, 3).colRange(0, 3));
+	S12.t.copyTo(S12.T.rowRange(0, 3).col(3));
+
+	// Step 8.2 T21
+
+	S21.T = cv::Mat::eye(4, 4, P1.type());
+
+	cv::Mat sRinv = (1.0 / S12.scale)*S12.R.t();
+
+	sRinv.copyTo(S21.T.rowRange(0, 3).colRange(0, 3));
+	cv::Mat tinv = -sRinv*S12.t;
+	tinv.copyTo(S21.T.rowRange(0, 3).col(3));
+}
 
 Sim3Solver::Sim3Solver(KeyFrame *pKF1, KeyFrame *pKF2, const std::vector<MapPoint *> &vpMatched12, const bool bFixScale) :
 	mnIterations(0), mnBestInliers(0), mbFixScale(bFixScale)
@@ -177,12 +302,13 @@ cv::Mat Sim3Solver::iterate(int nIterations, bool &bNoMore, std::vector<bool> &v
 			vAvailableIndices.pop_back();
 		}
 
-		ComputeSim3(P3Dc1i, P3Dc2i);
+		Sim3 S12, S21;
+		ComputeSim3(P3Dc1i, P3Dc2i, S12, S21, mbFixScale);
 
 		//CheckInliers();
 		std::vector<cv::Mat> vP1im2, vP2im1;
-		Project(mvX3Dc2, vP2im1, mT12i, mK1);
-		Project(mvX3Dc1, vP1im2, mT21i, mK2);
+		Project(mvX3Dc2, vP2im1, S12.T, mK1);
+		Project(mvX3Dc1, vP1im2, S21.T, mK2);
 
 		mnInliersi = 0;
 
@@ -207,10 +333,10 @@ cv::Mat Sim3Solver::iterate(int nIterations, bool &bNoMore, std::vector<bool> &v
 		{
 			mvbBestInliers = mvbInliersi;
 			mnBestInliers = mnInliersi;
-			mBestT12 = mT12i.clone();
-			mBestRotation = mR12i.clone();
-			mBestTranslation = mt12i.clone();
-			mBestScale = ms12i;
+			mBestT12 = S12.T.clone();
+			mBestRotation = S12.R.clone();
+			mBestTranslation = S12.t.clone();
+			mBestScale = S12.scale;
 
 			if (mnInliersi > mRansacMinInliers)
 			{
@@ -233,130 +359,6 @@ cv::Mat Sim3Solver::find(std::vector<bool> &vbInliers12, int &nInliers)
 {
 	bool bFlag;
 	return iterate(mRansacMaxIts, bFlag, vbInliers12, nInliers);
-}
-
-static void ComputeCentroid(cv::Mat &P, cv::Mat &Pr, cv::Mat &C)
-{
-	cv::reduce(P, C, 1, CV_REDUCE_SUM);
-	C = C / P.cols;
-
-	for (int i = 0; i < P.cols; i++)
-	{
-		Pr.col(i) = P.col(i) - C;
-	}
-}
-
-void Sim3Solver::ComputeSim3(cv::Mat &P1, cv::Mat &P2)
-{
-	// Custom implementation of:
-	// Horn 1987, Closed-form solution of absolute orientataion using unit quaternions
-
-	// Step 1: Centroid and relative coordinates
-
-	cv::Mat Pr1(P1.size(), P1.type()); // Relative coordinates to centroid (set 1)
-	cv::Mat Pr2(P2.size(), P2.type()); // Relative coordinates to centroid (set 2)
-	cv::Mat O1(3, 1, Pr1.type()); // Centroid of P1
-	cv::Mat O2(3, 1, Pr2.type()); // Centroid of P2
-
-	ComputeCentroid(P1, Pr1, O1);
-	ComputeCentroid(P2, Pr2, O2);
-
-	// Step 2: Compute M matrix
-
-	cv::Mat M = Pr2*Pr1.t();
-
-	// Step 3: Compute N matrix
-
-	double N11, N12, N13, N14, N22, N23, N24, N33, N34, N44;
-
-	cv::Mat N(4, 4, P1.type());
-
-	N11 = M.at<float>(0, 0) + M.at<float>(1, 1) + M.at<float>(2, 2);
-	N12 = M.at<float>(1, 2) - M.at<float>(2, 1);
-	N13 = M.at<float>(2, 0) - M.at<float>(0, 2);
-	N14 = M.at<float>(0, 1) - M.at<float>(1, 0);
-	N22 = M.at<float>(0, 0) - M.at<float>(1, 1) - M.at<float>(2, 2);
-	N23 = M.at<float>(0, 1) + M.at<float>(1, 0);
-	N24 = M.at<float>(2, 0) + M.at<float>(0, 2);
-	N33 = -M.at<float>(0, 0) + M.at<float>(1, 1) - M.at<float>(2, 2);
-	N34 = M.at<float>(1, 2) + M.at<float>(2, 1);
-	N44 = -M.at<float>(0, 0) - M.at<float>(1, 1) + M.at<float>(2, 2);
-
-	N = (cv::Mat_<float>(4, 4) << N11, N12, N13, N14,
-		N12, N22, N23, N24,
-		N13, N23, N33, N34,
-		N14, N24, N34, N44);
-
-
-	// Step 4: Eigenvector of the highest eigenvalue
-
-	cv::Mat eval, evec;
-
-	cv::eigen(N, eval, evec); //evec[0] is the quaternion of the desired rotation
-
-	cv::Mat vec(1, 3, evec.type());
-	(evec.row(0).colRange(1, 4)).copyTo(vec); //extract imaginary part of the quaternion (sin*axis)
-
-	// Rotation angle. sin is the norm of the imaginary part, cos is the real part
-	double ang = atan2(norm(vec), evec.at<float>(0, 0));
-
-	vec = 2 * ang*vec / norm(vec); //Angle-axis representation. quaternion angle is the half
-
-	mR12i.create(3, 3, P1.type());
-
-	cv::Rodrigues(vec, mR12i); // computes the rotation matrix from angle-axis
-
-	// Step 5: Rotate set 2
-
-	cv::Mat P3 = mR12i*Pr2;
-
-	// Step 6: Scale
-
-	if (!mbFixScale)
-	{
-		double nom = Pr1.dot(P3);
-		cv::Mat aux_P3(P3.size(), P3.type());
-		aux_P3 = P3;
-		cv::pow(P3, 2, aux_P3);
-		double den = 0;
-
-		for (int i = 0; i < aux_P3.rows; i++)
-		{
-			for (int j = 0; j < aux_P3.cols; j++)
-			{
-				den += aux_P3.at<float>(i, j);
-			}
-		}
-
-		ms12i = nom / den;
-	}
-	else
-		ms12i = 1.0f;
-
-	// Step 7: Translation
-
-	mt12i.create(1, 3, P1.type());
-	mt12i = O1 - ms12i*mR12i*O2;
-
-	// Step 8: Transformation
-
-	// Step 8.1 T12
-	mT12i = cv::Mat::eye(4, 4, P1.type());
-
-	cv::Mat sR = ms12i*mR12i;
-
-	sR.copyTo(mT12i.rowRange(0, 3).colRange(0, 3));
-	mt12i.copyTo(mT12i.rowRange(0, 3).col(3));
-
-	// Step 8.2 T21
-
-	mT21i = cv::Mat::eye(4, 4, P1.type());
-
-	cv::Mat sRinv = (1.0 / ms12i)*mR12i.t();
-
-	sRinv.copyTo(mT21i.rowRange(0, 3).colRange(0, 3));
-	cv::Mat tinv = -sRinv*mt12i;
-	tinv.copyTo(mT21i.rowRange(0, 3).col(3));
 }
 
 cv::Mat Sim3Solver::GetEstimatedRotation()

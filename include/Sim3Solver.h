@@ -36,6 +36,14 @@ class Sim3Solver
 {
 public:
 
+	struct Sim3
+	{
+		cv::Mat R;
+		cv::Mat t;
+		float scale;
+		cv::Mat T;
+	};
+
 	Sim3Solver(KeyFrame* pKF1, KeyFrame* pKF2, const std::vector<MapPoint*> &vpMatched12, const bool bFixScale = true);
 
 	void SetRansacParameters(double probability = 0.99, int minInliers = 6, int maxIterations = 300);
@@ -53,7 +61,7 @@ protected:
 
 	//void ComputeCentroid(cv::Mat &P, cv::Mat &Pr, cv::Mat &C);
 
-	void ComputeSim3(cv::Mat &P1, cv::Mat &P2);
+	//void ComputeSim3(cv::Mat &P1, cv::Mat &P2);
 
 	//void CheckInliers();
 
@@ -82,11 +90,11 @@ protected:
 	int mN1;
 
 	// Current Estimation
-	cv::Mat mR12i;
+	/*cv::Mat mR12i;
 	cv::Mat mt12i;
 	float ms12i;
 	cv::Mat mT12i;
-	cv::Mat mT21i;
+	cv::Mat mT21i;*/
 	std::vector<bool> mvbInliersi;
 	int mnInliersi;
 
