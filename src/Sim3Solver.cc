@@ -183,6 +183,26 @@ static void Project(const std::vector<cv::Mat> &vP3Dw, std::vector<cv::Mat> &vP2
 	}
 }
 
+static void FromCameraToImage(const std::vector<cv::Mat> &vP3Dc, std::vector<cv::Mat> &vP2D, cv::Mat K)
+{
+	const float &fx = K.at<float>(0, 0);
+	const float &fy = K.at<float>(1, 1);
+	const float &cx = K.at<float>(0, 2);
+	const float &cy = K.at<float>(1, 2);
+
+	vP2D.clear();
+	vP2D.reserve(vP3Dc.size());
+
+	for (size_t i = 0, iend = vP3Dc.size(); i < iend; i++)
+	{
+		const float invz = 1 / (vP3Dc[i].at<float>(2));
+		const float x = vP3Dc[i].at<float>(0)*invz;
+		const float y = vP3Dc[i].at<float>(1)*invz;
+
+		vP2D.push_back((cv::Mat_<float>(2, 1) << fx*x + cx, fy*y + cy));
+	}
+}
+
 Sim3Solver::Sim3Solver(KeyFrame *pKF1, KeyFrame *pKF2, const std::vector<MapPoint *> &vpMatched12, const bool bFixScale) :
 	mnIterations(0), mnBestInliers(0), mbFixScale(bFixScale)
 {
@@ -397,26 +417,6 @@ cv::Mat Sim3Solver::GetEstimatedTranslation()
 float Sim3Solver::GetEstimatedScale()
 {
 	return mBestScale;
-}
-
-void Sim3Solver::FromCameraToImage(const std::vector<cv::Mat> &vP3Dc, std::vector<cv::Mat> &vP2D, cv::Mat K)
-{
-	const float &fx = K.at<float>(0, 0);
-	const float &fy = K.at<float>(1, 1);
-	const float &cx = K.at<float>(0, 2);
-	const float &cy = K.at<float>(1, 2);
-
-	vP2D.clear();
-	vP2D.reserve(vP3Dc.size());
-
-	for (size_t i = 0, iend = vP3Dc.size(); i < iend; i++)
-	{
-		const float invz = 1 / (vP3Dc[i].at<float>(2));
-		const float x = vP3Dc[i].at<float>(0)*invz;
-		const float y = vP3Dc[i].at<float>(1)*invz;
-
-		vP2D.push_back((cv::Mat_<float>(2, 1) << fx*x + cx, fy*y + cy));
-	}
 }
 
 } //namespace ORB_SLAM
