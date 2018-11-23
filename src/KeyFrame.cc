@@ -347,23 +347,23 @@ void KeyFrame::UpdateConnections()
 	}
 }
 
-void KeyFrame::AddChild(KeyFrame *pKF)
+void KeyFrame::AddChild(KeyFrame* keyframe)
 {
 	LOCK_MUTEX_CONNECTIONS();
-	children_.insert(pKF);
+	children_.insert(keyframe);
 }
 
-void KeyFrame::EraseChild(KeyFrame *pKF)
+void KeyFrame::EraseChild(KeyFrame* keyframe)
 {
 	LOCK_MUTEX_CONNECTIONS();
-	children_.erase(pKF);
+	children_.erase(keyframe);
 }
 
-void KeyFrame::ChangeParent(KeyFrame *pKF)
+void KeyFrame::ChangeParent(KeyFrame* keyframe)
 {
 	LOCK_MUTEX_CONNECTIONS();
-	parent_ = pKF;
-	pKF->AddChild(this);
+	parent_ = keyframe;
+	keyframe->AddChild(this);
 }
 
 set<KeyFrame*> KeyFrame::GetChilds()
