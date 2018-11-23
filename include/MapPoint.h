@@ -44,7 +44,7 @@ public:
 	MapPoint(const cv::Mat& Xw, KeyFrame* referenceKF, Map* map);
 	MapPoint(const cv::Mat& Xw, Map* map, Frame* frame, int idx);
 
-	void SetWorldPos(const cv::Mat &Pos);
+	void SetWorldPos(const cv::Mat& Xw);
 	cv::Mat GetWorldPos();
 
 	cv::Mat GetNormal();
@@ -53,16 +53,16 @@ public:
 	std::map<KeyFrame*, size_t> GetObservations();
 	int Observations();
 
-	void AddObservation(KeyFrame* pKF, size_t idx);
-	void EraseObservation(KeyFrame* pKF);
+	void AddObservation(KeyFrame* keyframe, size_t idx);
+	void EraseObservation(KeyFrame* keyframe);
 
-	int GetIndexInKeyFrame(KeyFrame* pKF);
-	bool IsInKeyFrame(KeyFrame* pKF);
+	int GetIndexInKeyFrame(KeyFrame* keyframe);
+	bool IsInKeyFrame(KeyFrame* keyframe);
 
 	void SetBadFlag();
 	bool isBad();
 
-	void Replace(MapPoint* pMP);
+	void Replace(MapPoint* mappoint);
 	MapPoint* GetReplaced();
 
 	void IncreaseVisible(int n = 1);
@@ -80,8 +80,8 @@ public:
 
 	float GetMinDistanceInvariance();
 	float GetMaxDistanceInvariance();
-	int PredictScale(float currentDist, KeyFrame*pKF);
-	int PredictScale(float currentDist, Frame* pF);
+	int PredictScale(float currentDist, KeyFrame*keyframe);
+	int PredictScale(float currentDist, Frame* frame);
 
 public:
 

@@ -122,7 +122,7 @@ void MapPoint::EraseObservation(KeyFrame* keyframe)
 		LOCK_MUTEX_FEATURES();
 		if (observations_.count(keyframe))
 		{
-			const int idx = observations_[keyframe];
+			const size_t idx = observations_[keyframe];
 			if (keyframe->uright[idx] >= 0)
 				nobservations_ -= 2;
 			else
@@ -294,7 +294,7 @@ void MapPoint::ComputeDistinctiveDescriptors()
 
 	// Take the descriptor with least median distance to the rest
 	int bestMedian = std::numeric_limits<int>::max();
-	int bestIdx = 0;
+	size_t bestIdx = 0;
 	for (size_t i = 0; i < N; i++)
 	{
 		std::vector<int> dists(distances[i]);
@@ -323,7 +323,7 @@ cv::Mat MapPoint::GetDescriptor()
 int MapPoint::GetIndexInKeyFrame(KeyFrame *pKF)
 {
 	LOCK_MUTEX_FEATURES();
-	return observations_.count(pKF) ? observations_[pKF] : -1;
+	return observations_.count(pKF) ? static_cast<int>(observations_[pKF]) : -1;
 }
 
 bool MapPoint::IsInKeyFrame(KeyFrame *pKF)
