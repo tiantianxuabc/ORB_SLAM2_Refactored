@@ -680,7 +680,7 @@ public:
 
 		for (KeyFrame* connectedKF : connectedKFs)
 		{
-			vector<KeyFrame*> prevNeighbors = connectedKF->GetVectorCovisibleKeyFrames();
+			std::vector<KeyFrame*> prevNeighbors = connectedKF->GetVectorCovisibleKeyFrames();
 
 			// Update connections. Detect new links.
 			connectedKF->UpdateConnections();
