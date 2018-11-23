@@ -28,6 +28,8 @@
 
 using namespace std;
 
+#define LOCK_MUTEX_DATABASE() std::unique_lock<std::mutex> lock(mutex_);
+
 namespace ORB_SLAM2
 {
 
@@ -39,7 +41,7 @@ KeyFrameDatabase::KeyFrameDatabase(const ORBVocabulary &voc) : voc_(&voc)
 
 void KeyFrameDatabase::add(KeyFrame *pKF)
 {
-	unique_lock<mutex> lock(mutex_);
+	LOCK_MUTEX_DATABASE();
 
 	for (DBoW2::BowVector::const_iterator vit = pKF->mBowVec.begin(), vend = pKF->mBowVec.end(); vit != vend; vit++)
 		wordIdToKFs_[vit->first].push_back(pKF);
@@ -47,7 +49,7 @@ void KeyFrameDatabase::add(KeyFrame *pKF)
 
 void KeyFrameDatabase::erase(KeyFrame* pKF)
 {
-	unique_lock<mutex> lock(mutex_);
+	LOCK_MUTEX_DATABASE();
 
 	// Erase elements in the Inverse File for the entry
 	for (DBoW2::BowVector::const_iterator vit = pKF->mBowVec.begin(), vend = pKF->mBowVec.end(); vit != vend; vit++)
@@ -81,7 +83,7 @@ vector<KeyFrame*> KeyFrameDatabase::DetectLoopCandidates(KeyFrame* pKF, float mi
 	// Search all keyframes that share a word with current keyframes
 	// Discard keyframes connected to the query keyframe
 	{
-		unique_lock<mutex> lock(mutex_);
+		LOCK_MUTEX_DATABASE();
 
 		for (DBoW2::BowVector::const_iterator vit = pKF->mBowVec.begin(), vend = pKF->mBowVec.end(); vit != vend; vit++)
 		{
@@ -202,7 +204,7 @@ vector<KeyFrame*> KeyFrameDatabase::DetectRelocalizationCandidates(Frame *F)
 
 	// Search all keyframes that share a word with current frame
 	{
-		unique_lock<mutex> lock(mutex_);
+		LOCK_MUTEX_DATABASE();
 
 		for (DBoW2::BowVector::const_iterator vit = F->bowVector.begin(), vend = F->bowVector.end(); vit != vend; vit++)
 		{
