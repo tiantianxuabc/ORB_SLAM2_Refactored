@@ -173,14 +173,11 @@ std::vector<KeyFrame*> KeyFrame::GetVectorCovisibleKeyFrames()
 	return orderedConnectedKeyFrames_;
 }
 
-vector<KeyFrame*> KeyFrame::GetBestCovisibilityKeyFrames(const int &N)
+std::vector<KeyFrame*> KeyFrame::GetBestCovisibilityKeyFrames(int N)
 {
 	LOCK_MUTEX_CONNECTIONS();
-	if ((int)orderedConnectedKeyFrames_.size() < N)
-		return orderedConnectedKeyFrames_;
-	else
-		return vector<KeyFrame*>(orderedConnectedKeyFrames_.begin(), orderedConnectedKeyFrames_.begin() + N);
-
+	N = std::min(N, static_cast<int>(orderedConnectedKeyFrames_.size()));
+	return std::vector<KeyFrame*>(std::begin(orderedConnectedKeyFrames_), std::begin(orderedConnectedKeyFrames_) + N);
 }
 
 vector<KeyFrame*> KeyFrame::GetCovisiblesByWeight(const int &w)
