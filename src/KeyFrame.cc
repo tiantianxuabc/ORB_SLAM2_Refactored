@@ -30,19 +30,19 @@ namespace ORB_SLAM2
 
 long unsigned int KeyFrame::nextId = 0;
 
-KeyFrame::KeyFrame(Frame &F, Map *pMap, KeyFrameDatabase *pKFDB) :
-	frameId(F.id), timestamp(F.timestamp), grid(F.grid),
+KeyFrame::KeyFrame(Frame& frame, Map* map, KeyFrameDatabase* keyframeDB) :
+	frameId(frame.id), timestamp(frame.timestamp), grid(frame.grid),
 	trackReferenceForFrame(0), fuseTargetForKF(0), BALocalForKF(0), BAFixedForKF(0),
 	loopQuery(0), loopWords(0), relocQuery(0), relocWords(0), BAGlobalForKF(0),
-	camera(F.camera), thDepth(F.thDepth), N(F.N), keypointsL(F.keypointsL), keypointsUn(F.keypointsUn),
-	uright(F.uright), depth(F.depth), descriptorsL(F.descriptorsL.clone()),
-	bowVector(F.bowVector), featureVector(F.featureVector), pyramid(F.pyramid), imageBounds(F.imageBounds),
-	mappoints_(F.mappoints), keyFrameDB_(pKFDB),
-	voc_(F.voc), firstConnection_(true), parent_(NULL), notErase_(false),
-	toBeErased_(false), bad_(false), halfBaseline_(F.camera.baseline / 2), map_(pMap)
+	camera(frame.camera), thDepth(frame.thDepth), N(frame.N), keypointsL(frame.keypointsL), keypointsUn(frame.keypointsUn),
+	uright(frame.uright), depth(frame.depth), descriptorsL(frame.descriptorsL.clone()),
+	bowVector(frame.bowVector), featureVector(frame.featureVector), pyramid(frame.pyramid), imageBounds(frame.imageBounds),
+	mappoints_(frame.mappoints), keyFrameDB_(keyframeDB),
+	voc_(frame.voc), firstConnection_(true), parent_(NULL), notErase_(false),
+	toBeErased_(false), bad_(false), halfBaseline_(frame.camera.baseline / 2), map_(map)
 {
 	id = nextId++;
-	SetPose(F.pose.Tcw);
+	SetPose(frame.pose.Tcw);
 }
 
 void KeyFrame::ComputeBoW()
