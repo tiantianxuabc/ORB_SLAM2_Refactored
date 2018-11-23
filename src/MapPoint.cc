@@ -75,11 +75,11 @@ MapPoint::MapPoint(const cv::Mat& Xw, Map* map, Frame* frame, int idx) :
 	id = nextId++;
 }
 
-void MapPoint::SetWorldPos(const cv::Mat &Pos)
+void MapPoint::SetWorldPos(const cv::Mat& Xw)
 {
 	LOCK_MUTEX_GLOBAL();
 	LOCK_MUTEX_POSITION();
-	Pos.copyTo(Xw_);
+	Xw.copyTo(Xw_);
 }
 
 cv::Mat MapPoint::GetWorldPos()
