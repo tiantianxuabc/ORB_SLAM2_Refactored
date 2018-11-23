@@ -27,6 +27,7 @@
 #include <Thirdparty/DBoW2/DBoW2/BowVector.h>
 #include <Thirdparty/DBoW2/DBoW2/FeatureVector.h>
 
+#include "FrameId.h"
 #include "ORBVocabulary.h"
 #include "CameraParameters.h"
 
@@ -102,8 +103,6 @@ private:
 class Frame
 {
 public:
-
-	using frameid_t = int;
 
 	Frame();
 

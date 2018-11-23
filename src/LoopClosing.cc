@@ -876,7 +876,7 @@ private:
 	KeyFrameDatabase* keyframeDB_;
 	LoopDetector detector_;
 
-	KeyFrame::frameid_t lastLoopKFId_;
+	frameid_t lastLoopKFId_;
 
 	// Variables related to Global Bundle Adjustment
 	LoopCorrector corrector_;

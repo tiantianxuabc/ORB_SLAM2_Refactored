@@ -41,13 +41,13 @@ void Map::AddKeyFrame(KeyFrame* keyframe)
 void Map::AddMapPoint(MapPoint* mappoint)
 {
 	std::unique_lock<std::mutex> lock(mutexMap_);
-	mappoints.insert(mappoint);
+	mappoints_.insert(mappoint);
 }
 
 void Map::EraseMapPoint(MapPoint* mappoint)
 {
 	std::unique_lock<std::mutex> lock(mutexMap_);
-	mappoints.erase(mappoint);
+	mappoints_.erase(mappoint);
 
 	// TODO: This only erase the pointer.
 	// Delete the MapPoint
@@ -89,13 +89,13 @@ std::vector<KeyFrame*> Map::GetAllKeyFrames()
 std::vector<MapPoint*> Map::GetAllMapPoints()
 {
 	std::unique_lock<std::mutex> lock(mutexMap_);
-	return std::vector<MapPoint*>(mappoints.begin(), mappoints.end());
+	return std::vector<MapPoint*>(mappoints_.begin(), mappoints_.end());
 }
 
 long unsigned int Map::MapPointsInMap()
 {
 	std::unique_lock<std::mutex> lock(mutexMap_);
-	return mappoints.size();
+	return mappoints_.size();
 }
 
 long unsigned int Map::KeyFramesInMap()
@@ -110,7 +110,7 @@ std::vector<MapPoint*> Map::GetReferenceMapPoints()
 	return referenceMapPoints_;
 }
 
-long unsigned int Map::GetMaxKFid()
+frameid_t Map::GetMaxKFid()
 {
 	std::unique_lock<std::mutex> lock(mutexMap_);
 	return maxKFId_;
@@ -118,13 +118,13 @@ long unsigned int Map::GetMaxKFid()
 
 void Map::clear()
 {
-	for (std::set<MapPoint*>::iterator sit = mappoints.begin(), send = mappoints.end(); sit != send; sit++)
+	for (std::set<MapPoint*>::iterator sit = mappoints_.begin(), send = mappoints_.end(); sit != send; sit++)
 		delete *sit;
 
 	for (std::set<KeyFrame*>::iterator sit = keyframes_.begin(), send = keyframes_.end(); sit != send; sit++)
 		delete *sit;
 
-	mappoints.clear();
+	mappoints_.clear();
 	keyframes_.clear();
 	maxKFId_ = 0;
 	referenceMapPoints_.clear();

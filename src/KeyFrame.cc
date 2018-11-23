@@ -35,7 +35,7 @@ namespace ORB_SLAM2
 auto GetR = CameraPose::GetR;
 auto Gett = CameraPose::Gett;
 
-KeyFrame::frameid_t KeyFrame::nextId = 0;
+frameid_t KeyFrame::nextId = 0;
 
 using WeightAndKeyFrame = std::pair<int, KeyFrame*>;
 

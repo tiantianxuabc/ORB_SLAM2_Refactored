@@ -25,6 +25,8 @@
 #include <vector>
 #include <mutex>
 
+#include "FrameId.h"
+
 namespace ORB_SLAM2
 {
 
@@ -51,7 +53,7 @@ public:
 	long unsigned int MapPointsInMap();
 	long unsigned  KeyFramesInMap();
 
-	long unsigned int GetMaxKFid();
+	frameid_t GetMaxKFid();
 
 	void clear();
 
@@ -69,7 +71,7 @@ protected:
 
 	std::vector<MapPoint*> referenceMapPoints_;
 
-	int maxKFId_;
+	frameid_t maxKFId_;
 
 	// Index related to a big change in the map (loop closure, global BA)
 	int bigChangeId_;

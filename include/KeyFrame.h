@@ -26,6 +26,7 @@
 #include <Thirdparty/DBoW2/DBoW2/BowVector.h>
 #include <Thirdparty/DBoW2/DBoW2/FeatureVector.h>
 
+#include "FrameId.h"
 #include "Frame.h"
 #include "ORBVocabulary.h"
 #include "CameraParameters.h"
@@ -40,8 +41,6 @@ class KeyFrameDatabase;
 class KeyFrame
 {
 public:
-
-	using frameid_t = Frame::frameid_t;
 
 	KeyFrame(const Frame& frame, Map* map, KeyFrameDatabase* keyframeDB);
 
