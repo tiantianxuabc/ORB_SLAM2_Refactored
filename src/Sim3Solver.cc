@@ -160,6 +160,29 @@ static void ComputeSim3(const cv::Mat &P1, const cv::Mat &P2, Sim3& S12, Sim3& S
 	tinv.copyTo(S21.T.rowRange(0, 3).col(3));
 }
 
+static void Project(const std::vector<cv::Mat> &vP3Dw, std::vector<cv::Mat> &vP2D, cv::Mat Tcw, cv::Mat K)
+{
+	cv::Mat Rcw = Tcw.rowRange(0, 3).colRange(0, 3);
+	cv::Mat tcw = Tcw.rowRange(0, 3).col(3);
+	const float &fx = K.at<float>(0, 0);
+	const float &fy = K.at<float>(1, 1);
+	const float &cx = K.at<float>(0, 2);
+	const float &cy = K.at<float>(1, 2);
+
+	vP2D.clear();
+	vP2D.reserve(vP3Dw.size());
+
+	for (size_t i = 0, iend = vP3Dw.size(); i < iend; i++)
+	{
+		cv::Mat P3Dc = Rcw*vP3Dw[i] + tcw;
+		const float invz = 1 / (P3Dc.at<float>(2));
+		const float x = P3Dc.at<float>(0)*invz;
+		const float y = P3Dc.at<float>(1)*invz;
+
+		vP2D.push_back((cv::Mat_<float>(2, 1) << fx*x + cx, fy*y + cy));
+	}
+}
+
 Sim3Solver::Sim3Solver(KeyFrame *pKF1, KeyFrame *pKF2, const std::vector<MapPoint *> &vpMatched12, const bool bFixScale) :
 	mnIterations(0), mnBestInliers(0), mbFixScale(bFixScale)
 {
@@ -374,29 +397,6 @@ cv::Mat Sim3Solver::GetEstimatedTranslation()
 float Sim3Solver::GetEstimatedScale()
 {
 	return mBestScale;
-}
-
-void Sim3Solver::Project(const std::vector<cv::Mat> &vP3Dw, std::vector<cv::Mat> &vP2D, cv::Mat Tcw, cv::Mat K)
-{
-	cv::Mat Rcw = Tcw.rowRange(0, 3).colRange(0, 3);
-	cv::Mat tcw = Tcw.rowRange(0, 3).col(3);
-	const float &fx = K.at<float>(0, 0);
-	const float &fy = K.at<float>(1, 1);
-	const float &cx = K.at<float>(0, 2);
-	const float &cy = K.at<float>(1, 2);
-
-	vP2D.clear();
-	vP2D.reserve(vP3Dw.size());
-
-	for (size_t i = 0, iend = vP3Dw.size(); i < iend; i++)
-	{
-		cv::Mat P3Dc = Rcw*vP3Dw[i] + tcw;
-		const float invz = 1 / (P3Dc.at<float>(2));
-		const float x = P3Dc.at<float>(0)*invz;
-		const float y = P3Dc.at<float>(1)*invz;
-
-		vP2D.push_back((cv::Mat_<float>(2, 1) << fx*x + cx, fy*y + cy));
-	}
 }
 
 void Sim3Solver::FromCameraToImage(const std::vector<cv::Mat> &vP3Dc, std::vector<cv::Mat> &vP2D, cv::Mat K)
