@@ -408,15 +408,11 @@ void KeyFrame::SetErase()
 	{
 		LOCK_MUTEX_CONNECTIONS();
 		if (loopEdges_.empty())
-		{
 			notErase_ = false;
-		}
 	}
 
 	if (toBeErased_)
-	{
 		SetBadFlag();
-	}
 }
 
 void KeyFrame::SetBadFlag()
