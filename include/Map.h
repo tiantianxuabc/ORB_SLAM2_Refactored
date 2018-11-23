@@ -55,7 +55,7 @@ public:
 
 	frameid_t GetMaxKFid() const;
 
-	void clear();
+	void Clear();
 
 	std::vector<KeyFrame*> keyFrameOrigins;
 

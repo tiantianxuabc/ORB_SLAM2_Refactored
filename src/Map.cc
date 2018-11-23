@@ -117,7 +117,7 @@ frameid_t Map::GetMaxKFid() const
 	return maxKFId_;
 }
 
-void Map::clear()
+void Map::Clear()
 {
 	for (std::set<MapPoint*>::iterator sit = mappoints_.begin(), send = mappoints_.end(); sit != send; sit++)
 		delete *sit;
