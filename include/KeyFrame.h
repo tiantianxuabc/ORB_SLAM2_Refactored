@@ -55,7 +55,7 @@ public:
 	void ComputeBoW();
 
 	// Covisibility graph functions
-	void AddConnection(KeyFrame* pKF, const int &weight);
+	void AddConnection(KeyFrame* keyframe, int weight);
 	void EraseConnection(KeyFrame* pKF);
 	void UpdateConnections();
 	void UpdateBestCovisibles();
@@ -195,7 +195,7 @@ protected:
 	// Grid over the image to speed up feature matching
 	//std::vector<std::vector <std::vector<size_t>>> mGrid;
 
-	std::map<KeyFrame*, int> connectedKeyFrameWeights_;
+	std::map<KeyFrame*, int> connectionTo_;
 	std::vector<KeyFrame*> orderedConnectedKeyFrames_;
 	std::vector<int> orderedWeights_;
 

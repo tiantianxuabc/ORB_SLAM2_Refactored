@@ -117,14 +117,12 @@ cv::Mat KeyFrame::GetTranslation()
 	return Gett(Tcw).clone();
 }
 
-void KeyFrame::AddConnection(KeyFrame *pKF, const int &weight)
+void KeyFrame::AddConnection(KeyFrame* keyframe, int weight)
 {
 	{
 		LOCK_MUTEX_CONNECTIONS();
-		if (!connectionTo_.count(pKF))
-			connectionTo_[pKF] = weight;
-		else if (connectionTo_[pKF] != weight)
-			connectionTo_[pKF] = weight;
+		if (!connectionTo_.count(keyframe) || connectionTo_[keyframe] != weight)
+			connectionTo_[keyframe] = weight;
 		else
 			return;
 	}
