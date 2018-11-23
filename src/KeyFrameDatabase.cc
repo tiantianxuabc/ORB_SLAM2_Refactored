@@ -31,8 +31,7 @@ using namespace std;
 namespace ORB_SLAM2
 {
 
-KeyFrameDatabase::KeyFrameDatabase(const ORBVocabulary &voc) :
-	voc_(&voc)
+KeyFrameDatabase::KeyFrameDatabase(const ORBVocabulary &voc) : voc_(&voc)
 {
 	wordIdToKFs_.resize(voc.size());
 }
