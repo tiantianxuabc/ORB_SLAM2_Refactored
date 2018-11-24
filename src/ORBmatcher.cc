@@ -444,6 +444,8 @@ int ORBmatcher::SearchForInitialization(Frame& frame1, Frame& frame2, std::vecto
 	std::vector<MatchIdx> matchIds;
 	matchIds.reserve(frame1.keypointsUn.size());
 
+	const float radius = static_cast<float>(windowSize);
+
 	for (size_t idx1 = 0; idx1 < frame1.keypointsUn.size(); idx1++)
 	{
 		const cv::KeyPoint& keypoint1 = frame1.keypointsUn[idx1];
@@ -453,11 +455,11 @@ int ORBmatcher::SearchForInitialization(Frame& frame1, Frame& frame2, std::vecto
 
 		const float u = prevMatched[idx1].x;
 		const float v = prevMatched[idx1].y;
-		const std::vector<size_t> indices2 = frame2.GetFeaturesInArea(u, v,  windowSize, level1, level1);
+		const std::vector<size_t> indices2 = frame2.GetFeaturesInArea(u, v, radius, level1, level1);
 		if (indices2.empty())
 			continue;
 
-		const cv::Mat desc1 = frame1.descriptorsL.row(idx1);
+		const cv::Mat desc1 = frame1.descriptorsL.row(static_cast<int>(idx1));
 
 		int bestDist = std::numeric_limits<int>::max();
 		int secondBestDist = std::numeric_limits<int>::max();
