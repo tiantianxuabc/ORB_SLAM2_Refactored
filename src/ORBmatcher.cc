@@ -607,12 +607,10 @@ int ORBmatcher::SearchForInitialization(Frame &F1, Frame &F2, vector<cv::Point2f
 int ORBmatcher::SearchByBoW(KeyFrame* keyframe1, KeyFrame* keyframe2, std::vector<MapPoint*>& matches12)
 {
 	const vector<cv::KeyPoint> &vKeysUn1 = keyframe1->keypointsUn;
-	const DBoW2::FeatureVector &vFeatVec1 = keyframe1->featureVector;
 	const vector<MapPoint*> vpMapPoints1 = keyframe1->GetMapPointMatches();
 	const cv::Mat &Descriptors1 = keyframe1->descriptorsL;
 
 	const vector<cv::KeyPoint> &vKeysUn2 = keyframe2->keypointsUn;
-	const DBoW2::FeatureVector &vFeatVec2 = keyframe2->featureVector;
 	const vector<MapPoint*> vpMapPoints2 = keyframe2->GetMapPointMatches();
 	const cv::Mat &Descriptors2 = keyframe2->descriptorsL;
 
@@ -627,92 +625,76 @@ int ORBmatcher::SearchByBoW(KeyFrame* keyframe1, KeyFrame* keyframe2, std::vecto
 
 	int nmatches = 0;
 
-	DBoW2::FeatureVector::const_iterator f1it = vFeatVec1.begin();
-	DBoW2::FeatureVector::const_iterator f2it = vFeatVec2.begin();
-	DBoW2::FeatureVector::const_iterator f1end = vFeatVec1.end();
-	DBoW2::FeatureVector::const_iterator f2end = vFeatVec2.end();
-
-	while (f1it != f1end && f2it != f2end)
+	FeatureVectorIterator iterator(keyframe1->featureVector, keyframe2->featureVector);
+	while (iterator.next())
 	{
-		if (f1it->first == f2it->first)
+		const auto& indices1 = iterator.indices1();
+		const auto& indices2 = iterator.indices2();
+		for (size_t i1 = 0, iend1 = indices1.size(); i1 < iend1; i1++)
 		{
-			for (size_t i1 = 0, iend1 = f1it->second.size(); i1 < iend1; i1++)
+			const size_t idx1 = indices1[i1];
+
+			MapPoint* pMP1 = vpMapPoints1[idx1];
+			if (!pMP1)
+				continue;
+			if (pMP1->isBad())
+				continue;
+
+			const cv::Mat &d1 = Descriptors1.row(idx1);
+
+			int bestDist1 = 256;
+			int bestIdx2 = -1;
+			int bestDist2 = 256;
+
+			for (size_t i2 = 0, iend2 = indices2.size(); i2 < iend2; i2++)
 			{
-				const size_t idx1 = f1it->second[i1];
+				const size_t idx2 = indices2[i2];
 
-				MapPoint* pMP1 = vpMapPoints1[idx1];
-				if (!pMP1)
+				MapPoint* pMP2 = vpMapPoints2[idx2];
+
+				if (vbMatched2[idx2] || !pMP2)
 					continue;
-				if (pMP1->isBad())
+
+				if (pMP2->isBad())
 					continue;
 
-				const cv::Mat &d1 = Descriptors1.row(idx1);
+				const cv::Mat &d2 = Descriptors2.row(idx2);
 
-				int bestDist1 = 256;
-				int bestIdx2 = -1;
-				int bestDist2 = 256;
+				int dist = DescriptorDistance(d1, d2);
 
-				for (size_t i2 = 0, iend2 = f2it->second.size(); i2 < iend2; i2++)
+				if (dist < bestDist1)
 				{
-					const size_t idx2 = f2it->second[i2];
-
-					MapPoint* pMP2 = vpMapPoints2[idx2];
-
-					if (vbMatched2[idx2] || !pMP2)
-						continue;
-
-					if (pMP2->isBad())
-						continue;
-
-					const cv::Mat &d2 = Descriptors2.row(idx2);
-
-					int dist = DescriptorDistance(d1, d2);
-
-					if (dist < bestDist1)
-					{
-						bestDist2 = bestDist1;
-						bestDist1 = dist;
-						bestIdx2 = idx2;
-					}
-					else if (dist < bestDist2)
-					{
-						bestDist2 = dist;
-					}
+					bestDist2 = bestDist1;
+					bestDist1 = dist;
+					bestIdx2 = idx2;
 				}
-
-				if (bestDist1 < TH_LOW)
+				else if (dist < bestDist2)
 				{
-					if (static_cast<float>(bestDist1) < fNNRatio_*static_cast<float>(bestDist2))
-					{
-						matches12[idx1] = vpMapPoints2[bestIdx2];
-						vbMatched2[bestIdx2] = true;
-
-						if (checkOrientation_)
-						{
-							float rot = vKeysUn1[idx1].angle - vKeysUn2[bestIdx2].angle;
-							if (rot < 0.0)
-								rot += 360.0f;
-							int bin = round(rot*factor);
-							if (bin == HISTO_LENGTH)
-								bin = 0;
-							assert(bin >= 0 && bin < HISTO_LENGTH);
-							rotHist[bin].push_back(idx1);
-						}
-						nmatches++;
-					}
+					bestDist2 = dist;
 				}
 			}
 
-			f1it++;
-			f2it++;
-		}
-		else if (f1it->first < f2it->first)
-		{
-			f1it = vFeatVec1.lower_bound(f2it->first);
-		}
-		else
-		{
-			f2it = vFeatVec2.lower_bound(f1it->first);
+			if (bestDist1 < TH_LOW)
+			{
+				if (static_cast<float>(bestDist1) < fNNRatio_*static_cast<float>(bestDist2))
+				{
+					matches12[idx1] = vpMapPoints2[bestIdx2];
+					vbMatched2[bestIdx2] = true;
+
+					if (checkOrientation_)
+					{
+						float rot = vKeysUn1[idx1].angle - vKeysUn2[bestIdx2].angle;
+						if (rot < 0.0)
+							rot += 360.0f;
+						int bin = round(rot*factor);
+						if (bin == HISTO_LENGTH)
+							bin = 0;
+						assert(bin >= 0 && bin < HISTO_LENGTH);
+						rotHist[bin].push_back(idx1);
+					}
+					nmatches++;
+				}
+			}
 		}
 	}
 
