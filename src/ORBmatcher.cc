@@ -36,7 +36,7 @@ namespace ORB_SLAM2
 
 const int ORBmatcher::TH_HIGH = 100;
 const int ORBmatcher::TH_LOW = 50;
-const int ORBmatcher::HISTO_LENGTH = 30;
+static const int HISTO_LENGTH = 30;
 
 static float RadiusByViewingCos(const float &viewCos)
 {
@@ -1367,6 +1367,67 @@ int ORBmatcher::SearchBySim3(KeyFrame *pKF1, KeyFrame *pKF2, vector<MapPoint*> &
 	return nFound;
 }
 
+using MatchIdx = std::pair<int, int>;
+static int CheckOrientation(const Frame& frame1, const Frame& frame2, const std::vector<MatchIdx>& matches12,
+	std::vector<MapPoint*>& mappoints2)
+{
+	CV_Assert(mappoints2.size() == frame2.keypointsUn.size());
+
+	// should be : const int HIST_SIZE = 360 / ORIENTATION_HIST_STEP; ?
+	const float factor = 1.f / HISTO_LENGTH;
+	std::vector<int> hist[HISTO_LENGTH];
+
+	auto diffToBin = [=](float diff)
+	{
+		if (diff < 0)
+			diff += 360;
+
+		int bin = cvRound(factor * diff);
+		if (bin == HISTO_LENGTH)
+			bin = 0;
+
+		return bin;
+	};
+
+	for (const auto& match : matches12)
+	{
+		const int i1 = match.first;
+		const int i2 = match.second;
+		const cv::KeyPoint& keypoint1 = frame1.keypointsUn[i1];
+		const cv::KeyPoint& keypoint2 = frame2.keypointsUn[i2];
+		const int bin = diffToBin(keypoint1.angle - keypoint2.angle);
+		CV_Assert(bin >= 0 && bin < HISTO_LENGTH);
+		hist[bin].push_back(i2);
+	}
+
+	std::sort(std::begin(hist), std::end(hist), [](const std::vector<int>& lhs, const std::vector<int>& rhs)
+	{
+		return lhs.size() > rhs.size();
+	});
+
+	const size_t max1 = hist[0].size();
+	const size_t max2 = hist[1].size();
+	const size_t max3 = hist[2].size();
+
+	int eraseBin = 3;
+	if (max2 < 0.1 * max1)
+		eraseBin = 1;
+	else if (max3 < 0.1 * max1)
+		eraseBin = 2;
+
+	int reduction = 0;
+	for (int bin = eraseBin; bin < HISTO_LENGTH; bin++)
+	{
+		for (int i2 : hist[bin])
+		{
+			//mappoints2[i2] = nullptr;
+			reduction++;
+		}
+	}
+
+	return static_cast<int>(matches12.size() - reduction);
+}
+
 int ORBmatcher::SearchByProjection(Frame& currFrame, const Frame& lastFrame, float th, bool monocular)
 {
 	int nmatches = 0;
@@ -1391,10 +1452,13 @@ int ORBmatcher::SearchByProjection(Frame& currFrame, const Frame& lastFrame, flo
 	const bool forward = tlc.at<float>(2) > camera.baseline && !monocular;
 	const bool backward = -tlc.at<float>(2) > camera.baseline && !monocular;
 
-	for (int i1 = 0; i1 < lastFrame.N; i1++)
+	std::vector<MatchIdx> matchIds;
+	matchIds.reserve(lastFrame.N);
+
+	for (int idx1 = 0; idx1 < lastFrame.N; idx1++)
 	{
-		MapPoint* mappoint1 = lastFrame.mappoints[i1];
-		if (!mappoint1 || lastFrame.outlier[i1])
+		MapPoint* mappoint1 = lastFrame.mappoints[idx1];
+		if (!mappoint1 || lastFrame.outlier[idx1])
 			continue;
 
 		// Project
@@ -1414,7 +1478,7 @@ int ORBmatcher::SearchByProjection(Frame& currFrame, const Frame& lastFrame, flo
 		if (!currFrame.imageBounds.Contains(u, v))
 			continue;
 
-		const int octave1 = lastFrame.keypointsL[i1].octave;
+		const int octave1 = lastFrame.keypointsL[idx1].octave;
 
 		// Search in a window. Size depends on scale
 		const float radius = th*currFrame.pyramid.scaleFactors[octave1];
@@ -1430,25 +1494,25 @@ int ORBmatcher::SearchByProjection(Frame& currFrame, const Frame& lastFrame, flo
 
 		int bestDist = 256;
 		int bestIdx2 = -1;
-		for (size_t i2 : indices2)
+		for (size_t idx2 : indices2)
 		{
-			MapPoint* mappoint2 = currFrame.mappoints[i2];
+			MapPoint* mappoint2 = currFrame.mappoints[idx2];
 			if (mappoint2 && mappoint2->Observations() > 0)
 				continue;
 
-			if (currFrame.uright[i2] > 0)
+			if (currFrame.uright[idx2] > 0)
 			{
 				const float ur = u - camera.bf * invZc;
-				if (fabsf(ur - currFrame.uright[i2]) > radius)
+				if (fabsf(ur - currFrame.uright[idx2]) > radius)
 					continue;
 			}
 
-			const cv::Mat desc2 = currFrame.descriptorsL.row(i2);
+			const cv::Mat desc2 = currFrame.descriptorsL.row(idx2);
 			const int dist = DescriptorDistance(desc1, desc2);
 			if (dist < bestDist)
 			{
 				bestDist = dist;
-				bestIdx2 = static_cast<int>(i2);
+				bestIdx2 = static_cast<int>(idx2);
 			}
 		}
 
@@ -1458,40 +1522,13 @@ int ORBmatcher::SearchByProjection(Frame& currFrame, const Frame& lastFrame, flo
 			nmatches++;
 
 			if (checkOrientation_)
-			{
-				float rot = lastFrame.keypointsUn[i1].angle - currFrame.keypointsUn[bestIdx2].angle;
-				if (rot < 0.0)
-					rot += 360.0f;
-				int bin = round(rot*factor);
-				if (bin == HISTO_LENGTH)
-					bin = 0;
-				assert(bin >= 0 && bin < HISTO_LENGTH);
-				rotHist[bin].push_back(bestIdx2);
-			}
+				matchIds.push_back(std::make_pair(idx1, bestIdx2));
 		}
 	}
 
-	//Apply rotation consistency
+	// Apply rotation consistency
 	if (checkOrientation_)
-	{
-		int ind1 = -1;
-		int ind2 = -1;
-		int ind3 = -1;
-
-		ComputeThreeMaxima(rotHist, HISTO_LENGTH, ind1, ind2, ind3);
-
-		for (int i = 0; i < HISTO_LENGTH; i++)
-		{
-			if (i != ind1 && i != ind2 && i != ind3)
-			{
-				for (size_t j = 0, jend = rotHist[i].size(); j < jend; j++)
-				{
-					currFrame.mappoints[rotHist[i][j]] = static_cast<MapPoint*>(NULL);
-					nmatches--;
-				}
-			}
-		}
-	}
+		nmatches = CheckOrientation(lastFrame, currFrame, matchIds, currFrame.mappoints);
 
 	return nmatches;
 }
