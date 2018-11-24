@@ -227,23 +227,26 @@ int ORBmatcher::SearchByProjection(Frame& frame, const std::vector<MapPoint*>& m
 	return nmatches;
 }
 
-static bool CheckDistEpipolarLine(const cv::KeyPoint &kp1, const cv::KeyPoint &kp2, const cv::Mat &F12, const KeyFrame* pKF2)
+static bool CheckDistEpipolarLine(const cv::KeyPoint& keypoint1, const cv::KeyPoint& keypoint2,
+	const cv::Mat1f& F12, const KeyFrame* keyframe2)
 {
+	const cv::Point2f& pt1 = keypoint1.pt;
+	const cv::Point2f& pt2 = keypoint2.pt;
+
 	// Epipolar line in second image l = x1'F12 = [a b c]
-	const float a = kp1.pt.x*F12.at<float>(0, 0) + kp1.pt.y*F12.at<float>(1, 0) + F12.at<float>(2, 0);
-	const float b = kp1.pt.x*F12.at<float>(0, 1) + kp1.pt.y*F12.at<float>(1, 1) + F12.at<float>(2, 1);
-	const float c = kp1.pt.x*F12.at<float>(0, 2) + kp1.pt.y*F12.at<float>(1, 2) + F12.at<float>(2, 2);
+	const float a = pt1.x * F12(0, 0) + pt1.y * F12(1, 0) + F12(2, 0);
+	const float b = pt1.x * F12(0, 1) + pt1.y * F12(1, 1) + F12(2, 1);
+	const float c = pt1.x * F12(0, 2) + pt1.y * F12(1, 2) + F12(2, 2);
 
-	const float num = a*kp2.pt.x + b*kp2.pt.y + c;
-
-	const float den = a*a + b*b;
+	const float num = a * pt2.x + b * pt2.y + c;
+	const float den = a * a + b * b;
 
 	if (den == 0)
 		return false;
 
-	const float dsqr = num*num / den;
+	const float dsqr = num * num / den;
 
-	return dsqr < 3.84*pKF2->pyramid.sigmaSq[kp2.octave];
+	return dsqr < 3.84 * keyframe2->pyramid.sigmaSq[keypoint2.octave];
 }
 
 struct FeatureVectorIterator
