@@ -22,11 +22,6 @@
 #ifndef VIEWER_H
 #define VIEWER_H
 
-//#include "FrameDrawer.h"
-//#include "MapDrawer.h"
-//#include "Tracking.h"
-//#include "System.h"
-
 #include <opencv2/opencv.hpp>
 
 #include <string>
@@ -52,15 +47,10 @@ public:
 	// Main thread function. Draw points, keyframes, the current camera pose and the last processed
 	// frame. Drawing is refreshed according to the camera fps. We use Pangolin.
 	void Run();
-
 	void RequestFinish();
-
 	void RequestStop();
-
 	bool isFinished();
-
 	bool isStopped();
-
 	void Release();
 
 	void SetCurrentCameraPose(const cv::Mat& Tcw);
@@ -69,6 +59,8 @@ public:
 private:
 
 	bool Stop();
+	bool CheckFinish();
+	void SetFinish();
 
 	System* system_;
 	std::unique_ptr<FrameDrawer> frameDrawer_;
@@ -78,17 +70,13 @@ private:
 	int waittime_;
 	
 	float viewpointX_, viewpointY_, viewpointZ_, viewpointF_;
-
-	bool CheckFinish();
-	void SetFinish();
 	bool finishRequested_;
 	bool finished_;
-	std::mutex mMutexFinish;
-
 	bool stopped_;
 	bool stopRequested_;
-	std::mutex mMutexStop;
 
+	std::mutex mMutexFinish;
+	std::mutex mMutexStop;
 };
 
 }
