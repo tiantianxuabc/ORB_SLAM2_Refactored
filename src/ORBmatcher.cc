@@ -198,6 +198,52 @@ static bool CheckDistEpipolarLine(const cv::KeyPoint &kp1, const cv::KeyPoint &k
 	return dsqr < 3.84*pKF2->pyramid.sigmaSq[kp2.octave];
 }
 
+struct FeatureVectorIterator
+{
+	using Iterator = DBoW2::FeatureVector::const_iterator;
+	using Indices = Iterator::value_type::second_type;
+
+	FeatureVectorIterator(const DBoW2::FeatureVector& fv1, const DBoW2::FeatureVector& fv2) : fv1(fv1), fv2(fv2)
+	{
+		it1 = std::cbegin(fv1);
+		it2 = std::cbegin(fv2);
+	}
+
+	bool end() const { return it1 == std::cend(fv1) || it2 == std::cend(fv2); }
+
+	bool next()
+	{
+		while (!end())
+		{
+			if (it1->first == it2->first)
+			{
+				node1 = it1;
+				node2 = it2;
+				++it1;
+				++it2;
+				return true;
+			}
+			else if (it1->first < it2->first)
+			{
+				it1 = fv1.lower_bound(it2->first);
+			}
+			else
+			{
+				it2 = fv2.lower_bound(it1->first);
+			}
+		}
+
+		return false;
+	}
+
+	const Indices& indices1() const { return node1->second; };
+	const Indices& indices2() const { return node2->second; };
+
+	const DBoW2::FeatureVector& fv1;
+	const DBoW2::FeatureVector& fv2;
+	Iterator node1, node2, it1, it2;
+};
+
 int ORBmatcher::SearchByBoW(KeyFrame* keyframe, Frame& frame, std::vector<MapPoint*>& matches)
 {
 	const vector<MapPoint*> mappoints1 = keyframe->GetMapPointMatches();
@@ -213,98 +259,77 @@ int ORBmatcher::SearchByBoW(KeyFrame* keyframe, Frame& frame, std::vector<MapPoi
 		rotHist[i].reserve(500);
 	const float factor = 1.0f / HISTO_LENGTH;
 
-	// We perform the matching over ORB that belong to the same vocabulary node (at a certain level)
-	DBoW2::FeatureVector::const_iterator KFit = vFeatVecKF.begin();
-	DBoW2::FeatureVector::const_iterator Fit = frame.featureVector.begin();
-	DBoW2::FeatureVector::const_iterator KFend = vFeatVecKF.end();
-	DBoW2::FeatureVector::const_iterator Fend = frame.featureVector.end();
-
-	while (KFit != KFend && Fit != Fend)
+	FeatureVectorIterator iterator(keyframe->featureVector, frame.featureVector);
+	while (iterator.next())
 	{
-		if (KFit->first == Fit->first)
+		const auto& vIndicesKF = iterator.indices1();
+		const auto& vIndicesF = iterator.indices2();
+		for (size_t iKF = 0; iKF < vIndicesKF.size(); iKF++)
 		{
-			const vector<unsigned int> vIndicesKF = KFit->second;
-			const vector<unsigned int> vIndicesF = Fit->second;
+			const unsigned int realIdxKF = vIndicesKF[iKF];
 
-			for (size_t iKF = 0; iKF < vIndicesKF.size(); iKF++)
+			MapPoint* pMP = mappoints1[realIdxKF];
+
+			if (!pMP)
+				continue;
+
+			if (pMP->isBad())
+				continue;
+
+			const cv::Mat &dKF = keyframe->descriptorsL.row(realIdxKF);
+
+			int bestDist1 = 256;
+			int bestIdxF = -1;
+			int bestDist2 = 256;
+
+			for (size_t iF = 0; iF < vIndicesF.size(); iF++)
 			{
-				const unsigned int realIdxKF = vIndicesKF[iKF];
+				const unsigned int realIdxF = vIndicesF[iF];
 
-				MapPoint* pMP = mappoints1[realIdxKF];
-
-				if (!pMP)
+				if (matches[realIdxF])
 					continue;
 
-				if (pMP->isBad())
-					continue;
+				const cv::Mat &dF = frame.descriptorsL.row(realIdxF);
 
-				const cv::Mat &dKF = keyframe->descriptorsL.row(realIdxKF);
+				const int dist = DescriptorDistance(dKF, dF);
 
-				int bestDist1 = 256;
-				int bestIdxF = -1;
-				int bestDist2 = 256;
-
-				for (size_t iF = 0; iF < vIndicesF.size(); iF++)
+				if (dist < bestDist1)
 				{
-					const unsigned int realIdxF = vIndicesF[iF];
-
-					if (matches[realIdxF])
-						continue;
-
-					const cv::Mat &dF = frame.descriptorsL.row(realIdxF);
-
-					const int dist = DescriptorDistance(dKF, dF);
-
-					if (dist < bestDist1)
-					{
-						bestDist2 = bestDist1;
-						bestDist1 = dist;
-						bestIdxF = realIdxF;
-					}
-					else if (dist < bestDist2)
-					{
-						bestDist2 = dist;
-					}
+					bestDist2 = bestDist1;
+					bestDist1 = dist;
+					bestIdxF = realIdxF;
 				}
-
-				if (bestDist1 <= TH_LOW)
+				else if (dist < bestDist2)
 				{
-					if (static_cast<float>(bestDist1) < mfNNratio*static_cast<float>(bestDist2))
-					{
-						matches[bestIdxF] = pMP;
-
-						const cv::KeyPoint &kp = keyframe->keypointsUn[realIdxKF];
-
-						if (checkOrientation_)
-						{
-							float rot = kp.angle - frame.keypointsL[bestIdxF].angle;
-							if (rot < 0.0)
-								rot += 360.0f;
-							int bin = round(rot*factor);
-							if (bin == HISTO_LENGTH)
-								bin = 0;
-							assert(bin >= 0 && bin < HISTO_LENGTH);
-							rotHist[bin].push_back(bestIdxF);
-						}
-						nmatches++;
-					}
+					bestDist2 = dist;
 				}
-
 			}
 
-			KFit++;
-			Fit++;
-		}
-		else if (KFit->first < Fit->first)
-		{
-			KFit = vFeatVecKF.lower_bound(Fit->first);
-		}
-		else
-		{
-			Fit = frame.featureVector.lower_bound(KFit->first);
+			if (bestDist1 <= TH_LOW)
+			{
+				if (static_cast<float>(bestDist1) < mfNNratio*static_cast<float>(bestDist2))
+				{
+					matches[bestIdxF] = pMP;
+
+					const cv::KeyPoint &kp = keyframe->keypointsUn[realIdxKF];
+
+					if (checkOrientation_)
+					{
+						float rot = kp.angle - frame.keypointsL[bestIdxF].angle;
+						if (rot < 0.0)
+							rot += 360.0f;
+						int bin = round(rot*factor);
+						if (bin == HISTO_LENGTH)
+							bin = 0;
+						assert(bin >= 0 && bin < HISTO_LENGTH);
+						rotHist[bin].push_back(bestIdxF);
+					}
+					nmatches++;
+				}
+			}
+
 		}
 	}
-
 
 	if (checkOrientation_)
 	{
