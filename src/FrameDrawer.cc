@@ -100,24 +100,22 @@ cv::Mat FrameDrawer::DrawFrame()
 			if (status[i] == MAPPOINT_STATUS_NONE)
 				continue;
 
-			cv::Point2f pt1, pt2;
-			pt1.x = currKeyPoints[i].pt.x - r;
-			pt1.y = currKeyPoints[i].pt.y - r;
-			pt2.x = currKeyPoints[i].pt.x + r;
-			pt2.y = currKeyPoints[i].pt.y + r;
+			const cv::Point2f& pt = currKeyPoints[i].pt;
+			const cv::Point2f pt1(pt.x - r, pt.y - r);
+			const cv::Point2f pt2(pt.x + r, pt.y + r);
 
 			// This is a match to a MapPoint in the map
 			if (status[i] == MAPPOINT_STATUS_MAP)
 			{
 				cv::rectangle(image, pt1, pt2, cv::Scalar(0, 255, 0));
-				cv::circle(image, currKeyPoints[i].pt, 2, cv::Scalar(0, 255, 0), -1);
+				cv::circle(image, pt, 2, cv::Scalar(0, 255, 0), -1);
 				ntracked_++;
 			}
 			// This is match to a "visual odometry" MapPoint created in the last frame
 			else if (status[i] == MAPPOINT_STATUS_VO)
 			{
 				cv::rectangle(image, pt1, pt2, cv::Scalar(255, 0, 0));
-				cv::circle(image, currKeyPoints[i].pt, 2, cv::Scalar(255, 0, 0), -1);
+				cv::circle(image, pt, 2, cv::Scalar(255, 0, 0), -1);
 				ntrackedVO_++;
 			}
 		}
