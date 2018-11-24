@@ -311,8 +311,8 @@ bool Sim3Solver::iterate(int maxk, Sim3& sim3, std::vector<bool>& isInlier)
 		// Get min set of points
 		for (int i = 0; i < 3; ++i)
 		{
-			const int randi = DUtils::Random::RandomInt(0, availableIndices.size() - 1);
-			const int idx = availableIndices[randi];
+			const int randi = DUtils::Random::RandomInt(0, static_cast<int>(availableIndices.size() - 1));
+			const size_t idx = availableIndices[randi];
 
 			Xc1_[idx].copyTo(P1.col(i));
 			Xc2_[idx].copyTo(P2.col(i));
