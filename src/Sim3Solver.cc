@@ -265,26 +265,23 @@ Sim3Solver::Sim3Solver(const KeyFrame* keyframe1, const KeyFrame* keyframe2, con
 
 void Sim3Solver::SetRansacParameters(double probability, int minInliers, int maxIterations)
 {
-	mRansacProb = probability;
-	mRansacMinInliers = minInliers;
-	mRansacMaxIts = maxIterations;
+	probability_ = probability;
+	minInliers_ = minInliers;
+	maxIterations_ = maxIterations;
 
 	N = static_cast<int>(allIndices.size()); // number of correspondences
 
-	mvbInliersi.resize(N);
+	inliers_.resize(N);
 
 	// Adjust Parameters according to number of correspondences
-	float epsilon = (float)mRansacMinInliers / N;
+	const float epsilon = 1.f * minInliers_ / N;
 
 	// Set RANSAC iterations according to probability, epsilon, and max iterations
-	int nIterations;
-
-	if (mRansacMinInliers == N)
-		nIterations = 1;
-	else
-		nIterations = ceil(log(1 - mRansacProb) / log(1 - pow(epsilon, 3)));
-
-	mRansacMaxIts = std::max(1, std::min(nIterations, mRansacMaxIts));
+	int niterations = 1;
+	if (minInliers_ != N)
+		niterations = static_cast<int>(ceil(log(1 - probability_) / log(1 - pow(epsilon, 3))));
+	
+	maxIterations_ = std::max(1, std::min(niterations, maxIterations_));
 
 	iterations_ = 0;
 }
@@ -295,7 +292,7 @@ cv::Mat Sim3Solver::iterate(int nIterations, bool &bNoMore, std::vector<bool> &v
 	vbInliers = std::vector<bool>(nkeypoints1_, false);
 	nInliers = 0;
 
-	if (N < mRansacMinInliers)
+	if (N < minInliers_)
 	{
 		bNoMore = true;
 		return cv::Mat();
@@ -307,7 +304,7 @@ cv::Mat Sim3Solver::iterate(int nIterations, bool &bNoMore, std::vector<bool> &v
 	cv::Mat P3Dc2i(3, 3, CV_32F);
 
 	int nCurrentIterations = 0;
-	while (iterations_ < mRansacMaxIts && nCurrentIterations < nIterations)
+	while (iterations_ < maxIterations_ && nCurrentIterations < nIterations)
 	{
 		nCurrentIterations++;
 		iterations_++;
@@ -348,34 +345,34 @@ cv::Mat Sim3Solver::iterate(int nIterations, bool &bNoMore, std::vector<bool> &v
 
 			if (err1 < maxErrorSq1_[i] && err2 < maxErrorSq2_[i])
 			{
-				mvbInliersi[i] = true;
+				inliers_[i] = true;
 				mnInliersi++;
 			}
 			else
-				mvbInliersi[i] = false;
+				inliers_[i] = false;
 		}
 
 		if (mnInliersi >= maxInliers_)
 		{
-			mvbBestInliers = mvbInliersi;
+			mvbBestInliers = inliers_;
 			maxInliers_ = mnInliersi;
 			mBestT12 = S12.T.clone();
 			mBestRotation = S12.R.clone();
 			mBestTranslation = S12.t.clone();
 			mBestScale = S12.scale;
 
-			if (mnInliersi > mRansacMinInliers)
+			if (mnInliersi > minInliers_)
 			{
 				nInliers = mnInliersi;
 				for (int i = 0; i < N; i++)
-					if (mvbInliersi[i])
+					if (inliers_[i])
 						vbInliers[indices1_[i]] = true;
 				return mBestT12;
 			}
 		}
 	}
 
-	if (iterations_ >= mRansacMaxIts)
+	if (iterations_ >= maxIterations_)
 		bNoMore = true;
 
 	return cv::Mat();
@@ -384,7 +381,7 @@ cv::Mat Sim3Solver::iterate(int nIterations, bool &bNoMore, std::vector<bool> &v
 cv::Mat Sim3Solver::find(std::vector<bool> &vbInliers12, int &nInliers)
 {
 	bool bFlag;
-	return iterate(mRansacMaxIts, bFlag, vbInliers12, nInliers);
+	return iterate(maxIterations_, bFlag, vbInliers12, nInliers);
 }
 
 cv::Mat Sim3Solver::GetEstimatedRotation()
