@@ -38,6 +38,14 @@ const int ORBmatcher::TH_HIGH = 100;
 const int ORBmatcher::TH_LOW = 50;
 const int ORBmatcher::HISTO_LENGTH = 30;
 
+static float RadiusByViewingCos(const float &viewCos)
+{
+	if (viewCos > 0.998)
+		return 2.5;
+	else
+		return 4.0;
+}
+
 ORBmatcher::ORBmatcher(float nnratio, bool checkOri) : mfNNratio(nnratio), mbCheckOrientation(checkOri)
 {
 }
@@ -127,15 +135,6 @@ int ORBmatcher::SearchByProjection(Frame &F, const vector<MapPoint*> &vpMapPoint
 
 	return nmatches;
 }
-
-float ORBmatcher::RadiusByViewingCos(const float &viewCos)
-{
-	if (viewCos > 0.998)
-		return 2.5;
-	else
-		return 4.0;
-}
-
 
 static bool CheckDistEpipolarLine(const cv::KeyPoint &kp1, const cv::KeyPoint &kp2, const cv::Mat &F12, const KeyFrame* pKF2)
 {
