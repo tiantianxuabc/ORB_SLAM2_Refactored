@@ -89,7 +89,69 @@ static void ComputeThreeMaxima(vector<int>* histo, const int L, int &ind1, int &
 	}
 }
 
-ORBmatcher::ORBmatcher(float nnratio, bool checkOri) : mfNNratio(nnratio), checkOrientation_(checkOri)
+using MatchIdx = std::pair<int, int>;
+static int CheckOrientation(const std::vector<cv::KeyPoint>& keypoints1, const std::vector<cv::KeyPoint>& keypoints2,
+	const std::vector<MatchIdx>& matches12, std::vector<MapPoint*>& mappoints2)
+{
+	CV_Assert(mappoints2.size() == keypoints2.size());
+
+	const float factor = 1.f / HISTO_LENGTH;
+	std::vector<int> hist[HISTO_LENGTH];
+	for (int i = 0; i < HISTO_LENGTH; i++)
+		hist[i].reserve(500);
+
+	auto diffToBin = [=](float diff)
+	{
+		if (diff < 0)
+			diff += 360;
+
+		int bin = cvRound(factor * diff);
+		if (bin == HISTO_LENGTH)
+			bin = 0;
+
+		return bin;
+	};
+
+	for (const auto& match : matches12)
+	{
+		const int i1 = match.first;
+		const int i2 = match.second;
+		const cv::KeyPoint& keypoint1 = keypoints1[i1];
+		const cv::KeyPoint& keypoint2 = keypoints2[i2];
+		const int bin = diffToBin(keypoint1.angle - keypoint2.angle);
+		CV_Assert(bin >= 0 && bin < HISTO_LENGTH);
+		hist[bin].push_back(i2);
+	}
+
+	std::sort(std::begin(hist), std::end(hist), [](const std::vector<int>& lhs, const std::vector<int>& rhs)
+	{
+		return lhs.size() > rhs.size();
+	});
+
+	const size_t max1 = hist[0].size();
+	const size_t max2 = hist[1].size();
+	const size_t max3 = hist[2].size();
+
+	int eraseBin = 3;
+	if (max2 < 0.1 * max1)
+		eraseBin = 1;
+	else if (max3 < 0.1 * max1)
+		eraseBin = 2;
+
+	int reduction = 0;
+	for (int bin = eraseBin; bin < HISTO_LENGTH; bin++)
+	{
+		for (int i2 : hist[bin])
+		{
+			mappoints2[i2] = nullptr;
+			reduction++;
+		}
+	}
+
+	return static_cast<int>(matches12.size() - reduction);
+}
+
+ORBmatcher::ORBmatcher(float nnratio, bool checkOri) : fNNRatio_(nnratio), checkOrientation_(checkOri)
 {
 }
 
@@ -168,7 +230,7 @@ int ORBmatcher::SearchByProjection(Frame &F, const vector<MapPoint*> &vpMapPoint
 		// Apply ratio to second match (only if best and second are in the same scale level)
 		if (bestDist <= TH_HIGH)
 		{
-			if (bestLevel == bestLevel2 && bestDist > mfNNratio*bestDist2)
+			if (bestLevel == bestLevel2 && bestDist > fNNRatio_*bestDist2)
 				continue;
 
 			F.mappoints[bestIdx] = pMP;
@@ -250,8 +312,6 @@ int ORBmatcher::SearchByBoW(KeyFrame* keyframe, Frame& frame, std::vector<MapPoi
 
 	matches.assign(frame.N, nullptr);
 
-	const DBoW2::FeatureVector &vFeatVecKF = keyframe->featureVector;
-
 	int nmatches = 0;
 
 	vector<int> rotHist[HISTO_LENGTH];
@@ -259,97 +319,60 @@ int ORBmatcher::SearchByBoW(KeyFrame* keyframe, Frame& frame, std::vector<MapPoi
 		rotHist[i].reserve(500);
 	const float factor = 1.0f / HISTO_LENGTH;
 
+	std::vector<MatchIdx> matchIds;
+	matchIds.reserve(keyframe->N);
+
 	FeatureVectorIterator iterator(keyframe->featureVector, frame.featureVector);
 	while (iterator.next())
 	{
-		const auto& vIndicesKF = iterator.indices1();
-		const auto& vIndicesF = iterator.indices2();
-		for (size_t iKF = 0; iKF < vIndicesKF.size(); iKF++)
+		const auto& indices1 = iterator.indices1();
+		const auto& indices2 = iterator.indices2();
+		for (auto idx1 : indices1)
 		{
-			const unsigned int realIdxKF = vIndicesKF[iKF];
+			MapPoint* mappoint1 = mappoints1[idx1];
 
-			MapPoint* pMP = mappoints1[realIdxKF];
-
-			if (!pMP)
+			if (!mappoint1 || mappoint1->isBad())
 				continue;
 
-			if (pMP->isBad())
-				continue;
+			const cv::Mat desc1 = keyframe->descriptorsL.row(idx1);
 
-			const cv::Mat &dKF = keyframe->descriptorsL.row(realIdxKF);
+			int bestDist = 256;
+			int bestIdx2 = -1;
+			int secondBestDist = 256;
 
-			int bestDist1 = 256;
-			int bestIdxF = -1;
-			int bestDist2 = 256;
-
-			for (size_t iF = 0; iF < vIndicesF.size(); iF++)
+			for (auto idx2 : indices2)
 			{
-				const unsigned int realIdxF = vIndicesF[iF];
-
-				if (matches[realIdxF])
+				if (matches[idx2])
 					continue;
 
-				const cv::Mat &dF = frame.descriptorsL.row(realIdxF);
-
-				const int dist = DescriptorDistance(dKF, dF);
-
-				if (dist < bestDist1)
+				const cv::Mat desc2 = frame.descriptorsL.row(idx2);
+				const int dist = DescriptorDistance(desc1, desc2);
+				if (dist < bestDist)
 				{
-					bestDist2 = bestDist1;
-					bestDist1 = dist;
-					bestIdxF = realIdxF;
+					secondBestDist = bestDist;
+					bestDist = dist;
+					bestIdx2 = static_cast<int>(idx2);
 				}
-				else if (dist < bestDist2)
+				else if (dist < secondBestDist)
 				{
-					bestDist2 = dist;
+					secondBestDist = dist;
 				}
 			}
 
-			if (bestDist1 <= TH_LOW)
+			if (bestDist <= TH_LOW && bestDist < fNNRatio_ * secondBestDist)
 			{
-				if (static_cast<float>(bestDist1) < mfNNratio*static_cast<float>(bestDist2))
-				{
-					matches[bestIdxF] = pMP;
+				matches[bestIdx2] = mappoint1;
+				nmatches++;
 
-					const cv::KeyPoint &kp = keyframe->keypointsUn[realIdxKF];
-
-					if (checkOrientation_)
-					{
-						float rot = kp.angle - frame.keypointsL[bestIdxF].angle;
-						if (rot < 0.0)
-							rot += 360.0f;
-						int bin = round(rot*factor);
-						if (bin == HISTO_LENGTH)
-							bin = 0;
-						assert(bin >= 0 && bin < HISTO_LENGTH);
-						rotHist[bin].push_back(bestIdxF);
-					}
-					nmatches++;
-				}
+				if (checkOrientation_)
+					matchIds.push_back(std::make_pair(static_cast<int>(idx1), bestIdx2));
 			}
 
 		}
 	}
 
 	if (checkOrientation_)
-	{
-		int ind1 = -1;
-		int ind2 = -1;
-		int ind3 = -1;
-
-		ComputeThreeMaxima(rotHist, HISTO_LENGTH, ind1, ind2, ind3);
-
-		for (int i = 0; i < HISTO_LENGTH; i++)
-		{
-			if (i == ind1 || i == ind2 || i == ind3)
-				continue;
-			for (size_t j = 0, jend = rotHist[i].size(); j < jend; j++)
-			{
-				matches[rotHist[i][j]] = static_cast<MapPoint*>(NULL);
-				nmatches--;
-			}
-		}
-	}
+		nmatches = CheckOrientation(keyframe->keypointsUn, frame.keypointsUn, matchIds, matches);
 
 	return nmatches;
 }
@@ -525,7 +548,7 @@ int ORBmatcher::SearchForInitialization(Frame &F1, Frame &F2, vector<cv::Point2f
 
 		if (bestDist <= TH_LOW)
 		{
-			if (bestDist < (float)bestDist2*mfNNratio)
+			if (bestDist < (float)bestDist2*fNNRatio_)
 			{
 				if (vnMatches21[bestIdx2] >= 0)
 				{
@@ -664,7 +687,7 @@ int ORBmatcher::SearchByBoW(KeyFrame *pKF1, KeyFrame *pKF2, vector<MapPoint *> &
 
 				if (bestDist1 < TH_LOW)
 				{
-					if (static_cast<float>(bestDist1) < mfNNratio*static_cast<float>(bestDist2))
+					if (static_cast<float>(bestDist1) < fNNRatio_*static_cast<float>(bestDist2))
 					{
 						vpMatches12[idx1] = vpMapPoints2[bestIdx2];
 						vbMatched2[bestIdx2] = true;
@@ -1392,69 +1415,6 @@ int ORBmatcher::SearchBySim3(KeyFrame *pKF1, KeyFrame *pKF2, vector<MapPoint*> &
 	return nFound;
 }
 
-using MatchIdx = std::pair<int, int>;
-static int CheckOrientation(const Frame& frame1, const Frame& frame2, const std::vector<MatchIdx>& matches12,
-	std::vector<MapPoint*>& mappoints2)
-{
-	CV_Assert(mappoints2.size() == frame2.keypointsUn.size());
-
-	// should be : const int HIST_SIZE = 360 / ORIENTATION_HIST_STEP; ?
-	const float factor = 1.f / HISTO_LENGTH;
-	std::vector<int> hist[HISTO_LENGTH];
-	for (int i = 0; i < HISTO_LENGTH; i++)
-		hist[i].reserve(500);
-
-	auto diffToBin = [=](float diff)
-	{
-		if (diff < 0)
-			diff += 360;
-
-		int bin = cvRound(factor * diff);
-		if (bin == HISTO_LENGTH)
-			bin = 0;
-
-		return bin;
-	};
-
-	for (const auto& match : matches12)
-	{
-		const int i1 = match.first;
-		const int i2 = match.second;
-		const cv::KeyPoint& keypoint1 = frame1.keypointsUn[i1];
-		const cv::KeyPoint& keypoint2 = frame2.keypointsUn[i2];
-		const int bin = diffToBin(keypoint1.angle - keypoint2.angle);
-		CV_Assert(bin >= 0 && bin < HISTO_LENGTH);
-		hist[bin].push_back(i2);
-	}
-
-	std::sort(std::begin(hist), std::end(hist), [](const std::vector<int>& lhs, const std::vector<int>& rhs)
-	{
-		return lhs.size() > rhs.size();
-	});
-
-	const size_t max1 = hist[0].size();
-	const size_t max2 = hist[1].size();
-	const size_t max3 = hist[2].size();
-
-	int eraseBin = 3;
-	if (max2 < 0.1 * max1)
-		eraseBin = 1;
-	else if (max3 < 0.1 * max1)
-		eraseBin = 2;
-
-	int reduction = 0;
-	for (int bin = eraseBin; bin < HISTO_LENGTH; bin++)
-	{
-		for (int i2 : hist[bin])
-		{
-			//mappoints2[i2] = nullptr;
-			reduction++;
-		}
-	}
-
-	return static_cast<int>(matches12.size() - reduction);
-}
-
 int ORBmatcher::SearchByProjection(Frame& currFrame, const Frame& lastFrame, float th, bool monocular)
 {
 	int nmatches = 0;
@@ -1549,7 +1509,7 @@ int ORBmatcher::SearchByProjection(Frame& currFrame, const Frame& lastFrame, flo
 
 	// Apply rotation consistency
 	if (checkOrientation_)
-		nmatches = CheckOrientation(lastFrame, currFrame, matchIds, currFrame.mappoints);
+		nmatches = CheckOrientation(lastFrame.keypointsUn, currFrame.keypointsUn, matchIds, currFrame.mappoints);
 
 	return nmatches;
 }
