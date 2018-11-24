@@ -227,7 +227,7 @@ Sim3Solver::Sim3Solver(const KeyFrame* keyframe1, const KeyFrame* keyframe2, con
 	const cv::Mat Rcw2 = keyframe2->GetRotation();
 	const cv::Mat tcw2 = keyframe2->GetTranslation();
 
-	allIndices.reserve(nkeypoints1_);
+	allIndices_.reserve(nkeypoints1_);
 
 	size_t idx = 0;
 	for (int i1 = 0; i1 < nkeypoints1_; i1++)
@@ -259,7 +259,7 @@ Sim3Solver::Sim3Solver(const KeyFrame* keyframe1, const KeyFrame* keyframe2, con
 		Xc2_.push_back(Rcw2 * X3D2w + tcw2);
 
 		indices1_.push_back(i1);
-		allIndices.push_back(idx++);
+		allIndices_.push_back(idx++);
 	}
 
 	K1_ = keyframe1->camera.Mat();
@@ -277,16 +277,16 @@ void Sim3Solver::SetRansacParameters(double probability, int minInliers, int max
 	minInliers_ = minInliers;
 	maxIterations_ = maxIterations;
 
-	N = static_cast<int>(allIndices.size()); // number of correspondences
+	nmatches_ = static_cast<int>(allIndices_.size()); // number of correspondences
 
-	inliers_.resize(N);
+	inliers_.resize(nmatches_);
 
 	// Adjust Parameters according to number of correspondences
-	const float epsilon = 1.f * minInliers_ / N;
+	const float epsilon = 1.f * minInliers_ / nmatches_;
 
 	// Set RANSAC iterations according to probability, epsilon, and max iterations
 	int niterations = 1;
-	if (minInliers_ != N)
+	if (minInliers_ != nmatches_)
 		niterations = static_cast<int>(ceil(log(1 - probability_) / log(1 - pow(epsilon, 3))));
 	
 	maxIterations_ = std::max(1, std::min(niterations, maxIterations_));
@@ -299,7 +299,7 @@ bool Sim3Solver::iterate(int maxk, Sim3& sim3, std::vector<bool>& isInlier)
 	terminate_ = false;
 	isInlier.assign(nkeypoints1_, false);
 	
-	if (N < minInliers_)
+	if (nmatches_ < minInliers_)
 	{
 		terminate_ = true;
 		return false;
@@ -312,7 +312,7 @@ bool Sim3Solver::iterate(int maxk, Sim3& sim3, std::vector<bool>& isInlier)
 
 	for (int k = 0; iterations_ < maxIterations_ && k < maxk; k++, iterations_++)
 	{
-		availableIndices = allIndices;
+		availableIndices = allIndices_;
 
 		// Get min set of points
 		for (int i = 0; i < 3; ++i)
@@ -356,7 +356,7 @@ bool Sim3Solver::iterate(int maxk, Sim3& sim3, std::vector<bool>& isInlier)
 			if (ninliers > minInliers_)
 			{
 				CopySim3(bestS12_, sim3);
-				for (int i = 0; i < N; i++)
+				for (int i = 0; i < nmatches_; i++)
 					if (inliers_[i])
 						isInlier[indices1_[i]] = true;
 				return true;

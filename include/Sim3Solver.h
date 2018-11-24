@@ -57,7 +57,7 @@ private:
 	std::vector<double> maxErrorSq1_;
 	std::vector<double> maxErrorSq2_;
 
-	int N;
+	int nmatches_;
 	int nkeypoints1_;
 
 	std::vector<bool> inliers_;
@@ -71,7 +71,7 @@ private:
 	bool fixScale_;
 
 	// Indices for random selection
-	std::vector<size_t> allIndices;
+	std::vector<size_t> allIndices_;
 
 	// Projections
 	std::vector<cv::Mat> points1_;
