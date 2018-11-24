@@ -58,38 +58,38 @@ public:
 
 private:
 
-	std::vector<cv::Mat> mvX3Dc1;
-	std::vector<cv::Mat> mvX3Dc2;
-	std::vector<MapPoint*> mvpMapPoints1;
-	std::vector<MapPoint*> mvpMapPoints2;
-	std::vector<MapPoint*> mvpMatches12;
-	std::vector<size_t> mvnIndices1;
-	std::vector<size_t> mvnMaxError1;
-	std::vector<size_t> mvnMaxError2;
+	std::vector<cv::Mat> Xc1_;
+	std::vector<cv::Mat> Xc2_;
+	//std::vector<MapPoint*> mvpMapPoints1;
+	//std::vector<MapPoint*> mvpMapPoints2;
+	//std::vector<MapPoint*> mvpMatches12;
+	std::vector<size_t> indices1_;
+	std::vector<double> maxErrorSq1_;
+	std::vector<double> maxErrorSq2_;
 
 	int N;
-	int mN1;
+	int nkeypoints1_;
 
 	std::vector<bool> mvbInliersi;
 	
 	// Current Ransac State
-	int mnIterations;
+	int iterations_;
 	std::vector<bool> mvbBestInliers;
-	int mnBestInliers;
+	int maxInliers_;
 	cv::Mat mBestT12;
 	cv::Mat mBestRotation;
 	cv::Mat mBestTranslation;
 	float mBestScale;
 
 	// Scale is fixed to 1 in the stereo/RGBD case
-	bool mbFixScale;
+	bool fixScale_;
 
 	// Indices for random selection
-	std::vector<size_t> mvAllIndices;
+	std::vector<size_t> allIndices;
 
 	// Projections
-	std::vector<cv::Mat> mvP1im1;
-	std::vector<cv::Mat> mvP2im2;
+	std::vector<cv::Mat> points1_;
+	std::vector<cv::Mat> points2_;
 
 	// RANSAC probability
 	double mRansacProb;
@@ -101,8 +101,8 @@ private:
 	int mRansacMaxIts;
 
 	// Calibration
-	cv::Mat mK1;
-	cv::Mat mK2;
+	cv::Mat K1_;
+	cv::Mat K2_;
 };
 
 } //namespace ORB_SLAM

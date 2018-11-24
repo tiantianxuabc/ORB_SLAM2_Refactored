@@ -203,76 +203,62 @@ static void FromCameraToImage(const std::vector<cv::Mat> &vP3Dc, std::vector<cv:
 	}
 }
 
-Sim3Solver::Sim3Solver(const KeyFrame *pKF1, const KeyFrame *pKF2, const std::vector<MapPoint *> &vpMatched12, bool bFixScale) :
-	mnIterations(0), mnBestInliers(0), mbFixScale(bFixScale)
+Sim3Solver::Sim3Solver(const KeyFrame* keyframe1, const KeyFrame* keyframe2, const std::vector<MapPoint*>& matches,
+	bool fixScale) : iterations_(0), maxInliers_(0), fixScale_(fixScale)
 {
-	std::vector<MapPoint*> vpKeyFrameMP1 = pKF1->GetMapPointMatches();
+	const std::vector<MapPoint*> mappoints1 = keyframe1->GetMapPointMatches();
 
-	mN1 = vpMatched12.size();
+	nkeypoints1_ = static_cast<int>(matches.size());
 
-	mvpMapPoints1.reserve(mN1);
-	mvpMapPoints2.reserve(mN1);
-	mvpMatches12 = vpMatched12;
-	mvnIndices1.reserve(mN1);
-	mvX3Dc1.reserve(mN1);
-	mvX3Dc2.reserve(mN1);
+	indices1_.reserve(nkeypoints1_);
+	Xc1_.reserve(nkeypoints1_);
+	Xc2_.reserve(nkeypoints1_);
 
-	cv::Mat Rcw1 = pKF1->GetRotation();
-	cv::Mat tcw1 = pKF1->GetTranslation();
-	cv::Mat Rcw2 = pKF2->GetRotation();
-	cv::Mat tcw2 = pKF2->GetTranslation();
+	const cv::Mat Rcw1 = keyframe1->GetRotation();
+	const cv::Mat tcw1 = keyframe1->GetTranslation();
+	const cv::Mat Rcw2 = keyframe2->GetRotation();
+	const cv::Mat tcw2 = keyframe2->GetTranslation();
 
-	mvAllIndices.reserve(mN1);
+	allIndices.reserve(nkeypoints1_);
 
 	size_t idx = 0;
-	for (int i1 = 0; i1 < mN1; i1++)
+	for (int i1 = 0; i1 < nkeypoints1_; i1++)
 	{
-		if (vpMatched12[i1])
-		{
-			MapPoint* pMP1 = vpKeyFrameMP1[i1];
-			MapPoint* pMP2 = vpMatched12[i1];
+		const MapPoint* mappoint1 = mappoints1[i1];
+		const MapPoint* mappoint2 = matches[i1];
 
-			if (!pMP1)
-				continue;
+		if (!mappoint1 || !mappoint2 || mappoint1->isBad() || mappoint2->isBad())
+			continue;
 
-			if (pMP1->isBad() || pMP2->isBad())
-				continue;
+		const int indexKF1 = mappoint1->GetIndexInKeyFrame(keyframe1);
+		const int indexKF2 = mappoint2->GetIndexInKeyFrame(keyframe2);
 
-			int indexKF1 = pMP1->GetIndexInKeyFrame(pKF1);
-			int indexKF2 = pMP2->GetIndexInKeyFrame(pKF2);
+		if (indexKF1 < 0 || indexKF2 < 0)
+			continue;
 
-			if (indexKF1 < 0 || indexKF2 < 0)
-				continue;
+		const cv::KeyPoint& keypoint1 = keyframe1->keypointsUn[indexKF1];
+		const cv::KeyPoint& keypoint2 = keyframe2->keypointsUn[indexKF2];
 
-			const cv::KeyPoint &kp1 = pKF1->keypointsUn[indexKF1];
-			const cv::KeyPoint &kp2 = pKF2->keypointsUn[indexKF2];
+		const float sigmaSq1 = keyframe1->pyramid.sigmaSq[keypoint1.octave];
+		const float sigmaSq2 = keyframe2->pyramid.sigmaSq[keypoint2.octave];
 
-			const float sigmaSquare1 = pKF1->pyramid.sigmaSq[kp1.octave];
-			const float sigmaSquare2 = pKF2->pyramid.sigmaSq[kp2.octave];
+		maxErrorSq1_.push_back(9.21 * sigmaSq1);
+		maxErrorSq2_.push_back(9.21 * sigmaSq2);
 
-			mvnMaxError1.push_back(9.210*sigmaSquare1);
-			mvnMaxError2.push_back(9.210*sigmaSquare2);
+		const cv::Mat X3D1w = mappoint1->GetWorldPos();
+		const cv::Mat X3D2w = mappoint2->GetWorldPos();
+		Xc1_.push_back(Rcw1 * X3D1w + tcw1);
+		Xc2_.push_back(Rcw2 * X3D2w + tcw2);
 
-			mvpMapPoints1.push_back(pMP1);
-			mvpMapPoints2.push_back(pMP2);
-			mvnIndices1.push_back(i1);
-
-			cv::Mat X3D1w = pMP1->GetWorldPos();
-			mvX3Dc1.push_back(Rcw1*X3D1w + tcw1);
-
-			cv::Mat X3D2w = pMP2->GetWorldPos();
-			mvX3Dc2.push_back(Rcw2*X3D2w + tcw2);
-
-			mvAllIndices.push_back(idx);
-			idx++;
-		}
+		indices1_.push_back(i1);
+		allIndices.push_back(idx++);
 	}
 
-	mK1 = pKF1->camera.Mat();
-	mK2 = pKF2->camera.Mat();
+	K1_ = keyframe1->camera.Mat();
+	K2_ = keyframe2->camera.Mat();
 
-	FromCameraToImage(mvX3Dc1, mvP1im1, mK1);
-	FromCameraToImage(mvX3Dc2, mvP2im2, mK2);
+	FromCameraToImage(Xc1_, points1_, K1_);
+	FromCameraToImage(Xc2_, points2_, K2_);
 
 	SetRansacParameters();
 }
@@ -283,7 +269,7 @@ void Sim3Solver::SetRansacParameters(double probability, int minInliers, int max
 	mRansacMinInliers = minInliers;
 	mRansacMaxIts = maxIterations;
 
-	N = mvpMapPoints1.size(); // number of correspondences
+	N = static_cast<int>(allIndices.size()); // number of correspondences
 
 	mvbInliersi.resize(N);
 
@@ -300,13 +286,13 @@ void Sim3Solver::SetRansacParameters(double probability, int minInliers, int max
 
 	mRansacMaxIts = std::max(1, std::min(nIterations, mRansacMaxIts));
 
-	mnIterations = 0;
+	iterations_ = 0;
 }
 
 cv::Mat Sim3Solver::iterate(int nIterations, bool &bNoMore, std::vector<bool> &vbInliers, int &nInliers)
 {
 	bNoMore = false;
-	vbInliers = std::vector<bool>(mN1, false);
+	vbInliers = std::vector<bool>(nkeypoints1_, false);
 	nInliers = 0;
 
 	if (N < mRansacMinInliers)
@@ -321,12 +307,12 @@ cv::Mat Sim3Solver::iterate(int nIterations, bool &bNoMore, std::vector<bool> &v
 	cv::Mat P3Dc2i(3, 3, CV_32F);
 
 	int nCurrentIterations = 0;
-	while (mnIterations < mRansacMaxIts && nCurrentIterations < nIterations)
+	while (iterations_ < mRansacMaxIts && nCurrentIterations < nIterations)
 	{
 		nCurrentIterations++;
-		mnIterations++;
+		iterations_++;
 
-		vAvailableIndices = mvAllIndices;
+		vAvailableIndices = allIndices;
 
 		// Get min set of points
 		for (short i = 0; i < 3; ++i)
@@ -335,32 +321,32 @@ cv::Mat Sim3Solver::iterate(int nIterations, bool &bNoMore, std::vector<bool> &v
 
 			int idx = vAvailableIndices[randi];
 
-			mvX3Dc1[idx].copyTo(P3Dc1i.col(i));
-			mvX3Dc2[idx].copyTo(P3Dc2i.col(i));
+			Xc1_[idx].copyTo(P3Dc1i.col(i));
+			Xc2_[idx].copyTo(P3Dc2i.col(i));
 
 			vAvailableIndices[randi] = vAvailableIndices.back();
 			vAvailableIndices.pop_back();
 		}
 
 		Sim3 S12, S21;
-		ComputeSim3(P3Dc1i, P3Dc2i, S12, S21, mbFixScale);
+		ComputeSim3(P3Dc1i, P3Dc2i, S12, S21, fixScale_);
 
 		//CheckInliers();
 		std::vector<cv::Mat> vP1im2, vP2im1;
-		Project(mvX3Dc2, vP2im1, S12.T, mK1);
-		Project(mvX3Dc1, vP1im2, S21.T, mK2);
+		Project(Xc2_, vP2im1, S12.T, K1_);
+		Project(Xc1_, vP1im2, S21.T, K2_);
 
 		int mnInliersi = 0;
 
-		for (size_t i = 0; i < mvP1im1.size(); i++)
+		for (size_t i = 0; i < points1_.size(); i++)
 		{
-			cv::Mat dist1 = mvP1im1[i] - vP2im1[i];
-			cv::Mat dist2 = vP1im2[i] - mvP2im2[i];
+			cv::Mat dist1 = points1_[i] - vP2im1[i];
+			cv::Mat dist2 = vP1im2[i] - points2_[i];
 
 			const float err1 = dist1.dot(dist1);
 			const float err2 = dist2.dot(dist2);
 
-			if (err1 < mvnMaxError1[i] && err2 < mvnMaxError2[i])
+			if (err1 < maxErrorSq1_[i] && err2 < maxErrorSq2_[i])
 			{
 				mvbInliersi[i] = true;
 				mnInliersi++;
@@ -369,10 +355,10 @@ cv::Mat Sim3Solver::iterate(int nIterations, bool &bNoMore, std::vector<bool> &v
 				mvbInliersi[i] = false;
 		}
 
-		if (mnInliersi >= mnBestInliers)
+		if (mnInliersi >= maxInliers_)
 		{
 			mvbBestInliers = mvbInliersi;
-			mnBestInliers = mnInliersi;
+			maxInliers_ = mnInliersi;
 			mBestT12 = S12.T.clone();
 			mBestRotation = S12.R.clone();
 			mBestTranslation = S12.t.clone();
@@ -383,13 +369,13 @@ cv::Mat Sim3Solver::iterate(int nIterations, bool &bNoMore, std::vector<bool> &v
 				nInliers = mnInliersi;
 				for (int i = 0; i < N; i++)
 					if (mvbInliersi[i])
-						vbInliers[mvnIndices1[i]] = true;
+						vbInliers[indices1_[i]] = true;
 				return mBestT12;
 			}
 		}
 	}
 
-	if (mnIterations >= mRansacMaxIts)
+	if (iterations_ >= mRansacMaxIts)
 		bNoMore = true;
 
 	return cv::Mat();
