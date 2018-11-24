@@ -21,12 +21,9 @@
 #ifndef FRAMEDRAWER_H
 #define FRAMEDRAWER_H
 
-//#include "Tracking.h"
-//#include "MapPoint.h"
-//#include "Map.h"
+#include <mutex>
 
 #include <opencv2/opencv.hpp>
-#include <mutex>
 
 namespace ORB_SLAM2
 {
@@ -37,6 +34,7 @@ class Tracking;
 class FrameDrawer
 {
 public:
+
 	FrameDrawer(Map* pMap);
 
 	// Update info from the last processed frame.
@@ -45,7 +43,7 @@ public:
 	// Draw last processed frame.
 	cv::Mat DrawFrame();
 
-protected:
+private:
 
 	// Info of the frame to be drawn
 	cv::Mat image_;
