@@ -50,11 +50,12 @@ public:
 
 	cv::Mat find(std::vector<bool> &vbInliers12, int &nInliers);
 
-	cv::Mat iterate(int nIterations, bool &bNoMore, std::vector<bool> &vbInliers);
-
-	cv::Mat GetEstimatedRotation();
+	//cv::Mat iterate(int nIterations, bool &bNoMore, std::vector<bool> &vbInliers);
+	bool iterate(int maxk, Sim3& sim3, std::vector<bool>& isInlier);
+	bool terminate() const;
+	/*cv::Mat GetEstimatedRotation();
 	cv::Mat GetEstimatedTranslation();
-	float GetEstimatedScale();
+	float GetEstimatedScale();*/
 
 private:
 
@@ -72,10 +73,11 @@ private:
 	// Current Ransac State
 	int iterations_;
 	int maxInliers_;
-	cv::Mat bestT12_;
+	Sim3 bestS12_;
+	/*cv::Mat bestT12_;
 	cv::Mat bestRotation_;
 	cv::Mat bestTranslation_;
-	float bestScale_;
+	float bestScale_;*/
 
 	// Scale is fixed to 1 in the stereo/RGBD case
 	bool fixScale_;
@@ -99,6 +101,8 @@ private:
 	// Calibration
 	cv::Mat K1_;
 	cv::Mat K2_;
+
+	bool terminate_;
 };
 
 } //namespace ORB_SLAM

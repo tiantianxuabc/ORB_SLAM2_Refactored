@@ -36,6 +36,14 @@ namespace ORB_SLAM2
 
 using Sim3 = Sim3Solver::Sim3;
 
+static void CopySim3(const Sim3& src, Sim3& dst)
+{
+	dst.T = src.T.clone();
+	dst.R = src.R.clone();
+	dst.t = src.t.clone();
+	dst.scale = src.scale;
+}
+
 static void ComputeCentroid(const cv::Mat &P, cv::Mat &Pr, cv::Mat &C)
 {
 	cv::reduce(P, C, 1, CV_REDUCE_SUM);
@@ -286,15 +294,15 @@ void Sim3Solver::SetRansacParameters(double probability, int minInliers, int max
 	iterations_ = 0;
 }
 
-cv::Mat Sim3Solver::iterate(int maxk, bool& terminate, std::vector<bool>& isInlier)
+bool Sim3Solver::iterate(int maxk, Sim3& sim3, std::vector<bool>& isInlier)
 {
-	terminate = false;
+	terminate_ = false;
 	isInlier.assign(nkeypoints1_, false);
 	
 	if (N < minInliers_)
 	{
-		terminate = true;
-		return cv::Mat();
+		terminate_ = true;
+		return false;
 	}
 
 	std::vector<size_t> availableIndices;
@@ -343,42 +351,43 @@ cv::Mat Sim3Solver::iterate(int maxk, bool& terminate, std::vector<bool>& isInli
 
 		if (ninliers >= maxInliers_)
 		{
-			//bestInliers_ = inliers_;
 			maxInliers_ = ninliers;
-			bestT12_ = S12.T.clone();
-			bestRotation_ = S12.R.clone();
-			bestTranslation_ = S12.t.clone();
-			bestScale_ = S12.scale;
-
+			CopySim3(S12, bestS12_);
 			if (ninliers > minInliers_)
 			{
+				CopySim3(bestS12_, sim3);
 				for (int i = 0; i < N; i++)
 					if (inliers_[i])
 						isInlier[indices1_[i]] = true;
-				return bestT12_;
+				return true;
 			}
 		}
 	}
 
 	if (iterations_ >= maxIterations_)
-		terminate = true;
+		terminate_ = true;
 
-	return cv::Mat();
+	return false;
 }
 
-cv::Mat Sim3Solver::GetEstimatedRotation()
+bool Sim3Solver::terminate() const
 {
-	return bestRotation_.clone();
+	return terminate_;
 }
 
-cv::Mat Sim3Solver::GetEstimatedTranslation()
-{
-	return bestTranslation_.clone();
-}
-
-float Sim3Solver::GetEstimatedScale()
-{
-	return bestScale_;
-}
+//cv::Mat Sim3Solver::GetEstimatedRotation()
+//{
+//	return bestRotation_.clone();
+//}
+//
+//cv::Mat Sim3Solver::GetEstimatedTranslation()
+//{
+//	return bestTranslation_.clone();
+//}
+//
+//float Sim3Solver::GetEstimatedScale()
+//{
+//	return bestScale_;
+//}
 
 } //namespace ORB_SLAM

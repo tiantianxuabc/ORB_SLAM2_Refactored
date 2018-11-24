@@ -118,28 +118,27 @@ public:
 
 				// Perform 5 Ransac Iterations
 				std::vector<bool> isInlier;
-				bool terminate;
-
 				Sim3Solver* solver = solvers[i];
-				cv::Mat Scm = solver->iterate(5, terminate, isInlier);
-
+				Sim3Solver::Sim3 sim3;
+				const bool found = solver->iterate(5, sim3, isInlier);
+				
 				// If Ransac reachs max. iterations discard keyframe
-				if (terminate)
+				if (solver->terminate())
 				{
 					discarded[i] = true;
 					ncandidates--;
 				}
 
 				// If RANSAC returns a Sim3, perform a guided matching and optimize with all correspondences
-				if (!Scm.empty())
+				if (found)
 				{
 					std::vector<MapPoint*> matches(vmatches[i].size());
 					for (size_t j = 0; j < isInlier.size(); j++)
 						matches[j] = isInlier[j] ? vmatches[i][j] : nullptr;
 
-					const cv::Mat R = solver->GetEstimatedRotation();
-					const cv::Mat t = solver->GetEstimatedTranslation();
-					const float s = solver->GetEstimatedScale();
+					const cv::Mat R = sim3.R;
+					const cv::Mat t = sim3.t;
+					const float s = sim3.scale;
 					matcher.SearchBySim3(currentKF, candidateKF, matches, s, R, t, 7.5f);
 
 					g2o::Sim3 Scm(Converter::toMatrix3d(R), Converter::toVector3d(t), s);
