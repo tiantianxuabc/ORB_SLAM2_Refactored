@@ -192,23 +192,23 @@ static void Project(const std::vector<cv::Mat>& points3D, std::vector<cv::Mat>& 
 	}
 }
 
-static void FromCameraToImage(const std::vector<cv::Mat> &vP3Dc, std::vector<cv::Mat> &vP2D, cv::Mat K)
+static void FromCameraToImage(const std::vector<cv::Mat>& points3D, std::vector<cv::Mat>& points2D,
+	const CameraParams& camera)
 {
-	const float &fx = K.at<float>(0, 0);
-	const float &fy = K.at<float>(1, 1);
-	const float &cx = K.at<float>(0, 2);
-	const float &cy = K.at<float>(1, 2);
+	const float fx = camera.fx;
+	const float fy = camera.fy;
+	const float cx = camera.cx;
+	const float cy = camera.cy;
 
-	vP2D.clear();
-	vP2D.reserve(vP3Dc.size());
+	points2D.clear();
+	points2D.reserve(points3D.size());
 
-	for (size_t i = 0, iend = vP3Dc.size(); i < iend; i++)
+	for (size_t i = 0; i < points3D.size(); i++)
 	{
-		const float invz = 1 / (vP3Dc[i].at<float>(2));
-		const float x = vP3Dc[i].at<float>(0)*invz;
-		const float y = vP3Dc[i].at<float>(1)*invz;
-
-		vP2D.push_back((cv::Mat_<float>(2, 1) << fx*x + cx, fy*y + cy));
+		const float invZ = 1 / (points3D[i].at<float>(2));
+		const float u = points3D[i].at<float>(0) * invZ;
+		const float v = points3D[i].at<float>(1) * invZ;
+		points2D.push_back((cv::Mat_<float>(2, 1) << fx * u + cx, fy * v + cy));
 	}
 }
 
@@ -266,8 +266,8 @@ Sim3Solver::Sim3Solver(const KeyFrame* keyframe1, const KeyFrame* keyframe2, con
 	camera1_ = keyframe1->camera;
 	camera2_ = keyframe2->camera;
 
-	FromCameraToImage(Xc1_, points1_, camera1_.Mat());
-	FromCameraToImage(Xc2_, points2_, camera2_.Mat());
+	FromCameraToImage(Xc1_, points1_, camera1_);
+	FromCameraToImage(Xc2_, points2_, camera2_);
 
 	SetRansacParameters();
 }
