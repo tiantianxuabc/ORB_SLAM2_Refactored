@@ -27,7 +27,6 @@
 #include <opencv2/opencv.hpp>
 
 #include "Viewer.h"
-//#include "FrameDrawer.h"
 #include "Map.h"
 #include "LocalMapping.h"
 #include "LoopClosing.h"
@@ -37,7 +36,6 @@
 #include "KeyFrameDatabase.h"
 #include "ORBextractor.h"
 #include "Initializer.h"
-//#include "MapDrawer.h"
 #include "System.h"
 #include "PnPsolver.h"
 #include "Usleep.h"

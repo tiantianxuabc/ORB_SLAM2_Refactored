@@ -33,8 +33,6 @@ namespace ORB_SLAM2
 {
 
 class System;
-//class FrameDrawer;
-//class MapDrawer;
 class Map;
 class KeyFrameDatabase;
 class LocalMapping;

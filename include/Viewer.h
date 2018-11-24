@@ -73,8 +73,7 @@ private:
 	System* system_;
 	std::unique_ptr<FrameDrawer> frameDrawer_;
 	std::unique_ptr<MapDrawer> mapDrawer_;
-	//Tracking* tracker_;
-
+	
 	// 1/fps in ms
 	int waittime_;
 	

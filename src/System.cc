@@ -28,8 +28,6 @@
 
 #include "KeyFrame.h"
 #include "Tracking.h"
-//#include "FrameDrawer.h"
-//#include "MapDrawer.h"
 #include "Map.h"
 #include "LocalMapping.h"
 #include "LoopClosing.h"
@@ -187,10 +185,6 @@ public:
 
 		//Create the Map
 		map_ = std::make_shared<Map>();
-
-		//Create Drawers. These are used by the Viewer
-		//frameDrawer_ = std::make_shared<FrameDrawer>(map_.get());
-		//mapDrawer_ = std::make_shared<MapDrawer>(map_.get(), settingsFile);
 
 		//Initialize the Tracking thread
 		//(it will live in the main thread of execution, the one that called this constructor)
@@ -566,9 +560,6 @@ private:
 
 	// The viewer draws the map and the current camera pose. It uses Pangolin.
 	std::shared_ptr<Viewer> viewer_;
-
-	//std::shared_ptr<FrameDrawer> frameDrawer_;
-	//std::shared_ptr<MapDrawer> mapDrawer_;
 
 	// System threads: Local Mapping, Loop Closing, Viewer.
 	// The Tracking thread "lives" in the main execution thread that creates the System object.
