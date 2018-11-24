@@ -71,11 +71,11 @@ static void GetCurrentOpenGLCameraMatrix(const cv::Mat& Tcw, pangolin::OpenGlMat
 	}
 }
 
-static void DrawCurrentCamera(pangolin::OpenGlMatrix &Twc, float cameraSize = 0.7f, float cameraLineWidth = 3.f)
+static void DrawCurrentCamera(const pangolin::OpenGlMatrix &Twc, float cameraSize = 0.7f, float cameraLineWidth = 3.f)
 {
-	const float &w = cameraSize;
-	const float h = w*0.75;
-	const float z = w*0.6;
+	const float w = cameraSize;
+	const float h = 0.75f * w;
+	const float z = 0.6f * w;
 
 	glPushMatrix();
 
