@@ -1310,12 +1310,13 @@ int ORBmatcher::SearchByProjection(Frame& currFrame, const Frame& lastFrame, flo
 	return nmatches;
 }
 
-int ORBmatcher::SearchByProjection(Frame &CurrentFrame, KeyFrame *pKF, const set<MapPoint*> &sAlreadyFound, const float th, const int ORBdist)
+int ORBmatcher::SearchByProjection(Frame& currFrame, KeyFrame* keyframe, const std::set<MapPoint*>& alreadyFound,
+	const float th, const int ORBdist)
 {
 	int nmatches = 0;
 
-	const cv::Mat Rcw = CurrentFrame.pose.Tcw.rowRange(0, 3).colRange(0, 3);
-	const cv::Mat tcw = CurrentFrame.pose.Tcw.rowRange(0, 3).col(3);
+	const cv::Mat Rcw = currFrame.pose.Tcw.rowRange(0, 3).colRange(0, 3);
+	const cv::Mat tcw = currFrame.pose.Tcw.rowRange(0, 3).col(3);
 	const cv::Mat Ow = -Rcw.t()*tcw;
 
 	// Rotation Histogram (to check rotation consistency)
@@ -1324,7 +1325,7 @@ int ORBmatcher::SearchByProjection(Frame &CurrentFrame, KeyFrame *pKF, const set
 		rotHist[i].reserve(500);
 	const float factor = 1.0f / HISTO_LENGTH;
 
-	const vector<MapPoint*> vpMPs = pKF->GetMapPointMatches();
+	const vector<MapPoint*> vpMPs = keyframe->GetMapPointMatches();
 
 	for (size_t i = 0, iend = vpMPs.size(); i < iend; i++)
 	{
@@ -1332,7 +1333,7 @@ int ORBmatcher::SearchByProjection(Frame &CurrentFrame, KeyFrame *pKF, const set
 
 		if (pMP)
 		{
-			if (!pMP->isBad() && !sAlreadyFound.count(pMP))
+			if (!pMP->isBad() && !alreadyFound.count(pMP))
 			{
 				//Project
 				cv::Mat x3Dw = pMP->GetWorldPos();
@@ -1342,14 +1343,14 @@ int ORBmatcher::SearchByProjection(Frame &CurrentFrame, KeyFrame *pKF, const set
 				const float yc = x3Dc.at<float>(1);
 				const float invzc = 1.0 / x3Dc.at<float>(2);
 
-				const float u = CurrentFrame.camera.fx*xc*invzc + CurrentFrame.camera.cx;
-				const float v = CurrentFrame.camera.fy*yc*invzc + CurrentFrame.camera.cy;
+				const float u = currFrame.camera.fx*xc*invzc + currFrame.camera.cx;
+				const float v = currFrame.camera.fy*yc*invzc + currFrame.camera.cy;
 
 				/*if(u<CurrentFrame.mnMinX || u>CurrentFrame.mnMaxX)
 					continue;
 				if(v<CurrentFrame.mnMinY || v>CurrentFrame.mnMaxY)
 					continue;*/
-				if (!CurrentFrame.imageBounds.Contains(u, v))
+				if (!currFrame.imageBounds.Contains(u, v))
 					continue;
 
 				// Compute predicted scale level
@@ -1363,12 +1364,12 @@ int ORBmatcher::SearchByProjection(Frame &CurrentFrame, KeyFrame *pKF, const set
 				if (dist3D<minDistance || dist3D>maxDistance)
 					continue;
 
-				int nPredictedLevel = pMP->PredictScale(dist3D, &CurrentFrame);
+				int nPredictedLevel = pMP->PredictScale(dist3D, &currFrame);
 
 				// Search in a window
-				const float radius = th*CurrentFrame.pyramid.scaleFactors[nPredictedLevel];
+				const float radius = th*currFrame.pyramid.scaleFactors[nPredictedLevel];
 
-				const vector<size_t> vIndices2 = CurrentFrame.GetFeaturesInArea(u, v, radius, nPredictedLevel - 1, nPredictedLevel + 1);
+				const vector<size_t> vIndices2 = currFrame.GetFeaturesInArea(u, v, radius, nPredictedLevel - 1, nPredictedLevel + 1);
 
 				if (vIndices2.empty())
 					continue;
@@ -1381,10 +1382,10 @@ int ORBmatcher::SearchByProjection(Frame &CurrentFrame, KeyFrame *pKF, const set
 				for (vector<size_t>::const_iterator vit = vIndices2.begin(); vit != vIndices2.end(); vit++)
 				{
 					const size_t i2 = *vit;
-					if (CurrentFrame.mappoints[i2])
+					if (currFrame.mappoints[i2])
 						continue;
 
-					const cv::Mat &d = CurrentFrame.descriptorsL.row(i2);
+					const cv::Mat &d = currFrame.descriptorsL.row(i2);
 
 					const int dist = DescriptorDistance(dMP, d);
 
@@ -1397,12 +1398,12 @@ int ORBmatcher::SearchByProjection(Frame &CurrentFrame, KeyFrame *pKF, const set
 
 				if (bestDist <= ORBdist)
 				{
-					CurrentFrame.mappoints[bestIdx2] = pMP;
+					currFrame.mappoints[bestIdx2] = pMP;
 					nmatches++;
 
 					if (checkOrientation_)
 					{
-						float rot = pKF->keypointsUn[i].angle - CurrentFrame.keypointsUn[bestIdx2].angle;
+						float rot = keyframe->keypointsUn[i].angle - currFrame.keypointsUn[bestIdx2].angle;
 						if (rot < 0.0)
 							rot += 360.0f;
 						int bin = round(rot*factor);
@@ -1431,7 +1432,7 @@ int ORBmatcher::SearchByProjection(Frame &CurrentFrame, KeyFrame *pKF, const set
 			{
 				for (size_t j = 0, jend = rotHist[i].size(); j < jend; j++)
 				{
-					CurrentFrame.mappoints[rotHist[i][j]] = NULL;
+					currFrame.mappoints[rotHist[i][j]] = NULL;
 					nmatches--;
 				}
 			}
