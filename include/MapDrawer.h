@@ -46,14 +46,14 @@ public:
 
 private:
 
-	Map* mpMap;
+	Map* map_;
 
-	float mKeyFrameSize;
-	float mKeyFrameLineWidth;
-	float mGraphLineWidth;
-	float mPointSize;
-	float mCameraSize;
-	float mCameraLineWidth;
+	float keyFrameSize_;
+	float keyFrameLineWidth_;
+	float graphLineWidth_;
+	float pointSize_;
+	float cameraSize_;
+	float cameraLineWidth_;
 
 	cv::Mat mCameraPose;
 
