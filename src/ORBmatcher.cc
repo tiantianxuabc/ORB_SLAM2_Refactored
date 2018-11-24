@@ -897,7 +897,7 @@ int ORBmatcher::Fuse(KeyFrame* keyframe, const std::vector<MapPoint*>& mappoints
 	return nfused;
 }
 
-int ORBmatcher::Fuse(KeyFrame* keyframe, cv::Mat Scw, const std::vector<MapPoint*>& mappoints,
+int ORBmatcher::Fuse(KeyFrame* keyframe, const cv::Mat& Scw, const std::vector<MapPoint*>& mappoints,
 	float th, std::vector<MapPoint*>& replacePoints)
 {
 	// Get Calibration Parameters for later projection
