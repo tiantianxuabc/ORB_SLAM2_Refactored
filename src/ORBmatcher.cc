@@ -1375,16 +1375,16 @@ int ORBmatcher::SearchByProjection(Frame& currFrame, const Frame& lastFrame, flo
 	vector<int> rotHist[HISTO_LENGTH];
 	for (int i = 0; i < HISTO_LENGTH; i++)
 		rotHist[i].reserve(500);
-	const float factor = 1.0f / HISTO_LENGTH;
+	const float factor = 1.f / HISTO_LENGTH;
 
-	const cv::Mat Rcw = currFrame.pose.Tcw.rowRange(0, 3).colRange(0, 3);
-	const cv::Mat tcw = currFrame.pose.Tcw.rowRange(0, 3).col(3);
+	const cv::Mat Rcw = CameraPose::GetR(currFrame.pose.Tcw);
+	const cv::Mat tcw = CameraPose::Gett(currFrame.pose.Tcw);
 
-	const cv::Mat Rlw = lastFrame.pose.Tcw.rowRange(0, 3).colRange(0, 3);
-	const cv::Mat tlw = lastFrame.pose.Tcw.rowRange(0, 3).col(3);
+	const cv::Mat Rlw = CameraPose::GetR(lastFrame.pose.Tcw);
+	const cv::Mat tlw = CameraPose::Gett(lastFrame.pose.Tcw);
 
 	const cv::Mat twc = -Rcw.t() * tcw;
-	const cv::Mat tlc = Rlw*twc + tlw;
+	const cv::Mat tlc = Rlw * twc + tlw;
 
 	const bool bForward = tlc.at<float>(2) > currFrame.camera.baseline && !monocular;
 	const bool bBackward = -tlc.at<float>(2) > currFrame.camera.baseline && !monocular;
