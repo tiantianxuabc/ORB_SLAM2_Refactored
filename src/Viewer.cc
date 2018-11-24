@@ -30,6 +30,9 @@
 #include "System.h"
 #include "Usleep.h"
 
+#define LOCK_MUTEX_STOP()   std::unique_lock<std::mutex> lock1(mutexStop_);
+#define LOCK_MUTEX_FINISH() std::unique_lock<std::mutex> lock2(mutexFinish_);
+
 namespace ORB_SLAM2
 {
 
@@ -177,45 +180,45 @@ void Viewer::Run()
 
 void Viewer::RequestFinish()
 {
-	unique_lock<mutex> lock(mMutexFinish);
+	LOCK_MUTEX_FINISH();
 	finishRequested_ = true;
 }
 
 bool Viewer::CheckFinish()
 {
-	unique_lock<mutex> lock(mMutexFinish);
+	LOCK_MUTEX_FINISH();
 	return finishRequested_;
 }
 
 void Viewer::SetFinish()
 {
-	unique_lock<mutex> lock(mMutexFinish);
+	LOCK_MUTEX_FINISH();
 	finished_ = true;
 }
 
 bool Viewer::isFinished()
 {
-	unique_lock<mutex> lock(mMutexFinish);
+	LOCK_MUTEX_FINISH();
 	return finished_;
 }
 
 void Viewer::RequestStop()
 {
-	unique_lock<mutex> lock(mMutexStop);
+	LOCK_MUTEX_STOP();
 	if (!stopped_)
 		stopRequested_ = true;
 }
 
 bool Viewer::isStopped()
 {
-	unique_lock<mutex> lock(mMutexStop);
+	LOCK_MUTEX_STOP();
 	return stopped_;
 }
 
 bool Viewer::Stop()
 {
-	unique_lock<mutex> lock(mMutexStop);
-	unique_lock<mutex> lock2(mMutexFinish);
+	LOCK_MUTEX_STOP();
+	LOCK_MUTEX_FINISH();
 
 	if (finishRequested_)
 		return false;
@@ -232,7 +235,7 @@ bool Viewer::Stop()
 
 void Viewer::Release()
 {
-	unique_lock<mutex> lock(mMutexStop);
+	LOCK_MUTEX_STOP();
 	stopped_ = false;
 }
 

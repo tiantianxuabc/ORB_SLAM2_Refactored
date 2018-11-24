@@ -75,8 +75,8 @@ private:
 	bool stopped_;
 	bool stopRequested_;
 
-	std::mutex mMutexFinish;
-	std::mutex mMutexStop;
+	std::mutex mutexFinish_;
+	std::mutex mutexStop_;
 };
 
 }
