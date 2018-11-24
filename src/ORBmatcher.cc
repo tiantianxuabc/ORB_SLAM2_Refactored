@@ -475,32 +475,33 @@ int ORBmatcher::SearchByProjection(const KeyFrame* keyframe, const cv::Mat& Scw,
 	return nmatches;
 }
 
-int ORBmatcher::SearchForInitialization(Frame &F1, Frame &F2, vector<cv::Point2f> &vbPrevMatched, vector<int> &vnMatches12, int windowSize)
+int ORBmatcher::SearchForInitialization(Frame& frame1, Frame& frame2, std::vector<cv::Point2f>& prevMatched,
+	std::vector<int>& matches12, int windowSize)
 {
 	int nmatches = 0;
-	vnMatches12 = vector<int>(F1.keypointsUn.size(), -1);
+	matches12 = vector<int>(frame1.keypointsUn.size(), -1);
 
 	vector<int> rotHist[HISTO_LENGTH];
 	for (int i = 0; i < HISTO_LENGTH; i++)
 		rotHist[i].reserve(500);
 	const float factor = 1.0f / HISTO_LENGTH;
 
-	vector<int> vMatchedDistance(F2.keypointsUn.size(), INT_MAX);
-	vector<int> vnMatches21(F2.keypointsUn.size(), -1);
+	vector<int> vMatchedDistance(frame2.keypointsUn.size(), INT_MAX);
+	vector<int> vnMatches21(frame2.keypointsUn.size(), -1);
 
-	for (size_t i1 = 0, iend1 = F1.keypointsUn.size(); i1 < iend1; i1++)
+	for (size_t i1 = 0, iend1 = frame1.keypointsUn.size(); i1 < iend1; i1++)
 	{
-		cv::KeyPoint kp1 = F1.keypointsUn[i1];
+		cv::KeyPoint kp1 = frame1.keypointsUn[i1];
 		int level1 = kp1.octave;
 		if (level1 > 0)
 			continue;
 
-		vector<size_t> vIndices2 = F2.GetFeaturesInArea(vbPrevMatched[i1].x, vbPrevMatched[i1].y, windowSize, level1, level1);
+		vector<size_t> vIndices2 = frame2.GetFeaturesInArea(prevMatched[i1].x, prevMatched[i1].y, windowSize, level1, level1);
 
 		if (vIndices2.empty())
 			continue;
 
-		cv::Mat d1 = F1.descriptorsL.row(i1);
+		cv::Mat d1 = frame1.descriptorsL.row(i1);
 
 		int bestDist = INT_MAX;
 		int bestDist2 = INT_MAX;
@@ -510,7 +511,7 @@ int ORBmatcher::SearchForInitialization(Frame &F1, Frame &F2, vector<cv::Point2f
 		{
 			size_t i2 = *vit;
 
-			cv::Mat d2 = F2.descriptorsL.row(i2);
+			cv::Mat d2 = frame2.descriptorsL.row(i2);
 
 			int dist = DescriptorDistance(d1, d2);
 
@@ -535,17 +536,17 @@ int ORBmatcher::SearchForInitialization(Frame &F1, Frame &F2, vector<cv::Point2f
 			{
 				if (vnMatches21[bestIdx2] >= 0)
 				{
-					vnMatches12[vnMatches21[bestIdx2]] = -1;
+					matches12[vnMatches21[bestIdx2]] = -1;
 					nmatches--;
 				}
-				vnMatches12[i1] = bestIdx2;
+				matches12[i1] = bestIdx2;
 				vnMatches21[bestIdx2] = i1;
 				vMatchedDistance[bestIdx2] = bestDist;
 				nmatches++;
 
 				if (checkOrientation_)
 				{
-					float rot = F1.keypointsUn[i1].angle - F2.keypointsUn[bestIdx2].angle;
+					float rot = frame1.keypointsUn[i1].angle - frame2.keypointsUn[bestIdx2].angle;
 					if (rot < 0.0)
 						rot += 360.0f;
 					int bin = round(rot*factor);
@@ -574,9 +575,9 @@ int ORBmatcher::SearchForInitialization(Frame &F1, Frame &F2, vector<cv::Point2f
 			for (size_t j = 0, jend = rotHist[i].size(); j < jend; j++)
 			{
 				int idx1 = rotHist[i][j];
-				if (vnMatches12[idx1] >= 0)
+				if (matches12[idx1] >= 0)
 				{
-					vnMatches12[idx1] = -1;
+					matches12[idx1] = -1;
 					nmatches--;
 				}
 			}
@@ -585,9 +586,9 @@ int ORBmatcher::SearchForInitialization(Frame &F1, Frame &F2, vector<cv::Point2f
 	}
 
 	//Update prev matched
-	for (size_t i1 = 0, iend1 = vnMatches12.size(); i1 < iend1; i1++)
-		if (vnMatches12[i1] >= 0)
-			vbPrevMatched[i1] = F2.keypointsUn[vnMatches12[i1]].pt;
+	for (size_t i1 = 0, iend1 = matches12.size(); i1 < iend1; i1++)
+		if (matches12[i1] >= 0)
+			prevMatched[i1] = frame2.keypointsUn[matches12[i1]].pt;
 
 	return nmatches;
 }
