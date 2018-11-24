@@ -845,31 +845,31 @@ int ORBmatcher::SearchForTriangulation(const KeyFrame* keyframe1, const KeyFrame
 	return nmatches;
 }
 
-int ORBmatcher::Fuse(KeyFrame *pKF, const vector<MapPoint *> &vpMapPoints, float th)
+int ORBmatcher::Fuse(KeyFrame* keyframe, const std::vector<MapPoint*>& mappoints, float th)
 {
-	cv::Mat Rcw = pKF->GetRotation();
-	cv::Mat tcw = pKF->GetTranslation();
+	cv::Mat Rcw = keyframe->GetRotation();
+	cv::Mat tcw = keyframe->GetTranslation();
 
-	const float &fx = pKF->camera.fx;
-	const float &fy = pKF->camera.fy;
-	const float &cx = pKF->camera.cx;
-	const float &cy = pKF->camera.cy;
-	const float &bf = pKF->camera.bf;
+	const float &fx = keyframe->camera.fx;
+	const float &fy = keyframe->camera.fy;
+	const float &cx = keyframe->camera.cx;
+	const float &cy = keyframe->camera.cy;
+	const float &bf = keyframe->camera.bf;
 
-	cv::Mat Ow = pKF->GetCameraCenter();
+	cv::Mat Ow = keyframe->GetCameraCenter();
 
 	int nFused = 0;
 
-	const int nMPs = vpMapPoints.size();
+	const int nMPs = mappoints.size();
 
 	for (int i = 0; i < nMPs; i++)
 	{
-		MapPoint* pMP = vpMapPoints[i];
+		MapPoint* pMP = mappoints[i];
 
 		if (!pMP)
 			continue;
 
-		if (pMP->isBad() || pMP->IsInKeyFrame(pKF))
+		if (pMP->isBad() || pMP->IsInKeyFrame(keyframe))
 			continue;
 
 		cv::Mat p3Dw = pMP->GetWorldPos();
@@ -887,7 +887,7 @@ int ORBmatcher::Fuse(KeyFrame *pKF, const vector<MapPoint *> &vpMapPoints, float
 		const float v = fy*y + cy;
 
 		// Point must be inside the image
-		if (!pKF->IsInImage(u, v))
+		if (!keyframe->IsInImage(u, v))
 			continue;
 
 		const float ur = u - bf*invz;
@@ -907,12 +907,12 @@ int ORBmatcher::Fuse(KeyFrame *pKF, const vector<MapPoint *> &vpMapPoints, float
 		if (PO.dot(Pn) < 0.5*dist3D)
 			continue;
 
-		int nPredictedLevel = pMP->PredictScale(dist3D, pKF);
+		int nPredictedLevel = pMP->PredictScale(dist3D, keyframe);
 
 		// Search in a radius
-		const float radius = th*pKF->pyramid.scaleFactors[nPredictedLevel];
+		const float radius = th*keyframe->pyramid.scaleFactors[nPredictedLevel];
 
-		const vector<size_t> vIndices = pKF->GetFeaturesInArea(u, v, radius);
+		const vector<size_t> vIndices = keyframe->GetFeaturesInArea(u, v, radius);
 
 		if (vIndices.empty())
 			continue;
@@ -927,25 +927,25 @@ int ORBmatcher::Fuse(KeyFrame *pKF, const vector<MapPoint *> &vpMapPoints, float
 		{
 			const size_t idx = *vit;
 
-			const cv::KeyPoint &kp = pKF->keypointsUn[idx];
+			const cv::KeyPoint &kp = keyframe->keypointsUn[idx];
 
 			const int &kpLevel = kp.octave;
 
 			if (kpLevel<nPredictedLevel - 1 || kpLevel>nPredictedLevel)
 				continue;
 
-			if (pKF->uright[idx] >= 0)
+			if (keyframe->uright[idx] >= 0)
 			{
 				// Check reprojection error in stereo
 				const float &kpx = kp.pt.x;
 				const float &kpy = kp.pt.y;
-				const float &kpr = pKF->uright[idx];
+				const float &kpr = keyframe->uright[idx];
 				const float ex = u - kpx;
 				const float ey = v - kpy;
 				const float er = ur - kpr;
 				const float e2 = ex*ex + ey*ey + er*er;
 
-				if (e2*pKF->pyramid.invSigmaSq[kpLevel] > 7.8)
+				if (e2*keyframe->pyramid.invSigmaSq[kpLevel] > 7.8)
 					continue;
 			}
 			else
@@ -956,11 +956,11 @@ int ORBmatcher::Fuse(KeyFrame *pKF, const vector<MapPoint *> &vpMapPoints, float
 				const float ey = v - kpy;
 				const float e2 = ex*ex + ey*ey;
 
-				if (e2*pKF->pyramid.invSigmaSq[kpLevel] > 5.99)
+				if (e2*keyframe->pyramid.invSigmaSq[kpLevel] > 5.99)
 					continue;
 			}
 
-			const cv::Mat &dKF = pKF->descriptorsL.row(idx);
+			const cv::Mat &dKF = keyframe->descriptorsL.row(idx);
 
 			const int dist = DescriptorDistance(dMP, dKF);
 
@@ -974,7 +974,7 @@ int ORBmatcher::Fuse(KeyFrame *pKF, const vector<MapPoint *> &vpMapPoints, float
 		// If there is already a MapPoint replace otherwise add new measurement
 		if (bestDist <= TH_LOW)
 		{
-			MapPoint* pMPinKF = pKF->GetMapPoint(bestIdx);
+			MapPoint* pMPinKF = keyframe->GetMapPoint(bestIdx);
 			if (pMPinKF)
 			{
 				if (!pMPinKF->isBad())
@@ -987,8 +987,8 @@ int ORBmatcher::Fuse(KeyFrame *pKF, const vector<MapPoint *> &vpMapPoints, float
 			}
 			else
 			{
-				pMP->AddObservation(pKF, bestIdx);
-				pKF->AddMapPoint(pMP, bestIdx);
+				pMP->AddObservation(keyframe, bestIdx);
+				keyframe->AddMapPoint(pMP, bestIdx);
 			}
 			nFused++;
 		}
