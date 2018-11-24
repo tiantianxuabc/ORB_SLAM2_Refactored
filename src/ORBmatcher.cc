@@ -607,11 +607,10 @@ int ORBmatcher::SearchForInitialization(Frame &F1, Frame &F2, vector<cv::Point2f
 int ORBmatcher::SearchByBoW(KeyFrame* keyframe1, KeyFrame* keyframe2, std::vector<MapPoint*>& matches12)
 {
 	const std::vector<cv::KeyPoint>& keypoints1 = keyframe1->keypointsUn;
+	const std::vector<cv::KeyPoint>& keypoints2 = keyframe2->keypointsUn;
 	const std::vector<MapPoint*> mappoints1 = keyframe1->GetMapPointMatches();
+	const std::vector<MapPoint*> mappoints2 = keyframe2->GetMapPointMatches();
 	const cv::Mat& descriptors1 = keyframe1->descriptorsL;
-
-	const vector<cv::KeyPoint>& keypoints2 = keyframe2->keypointsUn;
-	const vector<MapPoint*> mappoints2 = keyframe2->GetMapPointMatches();
 	const cv::Mat& descriptors2 = keyframe2->descriptorsL;
 
 	matches12.assign(mappoints1.size(), nullptr);
