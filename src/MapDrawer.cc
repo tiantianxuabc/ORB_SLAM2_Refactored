@@ -28,30 +28,29 @@ namespace ORB_SLAM2
 {
 
 
-MapDrawer::MapDrawer(Map* pMap, const std::string &strSettingPath) :mpMap(pMap)
+MapDrawer::MapDrawer(Map* map, const std::string &settingsFile) : map_(map)
 {
-	cv::FileStorage fSettings(strSettingPath, cv::FileStorage::READ);
+	cv::FileStorage settings(settingsFile, cv::FileStorage::READ);
 
-	mKeyFrameSize = fSettings["Viewer.KeyFrameSize"];
-	mKeyFrameLineWidth = fSettings["Viewer.KeyFrameLineWidth"];
-	mGraphLineWidth = fSettings["Viewer.GraphLineWidth"];
-	mPointSize = fSettings["Viewer.PointSize"];
-	mCameraSize = fSettings["Viewer.CameraSize"];
-	mCameraLineWidth = fSettings["Viewer.CameraLineWidth"];
-
+	keyFrameSize_ = settings["Viewer.KeyFrameSize"];
+	keyFrameLineWidth_ = settings["Viewer.KeyFrameLineWidth"];
+	graphLineWidth_ = settings["Viewer.GraphLineWidth"];
+	pointSize_ = settings["Viewer.PointSize"];
+	cameraSize_ = settings["Viewer.CameraSize"];
+	cameraLineWidth_ = settings["Viewer.CameraLineWidth"];
 }
 
 void MapDrawer::DrawMapPoints()
 {
-	const std::vector<MapPoint*> &vpMPs = mpMap->GetAllMapPoints();
-	const std::vector<MapPoint*> &vpRefMPs = mpMap->GetReferenceMapPoints();
+	const std::vector<MapPoint*> &vpMPs = map_->GetAllMapPoints();
+	const std::vector<MapPoint*> &vpRefMPs = map_->GetReferenceMapPoints();
 
 	std::set<MapPoint*> spRefMPs(vpRefMPs.begin(), vpRefMPs.end());
 
 	if (vpMPs.empty())
 		return;
 
-	glPointSize(mPointSize);
+	glPointSize(pointSize_);
 	glBegin(GL_POINTS);
 	glColor3f(0.0, 0.0, 0.0);
 
@@ -64,7 +63,7 @@ void MapDrawer::DrawMapPoints()
 	}
 	glEnd();
 
-	glPointSize(mPointSize);
+	glPointSize(pointSize_);
 	glBegin(GL_POINTS);
 	glColor3f(1.0, 0.0, 0.0);
 
@@ -82,11 +81,11 @@ void MapDrawer::DrawMapPoints()
 
 void MapDrawer::DrawKeyFrames(const bool bDrawKF, const bool bDrawGraph)
 {
-	const float &w = mKeyFrameSize;
+	const float &w = keyFrameSize_;
 	const float h = w*0.75;
 	const float z = w*0.6;
 
-	const std::vector<KeyFrame*> vpKFs = mpMap->GetAllKeyFrames();
+	const std::vector<KeyFrame*> vpKFs = map_->GetAllKeyFrames();
 
 	if (bDrawKF)
 	{
@@ -99,7 +98,7 @@ void MapDrawer::DrawKeyFrames(const bool bDrawKF, const bool bDrawGraph)
 
 			glMultMatrixf(Twc.ptr<GLfloat>(0));
 
-			glLineWidth(mKeyFrameLineWidth);
+			glLineWidth(keyFrameLineWidth_);
 			glColor3f(0.0f, 0.0f, 1.0f);
 			glBegin(GL_LINES);
 			glVertex3f(0, 0, 0);
@@ -130,7 +129,7 @@ void MapDrawer::DrawKeyFrames(const bool bDrawKF, const bool bDrawGraph)
 
 	if (bDrawGraph)
 	{
-		glLineWidth(mGraphLineWidth);
+		glLineWidth(graphLineWidth_);
 		glColor4f(0.0f, 1.0f, 0.0f, 0.6f);
 		glBegin(GL_LINES);
 
@@ -178,7 +177,7 @@ void MapDrawer::DrawKeyFrames(const bool bDrawKF, const bool bDrawGraph)
 
 void MapDrawer::DrawCurrentCamera(const pangolin::OpenGlMatrix &Twc)
 {
-	const float w = mCameraSize;
+	const float w = cameraSize_;
 	const float h = 0.75f * w;
 	const float z = 0.6f * w;
 
@@ -190,7 +189,7 @@ void MapDrawer::DrawCurrentCamera(const pangolin::OpenGlMatrix &Twc)
 	glMultMatrixd(Twc.m);
 #endif
 
-	glLineWidth(mCameraLineWidth);
+	glLineWidth(cameraLineWidth_);
 	glColor3f(0.0f, 1.0f, 0.0f);
 	glBegin(GL_LINES);
 	glVertex3f(0, 0, 0);
