@@ -49,8 +49,8 @@ public:
 	void Run();
 	void RequestFinish();
 	void RequestStop();
-	bool isFinished();
-	bool isStopped();
+	bool isFinished() const;
+	bool isStopped() const;
 	void Release();
 
 	void SetCurrentCameraPose(const cv::Mat& Tcw);
@@ -59,7 +59,7 @@ public:
 private:
 
 	bool Stop();
-	bool CheckFinish();
+	bool CheckFinish() const;
 	void SetFinish();
 
 	System* system_;
@@ -75,8 +75,8 @@ private:
 	bool stopped_;
 	bool stopRequested_;
 
-	std::mutex mutexFinish_;
-	std::mutex mutexStop_;
+	mutable std::mutex mutexFinish_;
+	mutable std::mutex mutexStop_;
 };
 
 }

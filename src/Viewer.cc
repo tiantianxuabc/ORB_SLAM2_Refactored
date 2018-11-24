@@ -184,7 +184,7 @@ void Viewer::RequestFinish()
 	finishRequested_ = true;
 }
 
-bool Viewer::CheckFinish()
+bool Viewer::CheckFinish() const
 {
 	LOCK_MUTEX_FINISH();
 	return finishRequested_;
@@ -196,7 +196,7 @@ void Viewer::SetFinish()
 	finished_ = true;
 }
 
-bool Viewer::isFinished()
+bool Viewer::isFinished() const
 {
 	LOCK_MUTEX_FINISH();
 	return finished_;
@@ -209,7 +209,7 @@ void Viewer::RequestStop()
 		stopRequested_ = true;
 }
 
-bool Viewer::isStopped()
+bool Viewer::isStopped() const
 {
 	LOCK_MUTEX_STOP();
 	return stopped_;
