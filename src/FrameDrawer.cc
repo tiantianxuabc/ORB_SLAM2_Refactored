@@ -27,6 +27,13 @@
 namespace ORB_SLAM2
 {
 
+enum
+{
+	MAPPOINT_STATUS_NONE,
+	MAPPOINT_STATUS_MAP,
+	MAPPOINT_STATUS_VO,
+};
+
 FrameDrawer::FrameDrawer(Map* map) : map_(map)
 {
 	state_ = Tracking::STATE_NOT_READY;
@@ -39,7 +46,7 @@ cv::Mat FrameDrawer::DrawFrame()
 	std::vector<cv::KeyPoint> initKeyPoints; // Initialization: KeyPoints in reference frame
 	std::vector<int> matches; // Initialization: correspondeces with reference keypoints
 	std::vector<cv::KeyPoint> currKeyPoints; // KeyPoints in current frame
-	std::vector<bool> isVO, isMap; // Tracked MapPoints in current frame
+	std::vector<int> status; // Tracked MapPoints in current frame
 	int state; // Tracking state
 
 	//Copy variables within scoped mutex
@@ -60,8 +67,7 @@ cv::Mat FrameDrawer::DrawFrame()
 		else if (state_ == Tracking::STATE_OK)
 		{
 			currKeyPoints = currKeyPoints_;
-			isVO = isVO_;
-			isMap = isMap_;
+			status = status_;
 		}
 		else if (state_ == Tracking::STATE_LOST)
 		{
@@ -91,27 +97,28 @@ cv::Mat FrameDrawer::DrawFrame()
 
 		for (size_t i = 0; i < currKeyPoints.size(); i++)
 		{
-			if (isVO[i] || isMap[i])
-			{
-				cv::Point2f pt1, pt2;
-				pt1.x = currKeyPoints[i].pt.x - r;
-				pt1.y = currKeyPoints[i].pt.y - r;
-				pt2.x = currKeyPoints[i].pt.x + r;
-				pt2.y = currKeyPoints[i].pt.y + r;
+			if (status[i] == MAPPOINT_STATUS_NONE)
+				continue;
 
-				// This is a match to a MapPoint in the map
-				if (isMap[i])
-				{
-					cv::rectangle(image, pt1, pt2, cv::Scalar(0, 255, 0));
-					cv::circle(image, currKeyPoints[i].pt, 2, cv::Scalar(0, 255, 0), -1);
-					ntracked_++;
-				}
-				else // This is match to a "visual odometry" MapPoint created in the last frame
-				{
-					cv::rectangle(image, pt1, pt2, cv::Scalar(255, 0, 0));
-					cv::circle(image, currKeyPoints[i].pt, 2, cv::Scalar(255, 0, 0), -1);
-					ntrackedVO_++;
-				}
+			cv::Point2f pt1, pt2;
+			pt1.x = currKeyPoints[i].pt.x - r;
+			pt1.y = currKeyPoints[i].pt.y - r;
+			pt2.x = currKeyPoints[i].pt.x + r;
+			pt2.y = currKeyPoints[i].pt.y + r;
+
+			// This is a match to a MapPoint in the map
+			if (status[i] == MAPPOINT_STATUS_MAP)
+			{
+				cv::rectangle(image, pt1, pt2, cv::Scalar(0, 255, 0));
+				cv::circle(image, currKeyPoints[i].pt, 2, cv::Scalar(0, 255, 0), -1);
+				ntracked_++;
+			}
+			// This is match to a "visual odometry" MapPoint created in the last frame
+			else if (status[i] == MAPPOINT_STATUS_VO)
+			{
+				cv::rectangle(image, pt1, pt2, cv::Scalar(255, 0, 0));
+				cv::circle(image, currKeyPoints[i].pt, 2, cv::Scalar(255, 0, 0), -1);
+				ntrackedVO_++;
 			}
 		}
 	}
@@ -169,10 +176,10 @@ void FrameDrawer::Update(Tracking* tracker)
 
 	tracker->GetImGray().copyTo(image_);
 	currKeyPoints_ = tracker->GetCurrentFrame().keypointsL;
+	const Frame& currFrame = tracker->GetCurrentFrame();
 
-	const int N = static_cast<int>(currKeyPoints_.size());
-	isVO_.assign(N, false);
-	isMap_.assign(N, false);
+	const int nkeypoints = static_cast<int>(currKeyPoints_.size());
+	status_.assign(nkeypoints, MAPPOINT_STATUS_NONE);
 	localizationMode_ = tracker->OnlyTracking();
 
 	const int state = tracker->GetLastProcessedState();
@@ -183,16 +190,12 @@ void FrameDrawer::Update(Tracking* tracker)
 	}
 	else if (state == Tracking::STATE_OK)
 	{
-		for (int i = 0; i < N; i++)
+		for (int i = 0; i < nkeypoints; i++)
 		{
-			const MapPoint* mappint = tracker->GetCurrentFrame().mappoints[i];
-			if (!mappint || tracker->GetCurrentFrame().outlier[i])
+			const MapPoint* mappoint = currFrame.mappoints[i];
+			if (!mappoint || currFrame.outlier[i])
 				continue;
-
-			if (mappint->Observations() > 0)
-				isMap_[i] = true;
-			else
-				isVO_[i] = true;
+			status_[i] = mappoint->Observations() > 0 ? MAPPOINT_STATUS_MAP : MAPPOINT_STATUS_VO;
 		}
 	}
 	state_ = state;

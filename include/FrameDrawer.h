@@ -51,9 +51,8 @@ protected:
 
 	// Info of the frame to be drawn
 	cv::Mat image_;
-	//int N;
 	std::vector<cv::KeyPoint> currKeyPoints_;
-	std::vector<bool> isMap_, isVO_;
+	std::vector<int> status_;
 	bool localizationMode_;
 	int ntracked_, ntrackedVO_;
 	std::vector<cv::KeyPoint> initKeyPoints_;
