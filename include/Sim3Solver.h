@@ -26,6 +26,8 @@
 
 #include <opencv2/opencv.hpp>
 
+#include "CameraParameters.h"
+
 namespace ORB_SLAM2
 {
 
@@ -87,8 +89,10 @@ private:
 	int maxIterations_;
 
 	// Calibration
-	cv::Mat K1_;
-	cv::Mat K2_;
+	CameraParams camera1_;
+	CameraParams camera2_;
+	//cv::Mat K1_;
+	//cv::Mat K2_;
 
 	bool terminate_;
 };
