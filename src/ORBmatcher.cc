@@ -1386,8 +1386,10 @@ int ORBmatcher::SearchByProjection(Frame& currFrame, const Frame& lastFrame, flo
 	const cv::Mat twc = -Rcw.t() * tcw;
 	const cv::Mat tlc = Rlw * twc + tlw;
 
-	const bool forward = tlc.at<float>(2) > currFrame.camera.baseline && !monocular;
-	const bool backward = -tlc.at<float>(2) > currFrame.camera.baseline && !monocular;
+	const CameraParams& camera = currFrame.camera;
+
+	const bool forward = tlc.at<float>(2) > camera.baseline && !monocular;
+	const bool backward = -tlc.at<float>(2) > camera.baseline && !monocular;
 
 	for (int i = 0; i < lastFrame.N; i++)
 	{
@@ -1408,8 +1410,8 @@ int ORBmatcher::SearchByProjection(Frame& currFrame, const Frame& lastFrame, flo
 				if (invzc < 0)
 					continue;
 
-				float u = currFrame.camera.fx*xc*invzc + currFrame.camera.cx;
-				float v = currFrame.camera.fy*yc*invzc + currFrame.camera.cy;
+				float u = camera.fx*xc*invzc + camera.cx;
+				float v = camera.fy*yc*invzc + camera.cy;
 
 				if (!currFrame.imageBounds.Contains(u, v))
 					continue;
@@ -1445,7 +1447,7 @@ int ORBmatcher::SearchByProjection(Frame& currFrame, const Frame& lastFrame, flo
 
 					if (currFrame.uright[i2] > 0)
 					{
-						const float ur = u - currFrame.camera.bf*invzc;
+						const float ur = u - camera.bf*invzc;
 						const float er = fabs(ur - currFrame.uright[i2]);
 						if (er > radius)
 							continue;
