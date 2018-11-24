@@ -845,7 +845,7 @@ int ORBmatcher::SearchForTriangulation(const KeyFrame* keyframe1, const KeyFrame
 	return nmatches;
 }
 
-int ORBmatcher::Fuse(KeyFrame *pKF, const vector<MapPoint *> &vpMapPoints, const float th)
+int ORBmatcher::Fuse(KeyFrame *pKF, const vector<MapPoint *> &vpMapPoints, float th)
 {
 	cv::Mat Rcw = pKF->GetRotation();
 	cv::Mat tcw = pKF->GetTranslation();
