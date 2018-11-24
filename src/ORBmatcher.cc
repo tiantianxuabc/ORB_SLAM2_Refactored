@@ -1310,14 +1310,19 @@ int ORBmatcher::SearchByProjection(Frame& currFrame, const Frame& lastFrame, flo
 	return nmatches;
 }
 
-int ORBmatcher::SearchByProjection(Frame& currFrame, KeyFrame* keyframe, const std::set<MapPoint*>& alreadyFound,
+int ORBmatcher::SearchByProjection(Frame& frame, KeyFrame* keyframe, const std::set<MapPoint*>& alreadyFound,
 	float th, int ORBdist)
 {
 	int nmatches = 0;
 
-	const cv::Mat Rcw = CameraPose::GetR(currFrame.pose.Tcw);
-	const cv::Mat tcw = CameraPose::Gett(currFrame.pose.Tcw);
+	const cv::Mat Rcw = CameraPose::GetR(frame.pose.Tcw);
+	const cv::Mat tcw = CameraPose::Gett(frame.pose.Tcw);
 	const cv::Mat Ow = -Rcw.t() * tcw;
+
+	const float fx = frame.camera.fx;
+	const float fy = frame.camera.fy;
+	const float cx = frame.camera.cx;
+	const float cy = frame.camera.cy;
 
 	// Rotation Histogram (to check rotation consistency)
 	vector<int> rotHist[HISTO_LENGTH];
@@ -1325,120 +1330,80 @@ int ORBmatcher::SearchByProjection(Frame& currFrame, KeyFrame* keyframe, const s
 		rotHist[i].reserve(500);
 	const float factor = 1.0f / HISTO_LENGTH;
 
-	const vector<MapPoint*> vpMPs = keyframe->GetMapPointMatches();
+	const std::vector<MapPoint*> mappoints = keyframe->GetMapPointMatches();
 
-	for (size_t i = 0, iend = vpMPs.size(); i < iend; i++)
+	std::vector<MatchIdx> matchIds;
+	matchIds.reserve(mappoints.size());
+
+	for (size_t idx1 = 0; idx1 < mappoints.size(); idx1++)
 	{
-		MapPoint* pMP = vpMPs[i];
+		MapPoint* mappoint = mappoints[idx1];
+		if (!mappoint || mappoint->isBad() || alreadyFound.count(mappoint))
+			continue;
 
-		if (pMP)
+		//Project
+		const cv::Mat Xw = mappoint->GetWorldPos();
+		const cv::Mat Xc = Rcw * Xw + tcw;
+
+		const float invZc = 1.f / Xc.at<float>(2);
+		const float u = fx * Xc.at<float>(0) * invZc + cx;
+		const float v = fy * Xc.at<float>(1) * invZc + cy;
+
+		if (!frame.imageBounds.Contains(u, v))
+			continue;
+
+		// Compute predicted scale level
+		const cv::Mat PO = Xw - Ow;
+		const float dist3D = static_cast<float>(cv::norm(PO));
+
+		const float maxDistance = mappoint->GetMaxDistanceInvariance();
+		const float minDistance = mappoint->GetMinDistanceInvariance();
+
+		// Depth must be inside the scale pyramid of the image
+		if (dist3D < minDistance || dist3D > maxDistance)
+			continue;
+
+		const int predictedScale = mappoint->PredictScale(dist3D, &frame);
+
+		// Search in a window
+		const float radius = th * frame.pyramid.scaleFactors[predictedScale];
+
+		const std::vector<size_t> indices =  frame.GetFeaturesInArea(u, v, radius, predictedScale - 1, predictedScale + 1);
+		if (indices.empty())
+			continue;
+
+		const cv::Mat desc1 = mappoint->GetDescriptor();
+
+		int bestDist = 256;
+		int bestIdx2 = -1;
+
+		for (size_t idx2 : indices)
 		{
-			if (!pMP->isBad() && !alreadyFound.count(pMP))
+			if (frame.mappoints[idx2])
+				continue;
+
+			const cv::Mat desc2 = frame.descriptorsL.row(static_cast<int>(idx2));
+			const int dist = DescriptorDistance(desc1, desc2);
+			if (dist < bestDist)
 			{
-				//Project
-				cv::Mat x3Dw = pMP->GetWorldPos();
-				cv::Mat x3Dc = Rcw*x3Dw + tcw;
-
-				const float xc = x3Dc.at<float>(0);
-				const float yc = x3Dc.at<float>(1);
-				const float invzc = 1.0 / x3Dc.at<float>(2);
-
-				const float u = currFrame.camera.fx*xc*invzc + currFrame.camera.cx;
-				const float v = currFrame.camera.fy*yc*invzc + currFrame.camera.cy;
-
-				/*if(u<CurrentFrame.mnMinX || u>CurrentFrame.mnMaxX)
-					continue;
-				if(v<CurrentFrame.mnMinY || v>CurrentFrame.mnMaxY)
-					continue;*/
-				if (!currFrame.imageBounds.Contains(u, v))
-					continue;
-
-				// Compute predicted scale level
-				cv::Mat PO = x3Dw - Ow;
-				float dist3D = cv::norm(PO);
-
-				const float maxDistance = pMP->GetMaxDistanceInvariance();
-				const float minDistance = pMP->GetMinDistanceInvariance();
-
-				// Depth must be inside the scale pyramid of the image
-				if (dist3D<minDistance || dist3D>maxDistance)
-					continue;
-
-				int nPredictedLevel = pMP->PredictScale(dist3D, &currFrame);
-
-				// Search in a window
-				const float radius = th*currFrame.pyramid.scaleFactors[nPredictedLevel];
-
-				const vector<size_t> vIndices2 = currFrame.GetFeaturesInArea(u, v, radius, nPredictedLevel - 1, nPredictedLevel + 1);
-
-				if (vIndices2.empty())
-					continue;
-
-				const cv::Mat dMP = pMP->GetDescriptor();
-
-				int bestDist = 256;
-				int bestIdx2 = -1;
-
-				for (vector<size_t>::const_iterator vit = vIndices2.begin(); vit != vIndices2.end(); vit++)
-				{
-					const size_t i2 = *vit;
-					if (currFrame.mappoints[i2])
-						continue;
-
-					const cv::Mat &d = currFrame.descriptorsL.row(i2);
-
-					const int dist = DescriptorDistance(dMP, d);
-
-					if (dist < bestDist)
-					{
-						bestDist = dist;
-						bestIdx2 = i2;
-					}
-				}
-
-				if (bestDist <= ORBdist)
-				{
-					currFrame.mappoints[bestIdx2] = pMP;
-					nmatches++;
-
-					if (checkOrientation_)
-					{
-						float rot = keyframe->keypointsUn[i].angle - currFrame.keypointsUn[bestIdx2].angle;
-						if (rot < 0.0)
-							rot += 360.0f;
-						int bin = round(rot*factor);
-						if (bin == HISTO_LENGTH)
-							bin = 0;
-						assert(bin >= 0 && bin < HISTO_LENGTH);
-						rotHist[bin].push_back(bestIdx2);
-					}
-				}
-
+				bestDist = dist;
+				bestIdx2 = static_cast<int>(idx2);
 			}
+		}
+
+		if (bestDist <= ORBdist)
+		{
+			frame.mappoints[bestIdx2] = mappoint;
+			nmatches++;
+
+			if (checkOrientation_)
+				matchIds.push_back(std::make_pair(static_cast<int>(idx1), bestIdx2));
 		}
 	}
 
 	if (checkOrientation_)
-	{
-		int ind1 = -1;
-		int ind2 = -1;
-		int ind3 = -1;
-
-		ComputeThreeMaxima(rotHist, HISTO_LENGTH, ind1, ind2, ind3);
-
-		for (int i = 0; i < HISTO_LENGTH; i++)
-		{
-			if (i != ind1 && i != ind2 && i != ind3)
-			{
-				for (size_t j = 0, jend = rotHist[i].size(); j < jend; j++)
-				{
-					currFrame.mappoints[rotHist[i][j]] = NULL;
-					nmatches--;
-				}
-			}
-		}
-	}
-
+		nmatches = CheckOrientation(keyframe->keypointsUn, frame.keypointsUn, matchIds, frame.mappoints);
+	
 	return nmatches;
 }
 
