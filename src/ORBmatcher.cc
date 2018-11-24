@@ -155,85 +155,71 @@ ORBmatcher::ORBmatcher(float nnratio, bool checkOri) : fNNRatio_(nnratio), check
 {
 }
 
-int ORBmatcher::SearchByProjection(Frame &F, const vector<MapPoint*> &vpMapPoints, const float th)
+int ORBmatcher::SearchByProjection(Frame& frame, const std::vector<MapPoint*>& mappoints, float th)
 {
 	int nmatches = 0;
 
-	const bool bFactor = th != 1.0;
-
-	for (size_t iMP = 0; iMP < vpMapPoints.size(); iMP++)
+	for (MapPoint* mappoint : mappoints)
 	{
-		MapPoint* pMP = vpMapPoints[iMP];
-		if (!pMP->mbTrackInView)
+		if (!mappoint->mbTrackInView || mappoint->isBad())
 			continue;
 
-		if (pMP->isBad())
-			continue;
-
-		const int &nPredictedLevel = pMP->mnTrackScaleLevel;
+		const int predictedScale = mappoint->mnTrackScaleLevel;
 
 		// The size of the window will depend on the viewing direction
-		float r = RadiusByViewingCos(pMP->mTrackViewCos);
+		const float r = RadiusByViewingCos(mappoint->mTrackViewCos);
+		const float radius = th * r * frame.pyramid.scaleFactors[predictedScale];
+		const float u = mappoint->mTrackProjX;
+		const float v = mappoint->mTrackProjY;
 
-		if (bFactor)
-			r *= th;
-
-		const vector<size_t> vIndices =
-			F.GetFeaturesInArea(pMP->mTrackProjX, pMP->mTrackProjY, r*F.pyramid.scaleFactors[nPredictedLevel], nPredictedLevel - 1, nPredictedLevel);
-
-		if (vIndices.empty())
+		const std::vector<size_t> indices = frame.GetFeaturesInArea(u, v, radius, predictedScale - 1, predictedScale);
+		if (indices.empty())
 			continue;
 
-		const cv::Mat MPdescriptor = pMP->GetDescriptor();
+		const cv::Mat desc1 = mappoint->GetDescriptor();
 
 		int bestDist = 256;
 		int bestLevel = -1;
-		int bestDist2 = 256;
-		int bestLevel2 = -1;
+		int secondbestDist = 256;
+		int secondBestLevel = -1;
 		int bestIdx = -1;
 
 		// Get best and second matches with near keypoints
-		for (vector<size_t>::const_iterator vit = vIndices.begin(), vend = vIndices.end(); vit != vend; vit++)
+		for (size_t idx : indices)
 		{
-			const size_t idx = *vit;
+			if (frame.mappoints[idx] && frame.mappoints[idx]->Observations() > 0)
+				continue;
 
-			if (F.mappoints[idx])
-				if (F.mappoints[idx]->Observations() > 0)
-					continue;
-
-			if (F.uright[idx] > 0)
+			if (frame.uright[idx] > 0)
 			{
-				const float er = fabs(pMP->mTrackProjXR - F.uright[idx]);
-				if (er > r*F.pyramid.scaleFactors[nPredictedLevel])
+				if (fabsf(mappoint->mTrackProjXR - frame.uright[idx]) > radius)
 					continue;
 			}
 
-			const cv::Mat &d = F.descriptorsL.row(idx);
-
-			const int dist = DescriptorDistance(MPdescriptor, d);
-
+			const cv::Mat desc2 = frame.descriptorsL.row(idx);
+			const int dist = DescriptorDistance(desc1, desc2);
 			if (dist < bestDist)
 			{
-				bestDist2 = bestDist;
+				secondbestDist = bestDist;
 				bestDist = dist;
-				bestLevel2 = bestLevel;
-				bestLevel = F.keypointsUn[idx].octave;
-				bestIdx = idx;
+				secondBestLevel = bestLevel;
+				bestLevel = frame.keypointsUn[idx].octave;
+				bestIdx = static_cast<int>(idx);
 			}
-			else if (dist < bestDist2)
+			else if (dist < secondbestDist)
 			{
-				bestLevel2 = F.keypointsUn[idx].octave;
-				bestDist2 = dist;
+				secondBestLevel = frame.keypointsUn[idx].octave;
+				secondbestDist = dist;
 			}
 		}
 
 		// Apply ratio to second match (only if best and second are in the same scale level)
 		if (bestDist <= TH_HIGH)
 		{
-			if (bestLevel == bestLevel2 && bestDist > fNNRatio_*bestDist2)
+			if (bestLevel == secondBestLevel && bestDist > fNNRatio_ * secondbestDist)
 				continue;
 
-			F.mappoints[bestIdx] = pMP;
+			frame.mappoints[bestIdx] = mappoint;
 			nmatches++;
 		}
 	}
