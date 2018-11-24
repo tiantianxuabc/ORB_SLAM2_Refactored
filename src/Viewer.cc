@@ -110,38 +110,38 @@ static void DrawCurrentCamera(pangolin::OpenGlMatrix &Twc, float cameraSize = 0.
 	glPopMatrix();
 }
 
-Viewer::Viewer(System* pSystem, FrameDrawer *pFrameDrawer, MapDrawer *pMapDrawer, Tracking *pTracking, const string &strSettingPath) :
-	mpSystem(pSystem), mpFrameDrawer(pFrameDrawer), mpMapDrawer(pMapDrawer), mpTracker(pTracking),
-	mbFinishRequested(false), mbFinished(true), mbStopped(true), mbStopRequested(false)
+Viewer::Viewer(System* system, FrameDrawer* frameDrawer, MapDrawer* mapDrawer, Tracking* tracker, const string &settingsFile)
+	: system_(system), frameDrawer_(frameDrawer), mapDrawer_(mapDrawer), tracker_(tracker),
+	finishRequested_(false), finished_(true), stopped_(true), stopRequested_(false)
 {
-	cv::FileStorage fSettings(strSettingPath, cv::FileStorage::READ);
+	cv::FileStorage settings(settingsFile, cv::FileStorage::READ);
 
-	float fps = fSettings["Camera.fps"];
+	float fps = settings["Camera.fps"];
 	if (fps < 1)
 		fps = 30;
 	mT = 1e3 / fps;
 
-	mImageWidth = fSettings["Camera.width"];
-	mImageHeight = fSettings["Camera.height"];
+	mImageWidth = settings["Camera.width"];
+	mImageHeight = settings["Camera.height"];
 	if (mImageWidth < 1 || mImageHeight < 1)
 	{
 		mImageWidth = 640;
 		mImageHeight = 480;
 	}
 
-	mViewpointX = fSettings["Viewer.ViewpointX"];
-	mViewpointY = fSettings["Viewer.ViewpointY"];
-	mViewpointZ = fSettings["Viewer.ViewpointZ"];
-	mViewpointF = fSettings["Viewer.ViewpointF"];
+	mViewpointX = settings["Viewer.ViewpointX"];
+	mViewpointY = settings["Viewer.ViewpointY"];
+	mViewpointZ = settings["Viewer.ViewpointZ"];
+	mViewpointF = settings["Viewer.ViewpointF"];
 
-	mCameraSize = fSettings["Viewer.CameraSize"];
-	mCameraLineWidth = fSettings["Viewer.CameraLineWidth"];
+	mCameraSize = settings["Viewer.CameraSize"];
+	mCameraLineWidth = settings["Viewer.CameraLineWidth"];
 }
 
 void Viewer::Run()
 {
-	mbFinished = false;
-	mbStopped = false;
+	finished_ = false;
+	stopped_ = false;
 
 	pangolin::CreateWindowAndBind("ORB-SLAM2: Map Viewer", 1024, 768);
 
@@ -183,7 +183,7 @@ void Viewer::Run()
 	{
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-		GetCurrentOpenGLCameraMatrix(mpMapDrawer->GetCurrentCameraPose(), Twc);
+		GetCurrentOpenGLCameraMatrix(mapDrawer_->GetCurrentCameraPose(), Twc);
 
 		if (menuFollowCamera && bFollow)
 		{
@@ -202,12 +202,12 @@ void Viewer::Run()
 
 		if (menuLocalizationMode && !bLocalizationMode)
 		{
-			mpSystem->ActivateLocalizationMode();
+			system_->ActivateLocalizationMode();
 			bLocalizationMode = true;
 		}
 		else if (!menuLocalizationMode && bLocalizationMode)
 		{
-			mpSystem->DeactivateLocalizationMode();
+			system_->DeactivateLocalizationMode();
 			bLocalizationMode = false;
 		}
 
@@ -215,13 +215,13 @@ void Viewer::Run()
 		glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
 		DrawCurrentCamera(Twc, mCameraSize, mCameraLineWidth);
 		if (menuShowKeyFrames || menuShowGraph)
-			mpMapDrawer->DrawKeyFrames(menuShowKeyFrames, menuShowGraph);
+			mapDrawer_->DrawKeyFrames(menuShowKeyFrames, menuShowGraph);
 		if (menuShowPoints)
-			mpMapDrawer->DrawMapPoints();
+			mapDrawer_->DrawMapPoints();
 
 		pangolin::FinishFrame();
 
-		cv::Mat im = mpFrameDrawer->DrawFrame();
+		cv::Mat im = frameDrawer_->DrawFrame();
 		cv::imshow("ORB-SLAM2: Current Frame", im);
 		cv::waitKey(mT);
 
@@ -232,11 +232,11 @@ void Viewer::Run()
 			menuShowPoints = true;
 			menuLocalizationMode = false;
 			if (bLocalizationMode)
-				mpSystem->DeactivateLocalizationMode();
+				system_->DeactivateLocalizationMode();
 			bLocalizationMode = false;
 			bFollow = true;
 			menuFollowCamera = true;
-			mpSystem->Reset();
+			system_->Reset();
 			menuReset = false;
 		}
 
@@ -260,38 +260,38 @@ void Viewer::Run()
 void Viewer::RequestFinish()
 {
 	unique_lock<mutex> lock(mMutexFinish);
-	mbFinishRequested = true;
+	finishRequested_ = true;
 }
 
 bool Viewer::CheckFinish()
 {
 	unique_lock<mutex> lock(mMutexFinish);
-	return mbFinishRequested;
+	return finishRequested_;
 }
 
 void Viewer::SetFinish()
 {
 	unique_lock<mutex> lock(mMutexFinish);
-	mbFinished = true;
+	finished_ = true;
 }
 
 bool Viewer::isFinished()
 {
 	unique_lock<mutex> lock(mMutexFinish);
-	return mbFinished;
+	return finished_;
 }
 
 void Viewer::RequestStop()
 {
 	unique_lock<mutex> lock(mMutexStop);
-	if (!mbStopped)
-		mbStopRequested = true;
+	if (!stopped_)
+		stopRequested_ = true;
 }
 
 bool Viewer::isStopped()
 {
 	unique_lock<mutex> lock(mMutexStop);
-	return mbStopped;
+	return stopped_;
 }
 
 bool Viewer::Stop()
@@ -299,12 +299,12 @@ bool Viewer::Stop()
 	unique_lock<mutex> lock(mMutexStop);
 	unique_lock<mutex> lock2(mMutexFinish);
 
-	if (mbFinishRequested)
+	if (finishRequested_)
 		return false;
-	else if (mbStopRequested)
+	else if (stopRequested_)
 	{
-		mbStopped = true;
-		mbStopRequested = false;
+		stopped_ = true;
+		stopRequested_ = false;
 		return true;
 	}
 
@@ -315,7 +315,7 @@ bool Viewer::Stop()
 void Viewer::Release()
 {
 	unique_lock<mutex> lock(mMutexStop);
-	mbStopped = false;
+	stopped_ = false;
 }
 
 }

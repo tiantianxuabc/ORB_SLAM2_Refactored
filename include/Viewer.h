@@ -63,10 +63,10 @@ private:
 
 	bool Stop();
 
-	System* mpSystem;
-	FrameDrawer* mpFrameDrawer;
-	MapDrawer* mpMapDrawer;
-	Tracking* mpTracker;
+	System* system_;
+	FrameDrawer* frameDrawer_;
+	MapDrawer* mapDrawer_;
+	Tracking* tracker_;
 
 	// 1/fps in ms
 	double mT;
@@ -77,12 +77,12 @@ private:
 
 	bool CheckFinish();
 	void SetFinish();
-	bool mbFinishRequested;
-	bool mbFinished;
+	bool finishRequested_;
+	bool finished_;
 	std::mutex mMutexFinish;
 
-	bool mbStopped;
-	bool mbStopRequested;
+	bool stopped_;
+	bool stopRequested_;
 	std::mutex mMutexStop;
 
 };
