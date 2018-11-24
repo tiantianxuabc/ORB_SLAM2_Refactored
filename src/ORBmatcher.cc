@@ -372,13 +372,14 @@ int ORBmatcher::SearchByBoW(KeyFrame* keyframe, Frame& frame, std::vector<MapPoi
 	return nmatches;
 }
 
-int ORBmatcher::SearchByProjection(KeyFrame* pKF, cv::Mat Scw, const vector<MapPoint*> &vpPoints, vector<MapPoint*> &vpMatched, int th)
+int ORBmatcher::SearchByProjection(KeyFrame* keyframe, cv::Mat Scw, const vector<MapPoint*>& mappoints,
+	std::vector<MapPoint*>& matched, int th)
 {
 	// Get Calibration Parameters for later projection
-	const float &fx = pKF->camera.fx;
-	const float &fy = pKF->camera.fy;
-	const float &cx = pKF->camera.cx;
-	const float &cy = pKF->camera.cy;
+	const float &fx = keyframe->camera.fx;
+	const float &fy = keyframe->camera.fy;
+	const float &cx = keyframe->camera.cx;
+	const float &cy = keyframe->camera.cy;
 
 	// Decompose Scw
 	cv::Mat sRcw = Scw.rowRange(0, 3).colRange(0, 3);
@@ -388,15 +389,15 @@ int ORBmatcher::SearchByProjection(KeyFrame* pKF, cv::Mat Scw, const vector<MapP
 	cv::Mat Ow = -Rcw.t()*tcw;
 
 	// Set of MapPoints already found in the KeyFrame
-	set<MapPoint*> spAlreadyFound(vpMatched.begin(), vpMatched.end());
+	set<MapPoint*> spAlreadyFound(matched.begin(), matched.end());
 	spAlreadyFound.erase(static_cast<MapPoint*>(NULL));
 
 	int nmatches = 0;
 
 	// For each Candidate MapPoint Project and Match
-	for (int iMP = 0, iendMP = vpPoints.size(); iMP < iendMP; iMP++)
+	for (int iMP = 0, iendMP = mappoints.size(); iMP < iendMP; iMP++)
 	{
-		MapPoint* pMP = vpPoints[iMP];
+		MapPoint* pMP = mappoints[iMP];
 
 		// Discard Bad MapPoints and already found
 		if (pMP->isBad() || spAlreadyFound.count(pMP))
@@ -421,7 +422,7 @@ int ORBmatcher::SearchByProjection(KeyFrame* pKF, cv::Mat Scw, const vector<MapP
 		const float v = fy*y + cy;
 
 		// Point must be inside the image
-		if (!pKF->IsInImage(u, v))
+		if (!keyframe->IsInImage(u, v))
 			continue;
 
 		// Depth must be inside the scale invariance region of the point
@@ -439,12 +440,12 @@ int ORBmatcher::SearchByProjection(KeyFrame* pKF, cv::Mat Scw, const vector<MapP
 		if (PO.dot(Pn) < 0.5*dist)
 			continue;
 
-		int nPredictedLevel = pMP->PredictScale(dist, pKF);
+		int nPredictedLevel = pMP->PredictScale(dist, keyframe);
 
 		// Search in a radius
-		const float radius = th*pKF->pyramid.scaleFactors[nPredictedLevel];
+		const float radius = th*keyframe->pyramid.scaleFactors[nPredictedLevel];
 
-		const vector<size_t> vIndices = pKF->GetFeaturesInArea(u, v, radius);
+		const vector<size_t> vIndices = keyframe->GetFeaturesInArea(u, v, radius);
 
 		if (vIndices.empty())
 			continue;
@@ -457,15 +458,15 @@ int ORBmatcher::SearchByProjection(KeyFrame* pKF, cv::Mat Scw, const vector<MapP
 		for (vector<size_t>::const_iterator vit = vIndices.begin(), vend = vIndices.end(); vit != vend; vit++)
 		{
 			const size_t idx = *vit;
-			if (vpMatched[idx])
+			if (matched[idx])
 				continue;
 
-			const int &kpLevel = pKF->keypointsUn[idx].octave;
+			const int &kpLevel = keyframe->keypointsUn[idx].octave;
 
 			if (kpLevel<nPredictedLevel - 1 || kpLevel>nPredictedLevel)
 				continue;
 
-			const cv::Mat &dKF = pKF->descriptorsL.row(idx);
+			const cv::Mat &dKF = keyframe->descriptorsL.row(idx);
 
 			const int dist = DescriptorDistance(dMP, dKF);
 
@@ -478,7 +479,7 @@ int ORBmatcher::SearchByProjection(KeyFrame* pKF, cv::Mat Scw, const vector<MapP
 
 		if (bestDist <= TH_LOW)
 		{
-			vpMatched[bestIdx] = pMP;
+			matched[bestIdx] = pMP;
 			nmatches++;
 		}
 
