@@ -97,6 +97,16 @@ static void ComputeRotation(const cv::Mat1f& M, cv::Mat& R)
 	cv::Rodrigues(vec, R); // computes the rotation matrix from angle-axis
 }
 
+static void ComputeRotationSVD(cv::Mat& M, cv::Mat& R)
+{
+	cv::Mat w, U, Vh;
+	cv::SVD::compute(M.t(), w, U, Vh, cv::SVD::MODIFY_A | cv::SVD::FULL_UV);
+	cv::Mat S = cv::Mat::eye(3, 3, CV_32F);
+	if (cv::determinant(U) * cv::determinant(Vh) < 0)
+		S.at<float>(2, 2) = -1.f;
+	R = U * S * Vh;
+}
+
 static void ComputeSim3(const cv::Mat& P1, const cv::Mat& P2, Sim3& S12, Sim3& S21, bool fixScale)
 {
 	// Custom implementation of:
@@ -114,10 +124,11 @@ static void ComputeSim3(const cv::Mat& P1, const cv::Mat& P2, Sim3& S12, Sim3& S
 
 	// Step 2: Compute M matrix
 
-	cv::Mat M = Pr2*Pr1.t();
+	cv::Mat M = Pr2 * Pr1.t();
 
-	// Step 3 ~ Step 4
-	ComputeRotation(M, S12.R);
+	// Step 3 ~ Step 4: Compute Rotation matrix
+	//ComputeRotation(M, S12.R);
+	ComputeRotationSVD(M, S12.R);
 
 	// Step 5: Rotate set 2
 
