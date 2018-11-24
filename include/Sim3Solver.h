@@ -60,9 +60,6 @@ private:
 
 	std::vector<cv::Mat> Xc1_;
 	std::vector<cv::Mat> Xc2_;
-	//std::vector<MapPoint*> mvpMapPoints1;
-	//std::vector<MapPoint*> mvpMapPoints2;
-	//std::vector<MapPoint*> mvpMatches12;
 	std::vector<size_t> indices1_;
 	std::vector<double> maxErrorSq1_;
 	std::vector<double> maxErrorSq2_;
@@ -74,7 +71,6 @@ private:
 	
 	// Current Ransac State
 	int iterations_;
-	//std::vector<bool> bestInliers_;
 	int maxInliers_;
 	cv::Mat bestT12_;
 	cv::Mat bestRotation_;
