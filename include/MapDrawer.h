@@ -39,7 +39,7 @@ public:
 	MapDrawer(Map* pMap, const std::string &strSettingPath);
 
 	void DrawMapPoints();
-	void DrawKeyFrames(const bool bDrawKF, const bool bDrawGraph);
+	void DrawKeyFrames(bool drawKF, bool drawGraph);
 	void DrawCurrentCamera(const pangolin::OpenGlMatrix &Twc);
 	void SetCurrentCameraPose(const cv::Mat &Tcw);
 	void GetCurrentOpenGLCameraMatrix(pangolin::OpenGlMatrix &M);

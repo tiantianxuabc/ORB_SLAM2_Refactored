@@ -78,27 +78,26 @@ void MapDrawer::DrawMapPoints()
 	glEnd();
 }
 
-void MapDrawer::DrawKeyFrames(const bool bDrawKF, const bool bDrawGraph)
+void MapDrawer::DrawKeyFrames(bool drawKF, bool drawGraph)
 {
-	const float &w = keyFrameSize_;
-	const float h = w*0.75;
-	const float z = w*0.6;
+	const float w = keyFrameSize_;
+	const float h = 0.75f * w;
+	const float z = 0.6f * w;
 
-	const std::vector<KeyFrame*> vpKFs = map_->GetAllKeyFrames();
+	const std::vector<KeyFrame*> keyframes = map_->GetAllKeyFrames();
 
-	if (bDrawKF)
+	if (drawKF)
 	{
-		for (size_t i = 0; i < vpKFs.size(); i++)
+		for (KeyFrame* keyframe : keyframes)
 		{
-			KeyFrame* pKF = vpKFs[i];
-			cv::Mat Twc = pKF->GetPoseInverse().t();
+			const cv::Mat Twc = keyframe->GetPoseInverse().t();
 
 			glPushMatrix();
 
 			glMultMatrixf(Twc.ptr<GLfloat>(0));
 
 			glLineWidth(keyFrameLineWidth_);
-			glColor3f(0.0f, 0.0f, 1.0f);
+			glColor3f(0.f, 0.f, 1.f);
 			glBegin(GL_LINES);
 			glVertex3f(0, 0, 0);
 			glVertex3f(w, h, z);
@@ -126,45 +125,43 @@ void MapDrawer::DrawKeyFrames(const bool bDrawKF, const bool bDrawGraph)
 		}
 	}
 
-	if (bDrawGraph)
+	if (drawGraph)
 	{
 		glLineWidth(graphLineWidth_);
-		glColor4f(0.0f, 1.0f, 0.0f, 0.6f);
+		glColor4f(0.f, 1.f, 0.f, 0.6f);
 		glBegin(GL_LINES);
 
-		for (size_t i = 0; i < vpKFs.size(); i++)
+		//for (size_t i = 0; i < keyframes.size(); i++)
+		for (KeyFrame* keyframe : keyframes)
 		{
 			// Covisibility Graph
-			const std::vector<KeyFrame*> vCovKFs = vpKFs[i]->GetCovisiblesByWeight(100);
-			cv::Mat Ow = vpKFs[i]->GetCameraCenter();
-			if (!vCovKFs.empty())
+			cv::Mat Ow = keyframe->GetCameraCenter();
+			for (KeyFrame* covisibleKF : keyframe->GetCovisiblesByWeight(100))
 			{
-				for (std::vector<KeyFrame*>::const_iterator vit = vCovKFs.begin(), vend = vCovKFs.end(); vit != vend; vit++)
-				{
-					if ((*vit)->id < vpKFs[i]->id)
-						continue;
-					cv::Mat Ow2 = (*vit)->GetCameraCenter();
-					glVertex3f(Ow.at<float>(0), Ow.at<float>(1), Ow.at<float>(2));
-					glVertex3f(Ow2.at<float>(0), Ow2.at<float>(1), Ow2.at<float>(2));
-				}
+				if (covisibleKF->id < keyframe->id)
+					continue;
+
+				cv::Mat Ow2 = covisibleKF->GetCameraCenter();
+				glVertex3f(Ow.at<float>(0), Ow.at<float>(1), Ow.at<float>(2));
+				glVertex3f(Ow2.at<float>(0), Ow2.at<float>(1), Ow2.at<float>(2));
 			}
 
 			// Spanning tree
-			KeyFrame* pParent = vpKFs[i]->GetParent();
-			if (pParent)
+			KeyFrame* parentKF = keyframe->GetParent();
+			if (parentKF)
 			{
-				cv::Mat Owp = pParent->GetCameraCenter();
+				cv::Mat Owp = parentKF->GetCameraCenter();
 				glVertex3f(Ow.at<float>(0), Ow.at<float>(1), Ow.at<float>(2));
 				glVertex3f(Owp.at<float>(0), Owp.at<float>(1), Owp.at<float>(2));
 			}
 
 			// Loops
-			std::set<KeyFrame*> sLoopKFs = vpKFs[i]->GetLoopEdges();
-			for (std::set<KeyFrame*>::iterator sit = sLoopKFs.begin(), send = sLoopKFs.end(); sit != send; sit++)
+			for (KeyFrame* loopKF : keyframe->GetLoopEdges())
 			{
-				if ((*sit)->id < vpKFs[i]->id)
+				if (loopKF->id < keyframe->id)
 					continue;
-				cv::Mat Owl = (*sit)->GetCameraCenter();
+
+				cv::Mat Owl = loopKF->GetCameraCenter();
 				glVertex3f(Ow.at<float>(0), Ow.at<float>(1), Ow.at<float>(2));
 				glVertex3f(Owl.at<float>(0), Owl.at<float>(1), Owl.at<float>(2));
 			}
@@ -189,7 +186,7 @@ void MapDrawer::DrawCurrentCamera(const pangolin::OpenGlMatrix &Twc)
 #endif
 
 	glLineWidth(cameraLineWidth_);
-	glColor3f(0.0f, 1.0f, 0.0f);
+	glColor3f(0.f, 1.f, 0.f);
 	glBegin(GL_LINES);
 	glVertex3f(0, 0, 0);
 	glVertex3f(w, h, z);
