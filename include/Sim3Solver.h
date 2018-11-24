@@ -70,16 +70,16 @@ private:
 	int N;
 	int nkeypoints1_;
 
-	std::vector<bool> mvbInliersi;
+	std::vector<bool> inliers_;
 	
 	// Current Ransac State
 	int iterations_;
-	std::vector<bool> mvbBestInliers;
+	//std::vector<bool> bestInliers_;
 	int maxInliers_;
-	cv::Mat mBestT12;
-	cv::Mat mBestRotation;
-	cv::Mat mBestTranslation;
-	float mBestScale;
+	cv::Mat bestT12_;
+	cv::Mat bestRotation_;
+	cv::Mat bestTranslation_;
+	float bestScale_;
 
 	// Scale is fixed to 1 in the stereo/RGBD case
 	bool fixScale_;
@@ -92,13 +92,13 @@ private:
 	std::vector<cv::Mat> points2_;
 
 	// RANSAC probability
-	double mRansacProb;
+	double probability_;
 
 	// RANSAC min inliers
-	int mRansacMinInliers;
+	int minInliers_;
 
 	// RANSAC max iterations
-	int mRansacMaxIts;
+	int maxIterations_;
 
 	// Calibration
 	cv::Mat K1_;

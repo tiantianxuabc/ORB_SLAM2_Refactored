@@ -286,94 +286,84 @@ void Sim3Solver::SetRansacParameters(double probability, int minInliers, int max
 	iterations_ = 0;
 }
 
-cv::Mat Sim3Solver::iterate(int nIterations, bool &bNoMore, std::vector<bool> &vbInliers, int &nInliers)
+cv::Mat Sim3Solver::iterate(int maxk, bool& terminate, std::vector<bool>& isInlier, int& ninliers)
 {
-	bNoMore = false;
-	vbInliers = std::vector<bool>(nkeypoints1_, false);
-	nInliers = 0;
+	terminate = false;
+	isInlier.assign(nkeypoints1_, false);
+	ninliers = 0;
 
 	if (N < minInliers_)
 	{
-		bNoMore = true;
+		terminate = true;
 		return cv::Mat();
 	}
 
-	std::vector<size_t> vAvailableIndices;
+	std::vector<size_t> availableIndices;
 
-	cv::Mat P3Dc1i(3, 3, CV_32F);
-	cv::Mat P3Dc2i(3, 3, CV_32F);
+	cv::Mat P1(3, 3, CV_32F);
+	cv::Mat P2(3, 3, CV_32F);
 
-	int nCurrentIterations = 0;
-	while (iterations_ < maxIterations_ && nCurrentIterations < nIterations)
+	for (int k = 0; iterations_ < maxIterations_ && k < maxk; k++, iterations_++)
 	{
-		nCurrentIterations++;
-		iterations_++;
-
-		vAvailableIndices = allIndices;
+		availableIndices = allIndices;
 
 		// Get min set of points
-		for (short i = 0; i < 3; ++i)
+		for (int i = 0; i < 3; ++i)
 		{
-			int randi = DUtils::Random::RandomInt(0, vAvailableIndices.size() - 1);
+			const int randi = DUtils::Random::RandomInt(0, availableIndices.size() - 1);
+			const int idx = availableIndices[randi];
 
-			int idx = vAvailableIndices[randi];
+			Xc1_[idx].copyTo(P1.col(i));
+			Xc2_[idx].copyTo(P2.col(i));
 
-			Xc1_[idx].copyTo(P3Dc1i.col(i));
-			Xc2_[idx].copyTo(P3Dc2i.col(i));
-
-			vAvailableIndices[randi] = vAvailableIndices.back();
-			vAvailableIndices.pop_back();
+			availableIndices[randi] = availableIndices.back();
+			availableIndices.pop_back();
 		}
 
 		Sim3 S12, S21;
-		ComputeSim3(P3Dc1i, P3Dc2i, S12, S21, fixScale_);
+		ComputeSim3(P1, P2, S12, S21, fixScale_);
 
 		//CheckInliers();
-		std::vector<cv::Mat> vP1im2, vP2im1;
-		Project(Xc2_, vP2im1, S12.T, K1_);
-		Project(Xc1_, vP1im2, S21.T, K2_);
+		std::vector<cv::Mat> proj1, proj2;
+		Project(Xc2_, proj1, S12.T, K1_);
+		Project(Xc1_, proj2, S21.T, K2_);
 
-		int mnInliersi = 0;
-
+		int _ninliers = 0;
 		for (size_t i = 0; i < points1_.size(); i++)
 		{
-			cv::Mat dist1 = points1_[i] - vP2im1[i];
-			cv::Mat dist2 = vP1im2[i] - points2_[i];
+			cv::Mat diff1 = points1_[i] - proj1[i];
+			cv::Mat diff2 = points2_[i] - proj2[i];
 
-			const float err1 = dist1.dot(dist1);
-			const float err2 = dist2.dot(dist2);
-
-			if (err1 < maxErrorSq1_[i] && err2 < maxErrorSq2_[i])
-			{
-				inliers_[i] = true;
-				mnInliersi++;
-			}
-			else
-				inliers_[i] = false;
+			const double errorSq1 = diff1.dot(diff1);
+			const double errorSq2 = diff2.dot(diff2);
+			const bool inlier = errorSq1 < maxErrorSq1_[i] && errorSq2 < maxErrorSq2_[i];
+			inliers_[i] = inlier;
+			if (inlier)
+				_ninliers++;
 		}
 
-		if (mnInliersi >= maxInliers_)
+		if (_ninliers >= maxInliers_)
 		{
-			mvbBestInliers = inliers_;
-			maxInliers_ = mnInliersi;
-			mBestT12 = S12.T.clone();
-			mBestRotation = S12.R.clone();
-			mBestTranslation = S12.t.clone();
-			mBestScale = S12.scale;
+			//bestInliers_ = inliers_;
+			maxInliers_ = _ninliers;
+			bestT12_ = S12.T.clone();
+			bestRotation_ = S12.R.clone();
+			bestTranslation_ = S12.t.clone();
+			bestScale_ = S12.scale;
 
-			if (mnInliersi > minInliers_)
+			if (_ninliers > minInliers_)
 			{
-				nInliers = mnInliersi;
+				ninliers = _ninliers;
 				for (int i = 0; i < N; i++)
 					if (inliers_[i])
-						vbInliers[indices1_[i]] = true;
-				return mBestT12;
+						isInlier[indices1_[i]] = true;
+				return bestT12_;
 			}
 		}
 	}
 
 	if (iterations_ >= maxIterations_)
-		bNoMore = true;
+		terminate = true;
 
 	return cv::Mat();
 }
@@ -386,17 +376,17 @@ cv::Mat Sim3Solver::find(std::vector<bool> &vbInliers12, int &nInliers)
 
 cv::Mat Sim3Solver::GetEstimatedRotation()
 {
-	return mBestRotation.clone();
+	return bestRotation_.clone();
 }
 
 cv::Mat Sim3Solver::GetEstimatedTranslation()
 {
-	return mBestTranslation.clone();
+	return bestTranslation_.clone();
 }
 
 float Sim3Solver::GetEstimatedScale()
 {
-	return mBestScale;
+	return bestScale_;
 }
 
 } //namespace ORB_SLAM
