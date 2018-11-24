@@ -45,18 +45,10 @@ public:
 	};
 
 	Sim3Solver(const KeyFrame* pKF1, const KeyFrame* pKF2, const std::vector<MapPoint*> &vpMatched12, bool bFixScale = true);
-
 	void SetRansacParameters(double probability = 0.99, int minInliers = 6, int maxIterations = 300);
-
-	cv::Mat find(std::vector<bool> &vbInliers12, int &nInliers);
-
-	//cv::Mat iterate(int nIterations, bool &bNoMore, std::vector<bool> &vbInliers);
 	bool iterate(int maxk, Sim3& sim3, std::vector<bool>& isInlier);
 	bool terminate() const;
-	/*cv::Mat GetEstimatedRotation();
-	cv::Mat GetEstimatedTranslation();
-	float GetEstimatedScale();*/
-
+	
 private:
 
 	std::vector<cv::Mat> Xc1_;
@@ -74,11 +66,7 @@ private:
 	int iterations_;
 	int maxInliers_;
 	Sim3 bestS12_;
-	/*cv::Mat bestT12_;
-	cv::Mat bestRotation_;
-	cv::Mat bestTranslation_;
-	float bestScale_;*/
-
+	
 	// Scale is fixed to 1 in the stereo/RGBD case
 	bool fixScale_;
 

@@ -375,19 +375,4 @@ bool Sim3Solver::terminate() const
 	return terminate_;
 }
 
-//cv::Mat Sim3Solver::GetEstimatedRotation()
-//{
-//	return bestRotation_.clone();
-//}
-//
-//cv::Mat Sim3Solver::GetEstimatedTranslation()
-//{
-//	return bestTranslation_.clone();
-//}
-//
-//float Sim3Solver::GetEstimatedScale()
-//{
-//	return bestScale_;
-//}
-
 } //namespace ORB_SLAM
