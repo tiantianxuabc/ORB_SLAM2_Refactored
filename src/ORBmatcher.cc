@@ -734,27 +734,27 @@ int ORBmatcher::SearchForTriangulation(const KeyFrame* keyframe1, const KeyFrame
 	std::vector<std::pair<size_t, size_t>>& matchIds, bool onlyStereo)
 {
 	//Compute epipole in second image
-	cv::Mat Cw = keyframe1->GetCameraCenter();
-	cv::Mat R2w = keyframe2->GetRotation();
-	cv::Mat t2w = keyframe2->GetTranslation();
-	cv::Mat C2 = R2w*Cw + t2w;
-	const float invz = 1.0f / C2.at<float>(2);
-	const float ex = keyframe2->camera.fx*C2.at<float>(0)*invz + keyframe2->camera.cx;
-	const float ey = keyframe2->camera.fy*C2.at<float>(1)*invz + keyframe2->camera.cy;
+	const cv::Mat Cw = keyframe1->GetCameraCenter();
+	const cv::Mat R2w = keyframe2->GetRotation();
+	const cv::Mat t2w = keyframe2->GetTranslation();
+	const cv::Mat C2 = R2w * Cw + t2w;
+	const float invZ = 1.f / C2.at<float>(2);
+	const float epx = keyframe2->camera.fx * C2.at<float>(0) * invZ + keyframe2->camera.cx;
+	const float epy = keyframe2->camera.fy * C2.at<float>(1) * invZ + keyframe2->camera.cy;
 
 	// Find matches between not tracked keypoints
 	// Matching speed-up by ORB Vocabulary
 	// Compare only ORB that share the same node
 
 	int nmatches = 0;
-	vector<bool> vbMatched2(keyframe2->N, false);
-	vector<int> vMatches12(keyframe1->N, -1);
+	std::vector<bool> matched2(keyframe2->N, false);
+	std::vector<int> matches12(keyframe1->N, -1);
 
-	vector<int> rotHist[HISTO_LENGTH];
+	std::vector<int> hist[HISTO_LENGTH];
 	for (int i = 0; i < HISTO_LENGTH; i++)
-		rotHist[i].reserve(500);
+		hist[i].reserve(500);
 
-	const float factor = 1.0f / HISTO_LENGTH;
+	const float factor = 1.f / HISTO_LENGTH;
 
 	FeatureVectorIterator iterator(keyframe1->featureVector, keyframe2->featureVector);
 	while (iterator.next())
@@ -791,7 +791,7 @@ int ORBmatcher::SearchForTriangulation(const KeyFrame* keyframe1, const KeyFrame
 				MapPoint* pMP2 = keyframe2->GetMapPoint(idx2);
 
 				// If we have already matched or there is a MapPoint skip
-				if (vbMatched2[idx2] || pMP2)
+				if (matched2[idx2] || pMP2)
 					continue;
 
 				const bool bStereo2 = keyframe2->uright[idx2] >= 0;
@@ -811,8 +811,8 @@ int ORBmatcher::SearchForTriangulation(const KeyFrame* keyframe1, const KeyFrame
 
 				if (!bStereo1 && !bStereo2)
 				{
-					const float distex = ex - kp2.pt.x;
-					const float distey = ey - kp2.pt.y;
+					const float distex = epx - kp2.pt.x;
+					const float distey = epy - kp2.pt.y;
 					if (distex*distex + distey*distey < 100 * keyframe2->pyramid.scaleFactors[kp2.octave])
 						continue;
 				}
@@ -827,7 +827,7 @@ int ORBmatcher::SearchForTriangulation(const KeyFrame* keyframe1, const KeyFrame
 			if (bestIdx2 >= 0)
 			{
 				const cv::KeyPoint &kp2 = keyframe2->keypointsUn[bestIdx2];
-				vMatches12[idx1] = bestIdx2;
+				matches12[idx1] = bestIdx2;
 				nmatches++;
 
 				if (checkOrientation_)
@@ -839,7 +839,7 @@ int ORBmatcher::SearchForTriangulation(const KeyFrame* keyframe1, const KeyFrame
 					if (bin == HISTO_LENGTH)
 						bin = 0;
 					assert(bin >= 0 && bin < HISTO_LENGTH);
-					rotHist[bin].push_back(idx1);
+					hist[bin].push_back(idx1);
 				}
 			}
 		}
@@ -851,15 +851,15 @@ int ORBmatcher::SearchForTriangulation(const KeyFrame* keyframe1, const KeyFrame
 		int ind2 = -1;
 		int ind3 = -1;
 
-		ComputeThreeMaxima(rotHist, HISTO_LENGTH, ind1, ind2, ind3);
+		ComputeThreeMaxima(hist, HISTO_LENGTH, ind1, ind2, ind3);
 
 		for (int i = 0; i < HISTO_LENGTH; i++)
 		{
 			if (i == ind1 || i == ind2 || i == ind3)
 				continue;
-			for (size_t j = 0, jend = rotHist[i].size(); j < jend; j++)
+			for (size_t j = 0, jend = hist[i].size(); j < jend; j++)
 			{
-				vMatches12[rotHist[i][j]] = -1;
+				matches12[hist[i][j]] = -1;
 				nmatches--;
 			}
 		}
@@ -869,11 +869,11 @@ int ORBmatcher::SearchForTriangulation(const KeyFrame* keyframe1, const KeyFrame
 	matchIds.clear();
 	matchIds.reserve(nmatches);
 
-	for (size_t i = 0, iend = vMatches12.size(); i < iend; i++)
+	for (size_t i = 0, iend = matches12.size(); i < iend; i++)
 	{
-		if (vMatches12[i] < 0)
+		if (matches12[i] < 0)
 			continue;
-		matchIds.push_back(make_pair(i, vMatches12[i]));
+		matchIds.push_back(make_pair(i, matches12[i]));
 	}
 
 	return nmatches;
