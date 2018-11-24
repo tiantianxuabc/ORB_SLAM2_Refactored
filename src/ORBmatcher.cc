@@ -761,78 +761,67 @@ int ORBmatcher::SearchForTriangulation(const KeyFrame* keyframe1, const KeyFrame
 	{
 		const auto& indices1 = iterator.indices1();
 		const auto& indices2 = iterator.indices2();
-		for (size_t i1 = 0, iend1 = indices1.size(); i1 < iend1; i1++)
+		for (auto idx1 : indices1)
 		{
-			const size_t idx1 = indices1[i1];
-
-			MapPoint* pMP1 = keyframe1->GetMapPoint(idx1);
+			MapPoint* mappoint1 = keyframe1->GetMapPoint(idx1);
 
 			// If there is already a MapPoint skip
-			if (pMP1)
+			if (mappoint1)
 				continue;
 
-			const bool bStereo1 = keyframe1->uright[idx1] >= 0;
+			const bool stereo1 = keyframe1->uright[idx1] >= 0;
+			if (onlyStereo && !stereo1)
+				continue;
 
-			if (onlyStereo)
-				if (!bStereo1)
-					continue;
-
-			const cv::KeyPoint &kp1 = keyframe1->keypointsUn[idx1];
-
-			const cv::Mat &d1 = keyframe1->descriptorsL.row(idx1);
+			const cv::KeyPoint& keypoint1 = keyframe1->keypointsUn[idx1];
+			const cv::Mat desc1 = keyframe1->descriptorsL.row(idx1);
 
 			int bestDist = TH_LOW;
 			int bestIdx2 = -1;
 
-			for (size_t i2 = 0, iend2 = indices2.size(); i2 < iend2; i2++)
+			for (auto idx2 : indices2)
 			{
-				size_t idx2 = indices2[i2];
-
-				MapPoint* pMP2 = keyframe2->GetMapPoint(idx2);
+				MapPoint* mappoint2 = keyframe2->GetMapPoint(idx2);
 
 				// If we have already matched or there is a MapPoint skip
-				if (matched2[idx2] || pMP2)
+				if (matched2[idx2] || mappoint2)
 					continue;
 
-				const bool bStereo2 = keyframe2->uright[idx2] >= 0;
+				const bool stereo2 = keyframe2->uright[idx2] >= 0;
+				if (onlyStereo && !stereo2)
+					continue;
 
-				if (onlyStereo)
-					if (!bStereo2)
-						continue;
-
-				const cv::Mat &d2 = keyframe2->descriptorsL.row(idx2);
-
-				const int dist = DescriptorDistance(d1, d2);
-
+				const cv::Mat desc2 = keyframe2->descriptorsL.row(idx2);
+				const int dist = DescriptorDistance(desc1, desc2);
 				if (dist > TH_LOW || dist > bestDist)
 					continue;
 
-				const cv::KeyPoint &kp2 = keyframe2->keypointsUn[idx2];
+				const cv::KeyPoint& keypoint2 = keyframe2->keypointsUn[idx2];
 
-				if (!bStereo1 && !bStereo2)
+				if (!stereo1 && !stereo2)
 				{
-					const float distex = epx - kp2.pt.x;
-					const float distey = epy - kp2.pt.y;
-					if (distex*distex + distey*distey < 100 * keyframe2->pyramid.scaleFactors[kp2.octave])
+					const float dx = epx - keypoint2.pt.x;
+					const float dy = epy - keypoint2.pt.y;
+					if (dx * dx + dy * dy < 100 * keyframe2->pyramid.scaleFactors[keypoint2.octave])
 						continue;
 				}
 
-				if (CheckDistEpipolarLine(kp1, kp2, F12, keyframe2))
+				if (CheckDistEpipolarLine(keypoint1, keypoint2, F12, keyframe2))
 				{
-					bestIdx2 = idx2;
+					bestIdx2 = static_cast<int>(idx2);
 					bestDist = dist;
 				}
 			}
 
 			if (bestIdx2 >= 0)
 			{
-				const cv::KeyPoint &kp2 = keyframe2->keypointsUn[bestIdx2];
+				const cv::KeyPoint& keypoint2 = keyframe2->keypointsUn[bestIdx2];
 				matches12[idx1] = bestIdx2;
 				nmatches++;
 
 				if (checkOrientation_)
 				{
-					float rot = kp1.angle - kp2.angle;
+					float rot = keypoint1.angle - keypoint2.angle;
 					if (rot < 0.0)
 						rot += 360.0f;
 					int bin = round(rot*factor);
