@@ -70,7 +70,7 @@ cv::Mat FrameDrawer::DrawFrame()
 	} // destroy scoped mutex -> release mutex
 
 	if (image.channels() < 3) //this should be always true
-		cvtColor(image, image, CV_GRAY2BGR);
+		cv::cvtColor(image, image, CV_GRAY2BGR);
 
 	//Draw
 	if (state == Tracking::STATE_NOT_INITIALIZED) //INITIALIZING
@@ -123,42 +123,44 @@ cv::Mat FrameDrawer::DrawFrame()
 }
 
 
-void FrameDrawer::DrawTextInfo(cv::Mat &im, int nState, cv::Mat &imText)
+void FrameDrawer::DrawTextInfo(cv::Mat& src, int state, cv::Mat& dst)
 {
-	stringstream s;
-	if (nState == Tracking::STATE_NO_IMAGES)
-		s << " WAITING FOR IMAGES";
-	else if (nState == Tracking::STATE_NOT_INITIALIZED)
-		s << " TRYING TO INITIALIZE ";
-	else if (nState == Tracking::STATE_OK)
+	std::stringstream ss;
+	if (state == Tracking::STATE_NO_IMAGES)
 	{
-		if (!mbOnlyTracking)
-			s << "SLAM MODE |  ";
-		else
-			s << "LOCALIZATION | ";
-		int nKFs = map_->KeyFramesInMap();
-		int nMPs = map_->MapPointsInMap();
-		s << "KFs: " << nKFs << ", MPs: " << nMPs << ", Matches: " << ntracked_;
+		ss << " WAITING FOR IMAGES";
+	}
+	else if (state == Tracking::STATE_NOT_INITIALIZED)
+	{
+		ss << " TRYING TO INITIALIZE ";
+	}
+	else if (state == Tracking::STATE_OK)
+	{
+		ss << (localizationMode_ ? "LOCALIZATION | " : "SLAM MODE |  ");
+
+		const size_t nkeyframes = map_->KeyFramesInMap();
+		const size_t nmappoints = map_->MapPointsInMap();
+
+		ss << "KFs: " << nkeyframes << ", MPs: " << nmappoints << ", Matches: " << ntracked_;
 		if (ntrackedVO_ > 0)
-			s << ", + VO matches: " << ntrackedVO_;
+			ss << ", + VO matches: " << ntrackedVO_;
 	}
-	else if (nState == Tracking::STATE_LOST)
+	else if (state == Tracking::STATE_LOST)
 	{
-		s << " TRACK LOST. TRYING TO RELOCALIZE ";
+		ss << " TRACK LOST. TRYING TO RELOCALIZE ";
 	}
-	else if (nState == Tracking::STATE_NOT_READY)
+	else if (state == Tracking::STATE_NOT_READY)
 	{
-		s << " LOADING ORB VOCABULARY. PLEASE WAIT...";
+		ss << " LOADING ORB VOCABULARY. PLEASE WAIT...";
 	}
 
 	int baseline = 0;
-	cv::Size textSize = cv::getTextSize(s.str(), cv::FONT_HERSHEY_PLAIN, 1, 1, &baseline);
+	const cv::Size textSize = cv::getTextSize(ss.str(), cv::FONT_HERSHEY_PLAIN, 1, 1, &baseline);
 
-	imText = cv::Mat(im.rows + textSize.height + 10, im.cols, im.type());
-	im.copyTo(imText.rowRange(0, im.rows).colRange(0, im.cols));
-	imText.rowRange(im.rows, imText.rows) = cv::Mat::zeros(textSize.height + 10, im.cols, im.type());
-	cv::putText(imText, s.str(), cv::Point(5, imText.rows - 5), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(255, 255, 255), 1, 8);
-
+	dst = cv::Mat(src.rows + textSize.height + 10, src.cols, src.type());
+	src.copyTo(dst.rowRange(0, src.rows).colRange(0, src.cols));
+	dst.rowRange(src.rows, dst.rows) = cv::Mat::zeros(textSize.height + 10, src.cols, src.type());
+	cv::putText(dst, ss.str(), cv::Point(5, dst.rows - 5), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(255, 255, 255), 1, 8);
 }
 
 void FrameDrawer::Update(Tracking *pTracker)
@@ -169,7 +171,7 @@ void FrameDrawer::Update(Tracking *pTracker)
 	N = currKeyPoints_.size();
 	isVO_ = vector<bool>(N, false);
 	isMap_ = vector<bool>(N, false);
-	mbOnlyTracking = pTracker->OnlyTracking();
+	localizationMode_ = pTracker->OnlyTracking();
 
 
 	if (pTracker->GetLastProcessedState() == Tracking::STATE_NOT_INITIALIZED)

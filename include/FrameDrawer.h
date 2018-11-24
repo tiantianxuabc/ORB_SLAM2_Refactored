@@ -54,7 +54,7 @@ protected:
 	int N;
 	std::vector<cv::KeyPoint> currKeyPoints_;
 	std::vector<bool> isMap_, isVO_;
-	bool mbOnlyTracking;
+	bool localizationMode_;
 	int ntracked_, ntrackedVO_;
 	std::vector<cv::KeyPoint> initKeyPoints_;
 	std::vector<int> initMatches_;
