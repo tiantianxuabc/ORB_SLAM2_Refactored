@@ -33,39 +33,42 @@
 namespace ORB_SLAM2
 {
 
-static void GetCurrentOpenGLCameraMatrix(const cv::Mat& cameraPose, pangolin::OpenGlMatrix &M)
+static void GetCurrentOpenGLCameraMatrix(const cv::Mat& Tcw, pangolin::OpenGlMatrix &M)
 {
-	if (!cameraPose.empty())
+	if (!Tcw.empty())
 	{
-		cv::Mat Rwc(3, 3, CV_32F);
-		cv::Mat twc(3, 1, CV_32F);
+		cv::Mat1f Rwc(3, 3);
+		cv::Mat1f twc(3, 1);
 		{
-			Rwc = cameraPose.rowRange(0, 3).colRange(0, 3).t();
-			twc = -Rwc*cameraPose.rowRange(0, 3).col(3);
+			// unique_lock<mutex> lock(mMutexCamera);
+			Rwc = CameraPose::GetR(Tcw).t();
+			twc = -Rwc * CameraPose::Gett(Tcw);
 		}
 
-		M.m[0] = Rwc.at<float>(0, 0);
-		M.m[1] = Rwc.at<float>(1, 0);
-		M.m[2] = Rwc.at<float>(2, 0);
+		M.m[0] = Rwc(0, 0);
+		M.m[1] = Rwc(1, 0);
+		M.m[2] = Rwc(2, 0);
 		M.m[3] = 0.0;
 
-		M.m[4] = Rwc.at<float>(0, 1);
-		M.m[5] = Rwc.at<float>(1, 1);
-		M.m[6] = Rwc.at<float>(2, 1);
+		M.m[4] = Rwc(0, 1);
+		M.m[5] = Rwc(1, 1);
+		M.m[6] = Rwc(2, 1);
 		M.m[7] = 0.0;
 
-		M.m[8] = Rwc.at<float>(0, 2);
-		M.m[9] = Rwc.at<float>(1, 2);
-		M.m[10] = Rwc.at<float>(2, 2);
+		M.m[8] = Rwc(0, 2);
+		M.m[9] = Rwc(1, 2);
+		M.m[10] = Rwc(2, 2);
 		M.m[11] = 0.0;
 
-		M.m[12] = twc.at<float>(0);
-		M.m[13] = twc.at<float>(1);
-		M.m[14] = twc.at<float>(2);
+		M.m[12] = twc(0);
+		M.m[13] = twc(1);
+		M.m[14] = twc(2);
 		M.m[15] = 1.0;
 	}
 	else
+	{
 		M.SetIdentity();
+	}
 }
 
 static void DrawCurrentCamera(pangolin::OpenGlMatrix &Twc, float cameraSize = 0.7f, float cameraLineWidth = 3.f)

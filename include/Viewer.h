@@ -71,8 +71,8 @@ private:
 	// 1/fps in ms
 	double waittime_;
 	
-	float mViewpointX, mViewpointY, mViewpointZ, mViewpointF;
-	float mCameraSize, mCameraLineWidth;
+	float viewpointX_, viewpointY_, viewpointZ_, viewpointF_;
+	float cameraSize_, cameraLineWidth_;
 
 	bool CheckFinish();
 	void SetFinish();
