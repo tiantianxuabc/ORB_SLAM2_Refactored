@@ -481,13 +481,11 @@ int ORBmatcher::SearchForInitialization(Frame& frame1, Frame& frame2, std::vecto
 	int nmatches = 0;
 	matches12.assign(frame1.keypointsUn.size(), -1);
 
-	vector<int> rotHist[HISTO_LENGTH];
-	for (int i = 0; i < HISTO_LENGTH; i++)
-		rotHist[i].reserve(500);
-	const float factor = 1.0f / HISTO_LENGTH;
-
 	std::vector<int> matchedDistance(frame2.keypointsUn.size(), std::numeric_limits<int>::max());
 	std::vector<int> matches21(frame2.keypointsUn.size(), -1);
+
+	std::vector<MatchIdx> matchIds;
+	matchIds.reserve(frame1.keypointsUn.size());
 
 	for (size_t idx1 = 0; idx1 < frame1.keypointsUn.size(); idx1++)
 	{
@@ -542,43 +540,12 @@ int ORBmatcher::SearchForInitialization(Frame& frame1, Frame& frame2, std::vecto
 			nmatches++;
 
 			if (checkOrientation_)
-			{
-				float rot = frame1.keypointsUn[idx1].angle - frame2.keypointsUn[bestIdx2].angle;
-				if (rot < 0.0)
-					rot += 360.0f;
-				int bin = round(rot*factor);
-				if (bin == HISTO_LENGTH)
-					bin = 0;
-				assert(bin >= 0 && bin < HISTO_LENGTH);
-				rotHist[bin].push_back(idx1);
-			}
+				matchIds.push_back(std::make_pair(bestIdx2, static_cast<int>(idx1)));
 		}
 	}
 
 	if (checkOrientation_)
-	{
-		int ind1 = -1;
-		int ind2 = -1;
-		int ind3 = -1;
-
-		ComputeThreeMaxima(rotHist, HISTO_LENGTH, ind1, ind2, ind3);
-
-		for (int i = 0; i < HISTO_LENGTH; i++)
-		{
-			if (i == ind1 || i == ind2 || i == ind3)
-				continue;
-			for (size_t j = 0, jend = rotHist[i].size(); j < jend; j++)
-			{
-				int idx1 = rotHist[i][j];
-				if (matches12[idx1] >= 0)
-				{
-					matches12[idx1] = -1;
-					nmatches--;
-				}
-			}
-		}
-
-	}
+		nmatches = CheckOrientation(frame2.keypointsUn, frame1.keypointsUn, matchIds, matches12);
 
 	// Update prev matched
 	for (size_t i1 = 0, iend1 = matches12.size(); i1 < iend1; i1++)
