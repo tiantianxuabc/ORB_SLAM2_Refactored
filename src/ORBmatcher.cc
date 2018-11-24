@@ -604,19 +604,19 @@ int ORBmatcher::SearchForInitialization(Frame &F1, Frame &F2, vector<cv::Point2f
 	return nmatches;
 }
 
-int ORBmatcher::SearchByBoW(KeyFrame *pKF1, KeyFrame *pKF2, vector<MapPoint *> &vpMatches12)
+int ORBmatcher::SearchByBoW(KeyFrame* keyframe1, KeyFrame* keyframe2, std::vector<MapPoint*>& matches12)
 {
-	const vector<cv::KeyPoint> &vKeysUn1 = pKF1->keypointsUn;
-	const DBoW2::FeatureVector &vFeatVec1 = pKF1->featureVector;
-	const vector<MapPoint*> vpMapPoints1 = pKF1->GetMapPointMatches();
-	const cv::Mat &Descriptors1 = pKF1->descriptorsL;
+	const vector<cv::KeyPoint> &vKeysUn1 = keyframe1->keypointsUn;
+	const DBoW2::FeatureVector &vFeatVec1 = keyframe1->featureVector;
+	const vector<MapPoint*> vpMapPoints1 = keyframe1->GetMapPointMatches();
+	const cv::Mat &Descriptors1 = keyframe1->descriptorsL;
 
-	const vector<cv::KeyPoint> &vKeysUn2 = pKF2->keypointsUn;
-	const DBoW2::FeatureVector &vFeatVec2 = pKF2->featureVector;
-	const vector<MapPoint*> vpMapPoints2 = pKF2->GetMapPointMatches();
-	const cv::Mat &Descriptors2 = pKF2->descriptorsL;
+	const vector<cv::KeyPoint> &vKeysUn2 = keyframe2->keypointsUn;
+	const DBoW2::FeatureVector &vFeatVec2 = keyframe2->featureVector;
+	const vector<MapPoint*> vpMapPoints2 = keyframe2->GetMapPointMatches();
+	const cv::Mat &Descriptors2 = keyframe2->descriptorsL;
 
-	vpMatches12 = vector<MapPoint*>(vpMapPoints1.size(), static_cast<MapPoint*>(NULL));
+	matches12 = vector<MapPoint*>(vpMapPoints1.size(), static_cast<MapPoint*>(NULL));
 	vector<bool> vbMatched2(vpMapPoints2.size(), false);
 
 	vector<int> rotHist[HISTO_LENGTH];
@@ -684,7 +684,7 @@ int ORBmatcher::SearchByBoW(KeyFrame *pKF1, KeyFrame *pKF2, vector<MapPoint *> &
 				{
 					if (static_cast<float>(bestDist1) < fNNRatio_*static_cast<float>(bestDist2))
 					{
-						vpMatches12[idx1] = vpMapPoints2[bestIdx2];
+						matches12[idx1] = vpMapPoints2[bestIdx2];
 						vbMatched2[bestIdx2] = true;
 
 						if (checkOrientation_)
@@ -730,7 +730,7 @@ int ORBmatcher::SearchByBoW(KeyFrame *pKF1, KeyFrame *pKF2, vector<MapPoint *> &
 				continue;
 			for (size_t j = 0, jend = rotHist[i].size(); j < jend; j++)
 			{
-				vpMatches12[rotHist[i][j]] = static_cast<MapPoint*>(NULL);
+				matches12[rotHist[i][j]] = static_cast<MapPoint*>(NULL);
 				nmatches--;
 			}
 		}
