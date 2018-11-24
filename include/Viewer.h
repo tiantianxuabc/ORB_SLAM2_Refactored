@@ -78,7 +78,6 @@ private:
 	int waittime_;
 	
 	float viewpointX_, viewpointY_, viewpointZ_, viewpointF_;
-	float cameraSize_, cameraLineWidth_;
 
 	bool CheckFinish();
 	void SetFinish();

@@ -177,16 +177,90 @@ void MapDrawer::DrawKeyFrames(const bool bDrawKF, const bool bDrawGraph)
     }
 }
 
+void MapDrawer::DrawCurrentCamera(const pangolin::OpenGlMatrix &Twc)
+{
+	const float w = mCameraSize;
+	const float h = 0.75f * w;
+	const float z = 0.6f * w;
+
+	glPushMatrix();
+
+#ifdef HAVE_GLES
+	glMultMatrixf(Twc.m);
+#else
+	glMultMatrixd(Twc.m);
+#endif
+
+	glLineWidth(mCameraLineWidth);
+	glColor3f(0.0f, 1.0f, 0.0f);
+	glBegin(GL_LINES);
+	glVertex3f(0, 0, 0);
+	glVertex3f(w, h, z);
+	glVertex3f(0, 0, 0);
+	glVertex3f(w, -h, z);
+	glVertex3f(0, 0, 0);
+	glVertex3f(-w, -h, z);
+	glVertex3f(0, 0, 0);
+	glVertex3f(-w, h, z);
+
+	glVertex3f(w, h, z);
+	glVertex3f(w, -h, z);
+
+	glVertex3f(-w, h, z);
+	glVertex3f(-w, -h, z);
+
+	glVertex3f(-w, h, z);
+	glVertex3f(w, h, z);
+
+	glVertex3f(-w, -h, z);
+	glVertex3f(w, -h, z);
+	glEnd();
+
+	glPopMatrix();
+}
+
 void MapDrawer::SetCurrentCameraPose(const cv::Mat &Tcw)
 {
 	std::unique_lock<std::mutex> lock(mMutexCamera);
     mCameraPose = Tcw.clone();
 }
 
-cv::Mat MapDrawer::GetCurrentCameraPose() const
+void MapDrawer::GetCurrentOpenGLCameraMatrix(pangolin::OpenGlMatrix &M)
 {
-	std::unique_lock<std::mutex> lock(mMutexCamera);
-	return mCameraPose.clone();
+	if (!mCameraPose.empty())
+	{
+		cv::Mat1f Rwc(3, 3);
+		cv::Mat1f twc(3, 1);
+		{
+			unique_lock<mutex> lock(mMutexCamera);
+			Rwc = CameraPose::GetR(mCameraPose).t();
+			twc = -Rwc * CameraPose::Gett(mCameraPose);
+		}
+
+		M.m[0] = Rwc(0, 0);
+		M.m[1] = Rwc(1, 0);
+		M.m[2] = Rwc(2, 0);
+		M.m[3] = 0.0;
+
+		M.m[4] = Rwc(0, 1);
+		M.m[5] = Rwc(1, 1);
+		M.m[6] = Rwc(2, 1);
+		M.m[7] = 0.0;
+
+		M.m[8] = Rwc(0, 2);
+		M.m[9] = Rwc(1, 2);
+		M.m[10] = Rwc(2, 2);
+		M.m[11] = 0.0;
+
+		M.m[12] = twc(0);
+		M.m[13] = twc(1);
+		M.m[14] = twc(2);
+		M.m[15] = 1.0;
+	}
+	else
+	{
+		M.SetIdentity();
+	}
 }
 
 } //namespace ORB_SLAM

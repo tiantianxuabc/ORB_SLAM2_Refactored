@@ -33,86 +33,6 @@
 namespace ORB_SLAM2
 {
 
-static void GetCurrentOpenGLCameraMatrix(const cv::Mat& Tcw, pangolin::OpenGlMatrix &M)
-{
-	if (!Tcw.empty())
-	{
-		cv::Mat1f Rwc(3, 3);
-		cv::Mat1f twc(3, 1);
-		{
-			// unique_lock<mutex> lock(mMutexCamera);
-			Rwc = CameraPose::GetR(Tcw).t();
-			twc = -Rwc * CameraPose::Gett(Tcw);
-		}
-
-		M.m[0] = Rwc(0, 0);
-		M.m[1] = Rwc(1, 0);
-		M.m[2] = Rwc(2, 0);
-		M.m[3] = 0.0;
-
-		M.m[4] = Rwc(0, 1);
-		M.m[5] = Rwc(1, 1);
-		M.m[6] = Rwc(2, 1);
-		M.m[7] = 0.0;
-
-		M.m[8] = Rwc(0, 2);
-		M.m[9] = Rwc(1, 2);
-		M.m[10] = Rwc(2, 2);
-		M.m[11] = 0.0;
-
-		M.m[12] = twc(0);
-		M.m[13] = twc(1);
-		M.m[14] = twc(2);
-		M.m[15] = 1.0;
-	}
-	else
-	{
-		M.SetIdentity();
-	}
-}
-
-static void DrawCurrentCamera(const pangolin::OpenGlMatrix &Twc, float cameraSize = 0.7f, float cameraLineWidth = 3.f)
-{
-	const float w = cameraSize;
-	const float h = 0.75f * w;
-	const float z = 0.6f * w;
-
-	glPushMatrix();
-
-#ifdef HAVE_GLES
-	glMultMatrixf(Twc.m);
-#else
-	glMultMatrixd(Twc.m);
-#endif
-
-	glLineWidth(cameraLineWidth);
-	glColor3f(0.0f, 1.0f, 0.0f);
-	glBegin(GL_LINES);
-	glVertex3f(0, 0, 0);
-	glVertex3f(w, h, z);
-	glVertex3f(0, 0, 0);
-	glVertex3f(w, -h, z);
-	glVertex3f(0, 0, 0);
-	glVertex3f(-w, -h, z);
-	glVertex3f(0, 0, 0);
-	glVertex3f(-w, h, z);
-
-	glVertex3f(w, h, z);
-	glVertex3f(w, -h, z);
-
-	glVertex3f(-w, h, z);
-	glVertex3f(-w, -h, z);
-
-	glVertex3f(-w, h, z);
-	glVertex3f(w, h, z);
-
-	glVertex3f(-w, -h, z);
-	glVertex3f(w, -h, z);
-	glEnd();
-
-	glPopMatrix();
-}
-
 Viewer::Viewer(System* system, Map* map, const std::string& settingsFile)
 	: system_(system), finishRequested_(false), finished_(true), stopped_(true), stopRequested_(false)
 {
@@ -127,9 +47,6 @@ Viewer::Viewer(System* system, Map* map, const std::string& settingsFile)
 	viewpointY_ = settings["Viewer.ViewpointY"];
 	viewpointZ_ = settings["Viewer.ViewpointZ"];
 	viewpointF_ = settings["Viewer.ViewpointF"];
-
-	cameraSize_ = settings["Viewer.CameraSize"];
-	cameraLineWidth_ = settings["Viewer.CameraLineWidth"];
 
 	frameDrawer_ = std::make_unique<FrameDrawer>(map);
 	mapDrawer_ = std::make_unique<MapDrawer>(map, settingsFile);
@@ -184,7 +101,7 @@ void Viewer::Run()
 	{
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-		GetCurrentOpenGLCameraMatrix(mapDrawer_->GetCurrentCameraPose(), Twc);
+		mapDrawer_->GetCurrentOpenGLCameraMatrix(Twc);
 
 		if (menuFollowCamera && followCamera)
 		{
@@ -214,7 +131,7 @@ void Viewer::Run()
 
 		d_cam.Activate(s_cam);
 		glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
-		DrawCurrentCamera(Twc, cameraSize_, cameraLineWidth_);
+		mapDrawer_->DrawCurrentCamera(Twc);
 		if (menuShowKeyFrames || menuShowGraph)
 			mapDrawer_->DrawKeyFrames(menuShowKeyFrames, menuShowGraph);
 		if (menuShowPoints)
