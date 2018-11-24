@@ -1386,8 +1386,8 @@ int ORBmatcher::SearchByProjection(Frame& currFrame, const Frame& lastFrame, flo
 	const cv::Mat twc = -Rcw.t() * tcw;
 	const cv::Mat tlc = Rlw * twc + tlw;
 
-	const bool bForward = tlc.at<float>(2) > currFrame.camera.baseline && !monocular;
-	const bool bBackward = -tlc.at<float>(2) > currFrame.camera.baseline && !monocular;
+	const bool forward = tlc.at<float>(2) > currFrame.camera.baseline && !monocular;
+	const bool backward = -tlc.at<float>(2) > currFrame.camera.baseline && !monocular;
 
 	for (int i = 0; i < lastFrame.N; i++)
 	{
@@ -1421,9 +1421,9 @@ int ORBmatcher::SearchByProjection(Frame& currFrame, const Frame& lastFrame, flo
 
 				vector<size_t> vIndices2;
 
-				if (bForward)
+				if (forward)
 					vIndices2 = currFrame.GetFeaturesInArea(u, v, radius, nLastOctave);
-				else if (bBackward)
+				else if (backward)
 					vIndices2 = currFrame.GetFeaturesInArea(u, v, radius, 0, nLastOctave);
 				else
 					vIndices2 = currFrame.GetFeaturesInArea(u, v, radius, nLastOctave - 1, nLastOctave + 1);
