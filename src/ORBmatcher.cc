@@ -1376,6 +1376,8 @@ static int CheckOrientation(const Frame& frame1, const Frame& frame2, const std:
 	// should be : const int HIST_SIZE = 360 / ORIENTATION_HIST_STEP; ?
 	const float factor = 1.f / HISTO_LENGTH;
 	std::vector<int> hist[HISTO_LENGTH];
+	for (int i = 0; i < HISTO_LENGTH; i++)
+		hist[i].reserve(500);
 
 	auto diffToBin = [=](float diff)
 	{
@@ -1431,12 +1433,6 @@ static int CheckOrientation(const Frame& frame1, const Frame& frame2, const std:
 int ORBmatcher::SearchByProjection(Frame& currFrame, const Frame& lastFrame, float th, bool monocular)
 {
 	int nmatches = 0;
-
-	// Rotation Histogram (to check rotation consistency)
-	vector<int> rotHist[HISTO_LENGTH];
-	for (int i = 0; i < HISTO_LENGTH; i++)
-		rotHist[i].reserve(500);
-	const float factor = 1.f / HISTO_LENGTH;
 
 	const cv::Mat Rcw = CameraPose::GetR(currFrame.pose.Tcw);
 	const cv::Mat tcw = CameraPose::Gett(currFrame.pose.Tcw);
