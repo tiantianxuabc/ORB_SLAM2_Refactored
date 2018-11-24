@@ -41,47 +41,47 @@ class System;
 class Viewer
 {
 public:
-    Viewer(System* pSystem, FrameDrawer* pFrameDrawer, MapDrawer* pMapDrawer, Tracking *pTracking, const std::string &strSettingPath);
+	Viewer(System* pSystem, FrameDrawer* pFrameDrawer, MapDrawer* pMapDrawer, Tracking *pTracking, const std::string &strSettingPath);
 
-    // Main thread function. Draw points, keyframes, the current camera pose and the last processed
-    // frame. Drawing is refreshed according to the camera fps. We use Pangolin.
-    void Run();
+	// Main thread function. Draw points, keyframes, the current camera pose and the last processed
+	// frame. Drawing is refreshed according to the camera fps. We use Pangolin.
+	void Run();
 
-    void RequestFinish();
+	void RequestFinish();
 
-    void RequestStop();
+	void RequestStop();
 
-    bool isFinished();
+	bool isFinished();
 
-    bool isStopped();
+	bool isStopped();
 
-    void Release();
+	void Release();
 
 private:
 
-    bool Stop();
+	bool Stop();
 
-    System* mpSystem;
-    FrameDrawer* mpFrameDrawer;
-    MapDrawer* mpMapDrawer;
-    Tracking* mpTracker;
+	System* mpSystem;
+	FrameDrawer* mpFrameDrawer;
+	MapDrawer* mpMapDrawer;
+	Tracking* mpTracker;
 
-    // 1/fps in ms
-    double mT;
-    float mImageWidth, mImageHeight;
+	// 1/fps in ms
+	double mT;
+	float mImageWidth, mImageHeight;
 
-    float mViewpointX, mViewpointY, mViewpointZ, mViewpointF;
+	float mViewpointX, mViewpointY, mViewpointZ, mViewpointF;
 	float mCameraSize, mCameraLineWidth;
 
-    bool CheckFinish();
-    void SetFinish();
-    bool mbFinishRequested;
-    bool mbFinished;
-    std::mutex mMutexFinish;
+	bool CheckFinish();
+	void SetFinish();
+	bool mbFinishRequested;
+	bool mbFinished;
+	std::mutex mMutexFinish;
 
-    bool mbStopped;
-    bool mbStopRequested;
-    std::mutex mMutexStop;
+	bool mbStopped;
+	bool mbStopRequested;
+	std::mutex mMutexStop;
 
 };
 
@@ -89,5 +89,5 @@ private:
 
 
 #endif // VIEWER_H
-	
+
 
