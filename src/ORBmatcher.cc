@@ -1367,7 +1367,7 @@ int ORBmatcher::SearchBySim3(KeyFrame *pKF1, KeyFrame *pKF2, vector<MapPoint*> &
 	return nFound;
 }
 
-int ORBmatcher::SearchByProjection(Frame &CurrentFrame, const Frame &LastFrame, const float th, const bool bMono)
+int ORBmatcher::SearchByProjection(Frame &CurrentFrame, const Frame &LastFrame, float th, bool bMono)
 {
 	int nmatches = 0;
 
@@ -1412,10 +1412,6 @@ int ORBmatcher::SearchByProjection(Frame &CurrentFrame, const Frame &LastFrame, 
 				float u = CurrentFrame.camera.fx*xc*invzc + CurrentFrame.camera.cx;
 				float v = CurrentFrame.camera.fy*yc*invzc + CurrentFrame.camera.cy;
 
-				/*if(u<CurrentFrame.mnMinX || u>CurrentFrame.mnMaxX)
-					continue;
-				if(v<CurrentFrame.mnMinY || v>CurrentFrame.mnMaxY)
-					continue;*/
 				if (!CurrentFrame.imageBounds.Contains(u, v))
 					continue;
 
