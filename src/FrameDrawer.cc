@@ -27,10 +27,10 @@
 namespace ORB_SLAM2
 {
 
-FrameDrawer::FrameDrawer(Map* pMap) :mpMap(pMap)
+FrameDrawer::FrameDrawer(Map* map) : map_(map)
 {
-	mState = Tracking::STATE_NOT_READY;
-	mIm = cv::Mat(480, 640, CV_8UC3, cv::Scalar(0, 0, 0));
+	state_ = Tracking::STATE_NOT_READY;
+	image_ = cv::Mat(480, 640, CV_8UC3, cv::Scalar(0, 0, 0));
 }
 
 cv::Mat FrameDrawer::DrawFrame()
@@ -45,25 +45,25 @@ cv::Mat FrameDrawer::DrawFrame()
 	//Copy variables within scoped mutex
 	{
 		unique_lock<mutex> lock(mMutex);
-		state = mState;
-		if (mState == Tracking::STATE_NOT_READY)
-			mState = Tracking::STATE_NO_IMAGES;
+		state = state_;
+		if (state_ == Tracking::STATE_NOT_READY)
+			state_ = Tracking::STATE_NO_IMAGES;
 
-		mIm.copyTo(im);
+		image_.copyTo(im);
 
-		if (mState == Tracking::STATE_NOT_INITIALIZED)
+		if (state_ == Tracking::STATE_NOT_INITIALIZED)
 		{
 			vCurrentKeys = mvCurrentKeys;
 			vIniKeys = mvIniKeys;
 			vMatches = mvIniMatches;
 		}
-		else if (mState == Tracking::STATE_OK)
+		else if (state_ == Tracking::STATE_OK)
 		{
 			vCurrentKeys = mvCurrentKeys;
 			vbVO = mvbVO;
 			vbMap = mvbMap;
 		}
-		else if (mState == Tracking::STATE_LOST)
+		else if (state_ == Tracking::STATE_LOST)
 		{
 			vCurrentKeys = mvCurrentKeys;
 		}
@@ -137,8 +137,8 @@ void FrameDrawer::DrawTextInfo(cv::Mat &im, int nState, cv::Mat &imText)
 			s << "SLAM MODE |  ";
 		else
 			s << "LOCALIZATION | ";
-		int nKFs = mpMap->KeyFramesInMap();
-		int nMPs = mpMap->MapPointsInMap();
+		int nKFs = map_->KeyFramesInMap();
+		int nMPs = map_->MapPointsInMap();
 		s << "KFs: " << nKFs << ", MPs: " << nMPs << ", Matches: " << mnTracked;
 		if (mnTrackedVO > 0)
 			s << ", + VO matches: " << mnTrackedVO;
@@ -165,7 +165,7 @@ void FrameDrawer::DrawTextInfo(cv::Mat &im, int nState, cv::Mat &imText)
 void FrameDrawer::Update(Tracking *pTracker)
 {
 	unique_lock<mutex> lock(mMutex);
-	pTracker->GetImGray().copyTo(mIm);
+	pTracker->GetImGray().copyTo(image_);
 	mvCurrentKeys = pTracker->GetCurrentFrame().keypointsL;
 	N = mvCurrentKeys.size();
 	mvbVO = vector<bool>(N, false);
@@ -195,7 +195,7 @@ void FrameDrawer::Update(Tracking *pTracker)
 			}
 		}
 	}
-	mState = static_cast<int>(pTracker->GetLastProcessedState());
+	state_ = static_cast<int>(pTracker->GetLastProcessedState());
 }
 
 } //namespace ORB_SLAM
