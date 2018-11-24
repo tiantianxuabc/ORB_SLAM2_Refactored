@@ -730,28 +730,28 @@ int ORBmatcher::SearchByBoW(KeyFrame *pKF1, KeyFrame *pKF2, vector<MapPoint *> &
 	return nmatches;
 }
 
-int ORBmatcher::SearchForTriangulation(const KeyFrame *pKF1, const KeyFrame *pKF2, const cv::Mat& F12,
-	vector<pair<size_t, size_t> > &vMatchedPairs, bool bOnlyStereo)
+int ORBmatcher::SearchForTriangulation(const KeyFrame* keyframe1, const KeyFrame* keyframe2, const cv::Mat& F12,
+	std::vector<std::pair<size_t, size_t>>& matchIds, bool onlyStereo)
 {
-	const DBoW2::FeatureVector &vFeatVec1 = pKF1->featureVector;
-	const DBoW2::FeatureVector &vFeatVec2 = pKF2->featureVector;
+	const DBoW2::FeatureVector &vFeatVec1 = keyframe1->featureVector;
+	const DBoW2::FeatureVector &vFeatVec2 = keyframe2->featureVector;
 
 	//Compute epipole in second image
-	cv::Mat Cw = pKF1->GetCameraCenter();
-	cv::Mat R2w = pKF2->GetRotation();
-	cv::Mat t2w = pKF2->GetTranslation();
+	cv::Mat Cw = keyframe1->GetCameraCenter();
+	cv::Mat R2w = keyframe2->GetRotation();
+	cv::Mat t2w = keyframe2->GetTranslation();
 	cv::Mat C2 = R2w*Cw + t2w;
 	const float invz = 1.0f / C2.at<float>(2);
-	const float ex = pKF2->camera.fx*C2.at<float>(0)*invz + pKF2->camera.cx;
-	const float ey = pKF2->camera.fy*C2.at<float>(1)*invz + pKF2->camera.cy;
+	const float ex = keyframe2->camera.fx*C2.at<float>(0)*invz + keyframe2->camera.cx;
+	const float ey = keyframe2->camera.fy*C2.at<float>(1)*invz + keyframe2->camera.cy;
 
 	// Find matches between not tracked keypoints
 	// Matching speed-up by ORB Vocabulary
 	// Compare only ORB that share the same node
 
 	int nmatches = 0;
-	vector<bool> vbMatched2(pKF2->N, false);
-	vector<int> vMatches12(pKF1->N, -1);
+	vector<bool> vbMatched2(keyframe2->N, false);
+	vector<int> vMatches12(keyframe1->N, -1);
 
 	vector<int> rotHist[HISTO_LENGTH];
 	for (int i = 0; i < HISTO_LENGTH; i++)
@@ -772,21 +772,21 @@ int ORBmatcher::SearchForTriangulation(const KeyFrame *pKF1, const KeyFrame *pKF
 			{
 				const size_t idx1 = f1it->second[i1];
 
-				MapPoint* pMP1 = pKF1->GetMapPoint(idx1);
+				MapPoint* pMP1 = keyframe1->GetMapPoint(idx1);
 
 				// If there is already a MapPoint skip
 				if (pMP1)
 					continue;
 
-				const bool bStereo1 = pKF1->uright[idx1] >= 0;
+				const bool bStereo1 = keyframe1->uright[idx1] >= 0;
 
-				if (bOnlyStereo)
+				if (onlyStereo)
 					if (!bStereo1)
 						continue;
 
-				const cv::KeyPoint &kp1 = pKF1->keypointsUn[idx1];
+				const cv::KeyPoint &kp1 = keyframe1->keypointsUn[idx1];
 
-				const cv::Mat &d1 = pKF1->descriptorsL.row(idx1);
+				const cv::Mat &d1 = keyframe1->descriptorsL.row(idx1);
 
 				int bestDist = TH_LOW;
 				int bestIdx2 = -1;
@@ -795,36 +795,36 @@ int ORBmatcher::SearchForTriangulation(const KeyFrame *pKF1, const KeyFrame *pKF
 				{
 					size_t idx2 = f2it->second[i2];
 
-					MapPoint* pMP2 = pKF2->GetMapPoint(idx2);
+					MapPoint* pMP2 = keyframe2->GetMapPoint(idx2);
 
 					// If we have already matched or there is a MapPoint skip
 					if (vbMatched2[idx2] || pMP2)
 						continue;
 
-					const bool bStereo2 = pKF2->uright[idx2] >= 0;
+					const bool bStereo2 = keyframe2->uright[idx2] >= 0;
 
-					if (bOnlyStereo)
+					if (onlyStereo)
 						if (!bStereo2)
 							continue;
 
-					const cv::Mat &d2 = pKF2->descriptorsL.row(idx2);
+					const cv::Mat &d2 = keyframe2->descriptorsL.row(idx2);
 
 					const int dist = DescriptorDistance(d1, d2);
 
 					if (dist > TH_LOW || dist > bestDist)
 						continue;
 
-					const cv::KeyPoint &kp2 = pKF2->keypointsUn[idx2];
+					const cv::KeyPoint &kp2 = keyframe2->keypointsUn[idx2];
 
 					if (!bStereo1 && !bStereo2)
 					{
 						const float distex = ex - kp2.pt.x;
 						const float distey = ey - kp2.pt.y;
-						if (distex*distex + distey*distey < 100 * pKF2->pyramid.scaleFactors[kp2.octave])
+						if (distex*distex + distey*distey < 100 * keyframe2->pyramid.scaleFactors[kp2.octave])
 							continue;
 					}
 
-					if (CheckDistEpipolarLine(kp1, kp2, F12, pKF2))
+					if (CheckDistEpipolarLine(kp1, kp2, F12, keyframe2))
 					{
 						bestIdx2 = idx2;
 						bestDist = dist;
@@ -833,7 +833,7 @@ int ORBmatcher::SearchForTriangulation(const KeyFrame *pKF1, const KeyFrame *pKF
 
 				if (bestIdx2 >= 0)
 				{
-					const cv::KeyPoint &kp2 = pKF2->keypointsUn[bestIdx2];
+					const cv::KeyPoint &kp2 = keyframe2->keypointsUn[bestIdx2];
 					vMatches12[idx1] = bestIdx2;
 					nmatches++;
 
@@ -885,14 +885,14 @@ int ORBmatcher::SearchForTriangulation(const KeyFrame *pKF1, const KeyFrame *pKF
 
 	}
 
-	vMatchedPairs.clear();
-	vMatchedPairs.reserve(nmatches);
+	matchIds.clear();
+	matchIds.reserve(nmatches);
 
 	for (size_t i = 0, iend = vMatches12.size(); i < iend; i++)
 	{
 		if (vMatches12[i] < 0)
 			continue;
-		vMatchedPairs.push_back(make_pair(i, vMatches12[i]));
+		matchIds.push_back(make_pair(i, vMatches12[i]));
 	}
 
 	return nmatches;
