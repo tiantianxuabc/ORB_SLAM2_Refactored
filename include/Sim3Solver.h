@@ -56,24 +56,7 @@ public:
 	cv::Mat GetEstimatedTranslation();
 	float GetEstimatedScale();
 
-
-protected:
-
-	//void ComputeCentroid(cv::Mat &P, cv::Mat &Pr, cv::Mat &C);
-
-	//void ComputeSim3(cv::Mat &P1, cv::Mat &P2);
-
-	//void CheckInliers();
-
-	//void Project(const std::vector<cv::Mat> &vP3Dw, std::vector<cv::Mat> &vP2D, cv::Mat Tcw, cv::Mat K);
-	//void FromCameraToImage(const std::vector<cv::Mat> &vP3Dc, std::vector<cv::Mat> &vP2D, cv::Mat K);
-
-
-protected:
-
-	// KeyFrames and matches
-	//KeyFrame* mpKF1;
-	//KeyFrame* mpKF2;
+private:
 
 	std::vector<cv::Mat> mvX3Dc1;
 	std::vector<cv::Mat> mvX3Dc2;
@@ -81,23 +64,14 @@ protected:
 	std::vector<MapPoint*> mvpMapPoints2;
 	std::vector<MapPoint*> mvpMatches12;
 	std::vector<size_t> mvnIndices1;
-	//std::vector<size_t> mvSigmaSquare1;
-	//std::vector<size_t> mvSigmaSquare2;
 	std::vector<size_t> mvnMaxError1;
 	std::vector<size_t> mvnMaxError2;
 
 	int N;
 	int mN1;
 
-	// Current Estimation
-	/*cv::Mat mR12i;
-	cv::Mat mt12i;
-	float ms12i;
-	cv::Mat mT12i;
-	cv::Mat mT21i;*/
 	std::vector<bool> mvbInliersi;
-	//int mnInliersi;
-
+	
 	// Current Ransac State
 	int mnIterations;
 	std::vector<bool> mvbBestInliers;
@@ -126,14 +100,9 @@ protected:
 	// RANSAC max iterations
 	int mRansacMaxIts;
 
-	// Threshold inlier/outlier. e = dist(Pi,T_ij*Pj)^2 < 5.991*mSigma2
-	//float mTh;
-	//float mSigma2;
-
 	// Calibration
 	cv::Mat mK1;
 	cv::Mat mK2;
-
 };
 
 } //namespace ORB_SLAM
