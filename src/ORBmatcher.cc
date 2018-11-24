@@ -897,13 +897,14 @@ int ORBmatcher::Fuse(KeyFrame* keyframe, const std::vector<MapPoint*>& mappoints
 	return nfused;
 }
 
-int ORBmatcher::Fuse(KeyFrame *pKF, cv::Mat Scw, const vector<MapPoint *> &vpPoints, float th, vector<MapPoint *> &vpReplacePoint)
+int ORBmatcher::Fuse(KeyFrame* keyframe, cv::Mat Scw, const std::vector<MapPoint*>& mappoints,
+	float th, std::vector<MapPoint*>& replacePoints)
 {
 	// Get Calibration Parameters for later projection
-	const float &fx = pKF->camera.fx;
-	const float &fy = pKF->camera.fy;
-	const float &cx = pKF->camera.cx;
-	const float &cy = pKF->camera.cy;
+	const float &fx = keyframe->camera.fx;
+	const float &fy = keyframe->camera.fy;
+	const float &cx = keyframe->camera.cx;
+	const float &cy = keyframe->camera.cy;
 
 	// Decompose Scw
 	cv::Mat sRcw = Scw.rowRange(0, 3).colRange(0, 3);
@@ -913,16 +914,16 @@ int ORBmatcher::Fuse(KeyFrame *pKF, cv::Mat Scw, const vector<MapPoint *> &vpPoi
 	cv::Mat Ow = -Rcw.t()*tcw;
 
 	// Set of MapPoints already found in the KeyFrame
-	const set<MapPoint*> spAlreadyFound = pKF->GetMapPoints();
+	const set<MapPoint*> spAlreadyFound = keyframe->GetMapPoints();
 
 	int nFused = 0;
 
-	const int nPoints = vpPoints.size();
+	const int nPoints = mappoints.size();
 
 	// For each candidate MapPoint project and match
 	for (int iMP = 0; iMP < nPoints; iMP++)
 	{
-		MapPoint* pMP = vpPoints[iMP];
+		MapPoint* pMP = mappoints[iMP];
 
 		// Discard Bad MapPoints and already found
 		if (pMP->isBad() || spAlreadyFound.count(pMP))
@@ -947,7 +948,7 @@ int ORBmatcher::Fuse(KeyFrame *pKF, cv::Mat Scw, const vector<MapPoint *> &vpPoi
 		const float v = fy*y + cy;
 
 		// Point must be inside the image
-		if (!pKF->IsInImage(u, v))
+		if (!keyframe->IsInImage(u, v))
 			continue;
 
 		// Depth must be inside the scale pyramid of the image
@@ -966,12 +967,12 @@ int ORBmatcher::Fuse(KeyFrame *pKF, cv::Mat Scw, const vector<MapPoint *> &vpPoi
 			continue;
 
 		// Compute predicted scale level
-		const int nPredictedLevel = pMP->PredictScale(dist3D, pKF);
+		const int nPredictedLevel = pMP->PredictScale(dist3D, keyframe);
 
 		// Search in a radius
-		const float radius = th*pKF->pyramid.scaleFactors[nPredictedLevel];
+		const float radius = th*keyframe->pyramid.scaleFactors[nPredictedLevel];
 
-		const vector<size_t> vIndices = pKF->GetFeaturesInArea(u, v, radius);
+		const vector<size_t> vIndices = keyframe->GetFeaturesInArea(u, v, radius);
 
 		if (vIndices.empty())
 			continue;
@@ -985,12 +986,12 @@ int ORBmatcher::Fuse(KeyFrame *pKF, cv::Mat Scw, const vector<MapPoint *> &vpPoi
 		for (vector<size_t>::const_iterator vit = vIndices.begin(); vit != vIndices.end(); vit++)
 		{
 			const size_t idx = *vit;
-			const int &kpLevel = pKF->keypointsUn[idx].octave;
+			const int &kpLevel = keyframe->keypointsUn[idx].octave;
 
 			if (kpLevel<nPredictedLevel - 1 || kpLevel>nPredictedLevel)
 				continue;
 
-			const cv::Mat &dKF = pKF->descriptorsL.row(idx);
+			const cv::Mat &dKF = keyframe->descriptorsL.row(idx);
 
 			int dist = DescriptorDistance(dMP, dKF);
 
@@ -1004,16 +1005,16 @@ int ORBmatcher::Fuse(KeyFrame *pKF, cv::Mat Scw, const vector<MapPoint *> &vpPoi
 		// If there is already a MapPoint replace otherwise add new measurement
 		if (bestDist <= TH_LOW)
 		{
-			MapPoint* pMPinKF = pKF->GetMapPoint(bestIdx);
+			MapPoint* pMPinKF = keyframe->GetMapPoint(bestIdx);
 			if (pMPinKF)
 			{
 				if (!pMPinKF->isBad())
-					vpReplacePoint[iMP] = pMPinKF;
+					replacePoints[iMP] = pMPinKF;
 			}
 			else
 			{
-				pMP->AddObservation(pKF, bestIdx);
-				pKF->AddMapPoint(pMP, bestIdx);
+				pMP->AddObservation(keyframe, bestIdx);
+				keyframe->AddMapPoint(pMP, bestIdx);
 			}
 			nFused++;
 		}
