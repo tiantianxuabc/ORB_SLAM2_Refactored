@@ -50,17 +50,17 @@ protected:
 	void DrawTextInfo(cv::Mat &im, int nState, cv::Mat &imText);
 
 	// Info of the frame to be drawn
-	cv::Mat mIm;
+	cv::Mat image_;
 	int N;
-	std::vector<cv::KeyPoint> mvCurrentKeys;
-	std::vector<bool> mvbMap, mvbVO;
+	std::vector<cv::KeyPoint> currKeyPoints_;
+	std::vector<bool> isMap_, isVO_;
 	bool mbOnlyTracking;
-	int mnTracked, mnTrackedVO;
-	std::vector<cv::KeyPoint> mvIniKeys;
-	std::vector<int> mvIniMatches;
-	int mState;
+	int ntracked_, ntrackedVO_;
+	std::vector<cv::KeyPoint> initKeyPoints_;
+	std::vector<int> initMatches_;
+	int state_;
 
-	Map* mpMap;
+	Map* map_;
 
 	std::mutex mMutex;
 };
