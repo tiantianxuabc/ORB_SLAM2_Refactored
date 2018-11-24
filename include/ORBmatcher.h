@@ -45,11 +45,11 @@ public:
 
 	// Search matches between Frame keypoints and projected MapPoints. Returns number of matches
 	// Used to track the local map (Tracking)
-	int SearchByProjection(Frame &F, const std::vector<MapPoint*> &vpMapPoints, float th = 3);
+	int SearchByProjection(Frame& frame, const std::vector<MapPoint*>& mappoints, float th = 3);
 
 	// Project MapPoints tracked in last frame into the current frame and search matches.
 	// Used to track from previous frame (Tracking)
-	int SearchByProjection(Frame &CurrentFrame, const Frame &LastFrame, float th, bool bMono);
+	int SearchByProjection(Frame& currFrame, const Frame& lastFrame, float th, bool monocular);
 
 	// Project MapPoints seen in KeyFrame into the Frame and search matches.
 	// Used in relocalisation (Tracking)
@@ -64,22 +64,22 @@ public:
 	// Search matches between MapPoints in a KeyFrame and ORB in a Frame.
 	// Brute force constrained to ORB that belong to the same vocabulary node (at a certain level)
 	// Used in Relocalisation and Loop Detection
-	int SearchByBoW(KeyFrame *pKF, Frame &F, std::vector<MapPoint*> &vpMapPointMatches);
-	int SearchByBoW(KeyFrame *pKF1, KeyFrame* pKF2, std::vector<MapPoint*> &vpMatches12);
+	int SearchByBoW(KeyFrame* keyframe, Frame& frame, std::vector<MapPoint*>& matches);
+	int SearchByBoW(KeyFrame* keyframe1, KeyFrame* keyframe2, std::vector<MapPoint*>& matches12);
 
 	// Matching for the Map Initialization (only used in the monocular case)
-	int SearchForInitialization(Frame &F1, Frame &F2, std::vector<cv::Point2f> &vbPrevMatched, std::vector<int> &vnMatches12, int windowSize = 10);
+	int SearchForInitialization(Frame& frame1, Frame& frame2, std::vector<cv::Point2f>& prevMatched, std::vector<int>& matches12, int windowSize = 10);
 
 	// Matching to triangulate new MapPoints. Check Epipolar Constraint.
-	int SearchForTriangulation(const KeyFrame *pKF1, const KeyFrame* pKF2, const cv::Mat& F12,
-		std::vector<std::pair<size_t, size_t> > &vMatchedPairs, bool bOnlyStereo);
+	int SearchForTriangulation(const KeyFrame* keyframe1, const KeyFrame* keyframe2, const cv::Mat& F12,
+		std::vector<std::pair<size_t, size_t>>& matchIds, bool onlyStereo);
 
 	// Search matches between MapPoints seen in KF1 and KF2 transforming by a Sim3 [s12*R12|t12]
 	// In the stereo and RGB-D case, s12=1
-	int SearchBySim3(KeyFrame* pKF1, KeyFrame* pKF2, std::vector<MapPoint *> &vpMatches12, float s12, const cv::Mat &R12, const cv::Mat &t12, float th);
+	int SearchBySim3(KeyFrame* keyframe1, KeyFrame* keyframe2, std::vector<MapPoint*>& matches12, float s12, const cv::Mat &R12, const cv::Mat &t12, float th);
 
 	// Project MapPoints into KeyFrame and search for duplicated MapPoints.
-	int Fuse(KeyFrame* pKF, const std::vector<MapPoint *> &vpMapPoints, float th = 3.f);
+	int Fuse(KeyFrame* keyframe, const std::vector<MapPoint*>& mappoints, float th = 3.f);
 
 	// Project MapPoints into KeyFrame using a given Sim3 and search for duplicated MapPoints.
 	int Fuse(KeyFrame* keyframe, const cv::Mat& Scw, const std::vector<MapPoint*>& mappoints,
