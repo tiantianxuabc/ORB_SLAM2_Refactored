@@ -372,7 +372,7 @@ int ORBmatcher::SearchByBoW(KeyFrame* keyframe, Frame& frame, std::vector<MapPoi
 	return nmatches;
 }
 
-int ORBmatcher::SearchByProjection(KeyFrame* keyframe, cv::Mat Scw, const vector<MapPoint*>& mappoints,
+int ORBmatcher::SearchByProjection(const KeyFrame* keyframe, const cv::Mat& Scw, const std::vector<MapPoint*>& mappoints,
 	std::vector<MapPoint*>& matched, int th)
 {
 	// Get Calibration Parameters for later projection
