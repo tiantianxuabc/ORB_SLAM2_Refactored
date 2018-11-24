@@ -19,10 +19,15 @@
 */
 
 #include "Viewer.h"
-#include <pangolin/pangolin.h>
 
 #include <mutex>
 
+#include <pangolin/pangolin.h>
+
+#include "FrameDrawer.h"
+#include "MapDrawer.h"
+#include "Tracking.h"
+#include "System.h"
 #include "Usleep.h"
 
 namespace ORB_SLAM2
