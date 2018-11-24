@@ -36,7 +36,7 @@ class MapDrawer
 {
 public:
 
-	MapDrawer(Map* pMap, const std::string &strSettingPath);
+	MapDrawer(Map* map, const std::string &settingsFile);
 
 	void DrawMapPoints();
 	void DrawKeyFrames(bool drawKF, bool drawGraph);
@@ -55,9 +55,9 @@ private:
 	float cameraSize_;
 	float cameraLineWidth_;
 
-	cv::Mat mCameraPose;
+	cv::Mat cameraPose_;
 
-	mutable std::mutex mMutexCamera;
+	mutable std::mutex mutexCamera_;
 };
 
 } //namespace ORB_SLAM

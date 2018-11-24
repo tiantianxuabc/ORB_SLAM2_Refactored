@@ -27,7 +27,6 @@
 namespace ORB_SLAM2
 {
 
-
 MapDrawer::MapDrawer(Map* map, const std::string &settingsFile) : map_(map)
 {
 	cv::FileStorage settings(settingsFile, cv::FileStorage::READ);
@@ -171,7 +170,7 @@ void MapDrawer::DrawKeyFrames(bool drawKF, bool drawGraph)
 	}
 }
 
-void MapDrawer::DrawCurrentCamera(const pangolin::OpenGlMatrix &Twc)
+void MapDrawer::DrawCurrentCamera(const pangolin::OpenGlMatrix& Twc)
 {
 	const float w = cameraSize_;
 	const float h = 0.75f * w;
@@ -213,22 +212,22 @@ void MapDrawer::DrawCurrentCamera(const pangolin::OpenGlMatrix &Twc)
 	glPopMatrix();
 }
 
-void MapDrawer::SetCurrentCameraPose(const cv::Mat &Tcw)
+void MapDrawer::SetCurrentCameraPose(const cv::Mat& Tcw)
 {
-	std::unique_lock<std::mutex> lock(mMutexCamera);
-	mCameraPose = Tcw.clone();
+	std::unique_lock<std::mutex> lock(mutexCamera_);
+	cameraPose_ = Tcw.clone();
 }
 
-void MapDrawer::GetCurrentOpenGLCameraMatrix(pangolin::OpenGlMatrix &M)
+void MapDrawer::GetCurrentOpenGLCameraMatrix(pangolin::OpenGlMatrix& M)
 {
-	if (!mCameraPose.empty())
+	if (!cameraPose_.empty())
 	{
 		cv::Mat1f Rwc(3, 3);
 		cv::Mat1f twc(3, 1);
 		{
-			unique_lock<mutex> lock(mMutexCamera);
-			Rwc = CameraPose::GetR(mCameraPose).t();
-			twc = -Rwc * CameraPose::Gett(mCameraPose);
+			unique_lock<mutex> lock(mutexCamera_);
+			Rwc = CameraPose::GetR(cameraPose_).t();
+			twc = -Rwc * CameraPose::Gett(cameraPose_);
 		}
 
 		M.m[0] = Rwc(0, 0);
