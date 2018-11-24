@@ -21,33 +21,32 @@
 #ifndef MAPDRAWER_H
 #define MAPDRAWER_H
 
-#include<string>
-#include<mutex>
+#include <string>
+#include <mutex>
 
-#include<opencv2/opencv.hpp>
+#include <opencv2/opencv.hpp>
 #include <pangolin/pangolin.h>
 
 namespace ORB_SLAM2
 {
 
 class Map;
-class KeyFrame;
 
 class MapDrawer
 {
 public:
-	MapDrawer(Map* pMap, const std::string &strSettingPath);
 
-	Map* mpMap;
+	MapDrawer(Map* pMap, const std::string &strSettingPath);
 
 	void DrawMapPoints();
 	void DrawKeyFrames(const bool bDrawKF, const bool bDrawGraph);
 	void DrawCurrentCamera(const pangolin::OpenGlMatrix &Twc);
 	void SetCurrentCameraPose(const cv::Mat &Tcw);
-	void SetReferenceKeyFrame(KeyFrame *pKF);
 	void GetCurrentOpenGLCameraMatrix(pangolin::OpenGlMatrix &M);
 
 private:
+
+	Map* mpMap;
 
 	float mKeyFrameSize;
 	float mKeyFrameLineWidth;
