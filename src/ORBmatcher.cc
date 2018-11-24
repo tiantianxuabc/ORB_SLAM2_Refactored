@@ -90,10 +90,16 @@ static void ComputeThreeMaxima(vector<int>* histo, const int L, int &ind1, int &
 }
 
 using MatchIdx = std::pair<int, int>;
+
+template <typename T> static inline T InvalidMatch() { return 0; }
+template <> static inline MapPoint* InvalidMatch<MapPoint*>() { return nullptr; }
+template <> static inline int InvalidMatch<int>() { return -1; }
+
+template <typename T>
 static int CheckOrientation(const std::vector<cv::KeyPoint>& keypoints1, const std::vector<cv::KeyPoint>& keypoints2,
-	const std::vector<MatchIdx>& matches12, std::vector<MapPoint*>& mappoints2)
+	const std::vector<MatchIdx>& matches12, std::vector<T>& matchStatus)
 {
-	CV_Assert(mappoints2.size() == keypoints2.size());
+	CV_Assert(matchStatus.size() == keypoints2.size());
 
 	const float factor = 1.f / HISTO_LENGTH;
 	std::vector<int> hist[HISTO_LENGTH];
@@ -143,7 +149,7 @@ static int CheckOrientation(const std::vector<cv::KeyPoint>& keypoints1, const s
 	{
 		for (int i2 : hist[bin])
 		{
-			mappoints2[i2] = nullptr;
+			matchStatus[i2] = InvalidMatch<T>();
 			reduction++;
 		}
 	}
@@ -753,11 +759,8 @@ int ORBmatcher::SearchForTriangulation(const KeyFrame* keyframe1, const KeyFrame
 	std::vector<bool> matched2(keyframe2->N, false);
 	std::vector<int> matches12(keyframe1->N, -1);
 
-	std::vector<int> hist[HISTO_LENGTH];
-	for (int i = 0; i < HISTO_LENGTH; i++)
-		hist[i].reserve(500);
-
-	const float factor = 1.f / HISTO_LENGTH;
+	std::vector<MatchIdx> tmpMatchIds;
+	tmpMatchIds.reserve(keyframe1->N);
 
 	FeatureVectorIterator iterator(keyframe1->featureVector, keyframe2->featureVector);
 	while (iterator.next())
@@ -818,54 +821,25 @@ int ORBmatcher::SearchForTriangulation(const KeyFrame* keyframe1, const KeyFrame
 
 			if (bestIdx2 >= 0)
 			{
-				const cv::KeyPoint& keypoint2 = keyframe2->keypointsUn[bestIdx2];
 				matches12[idx1] = bestIdx2;
 				nmatches++;
 
 				if (checkOrientation_)
-				{
-					float rot = keypoint1.angle - keypoint2.angle;
-					if (rot < 0.0)
-						rot += 360.0f;
-					int bin = round(rot*factor);
-					if (bin == HISTO_LENGTH)
-						bin = 0;
-					assert(bin >= 0 && bin < HISTO_LENGTH);
-					hist[bin].push_back(idx1);
-				}
+					tmpMatchIds.push_back(std::make_pair(bestIdx2, static_cast<int>(idx1)));
 			}
 		}
 	}
 
 	if (checkOrientation_)
-	{
-		int ind1 = -1;
-		int ind2 = -1;
-		int ind3 = -1;
-
-		ComputeThreeMaxima(hist, HISTO_LENGTH, ind1, ind2, ind3);
-
-		for (int i = 0; i < HISTO_LENGTH; i++)
-		{
-			if (i == ind1 || i == ind2 || i == ind3)
-				continue;
-			for (size_t j = 0, jend = hist[i].size(); j < jend; j++)
-			{
-				matches12[hist[i][j]] = -1;
-				nmatches--;
-			}
-		}
-
-	}
-
+		nmatches = CheckOrientation(keyframe2->keypointsUn, keyframe1->keypointsUn, tmpMatchIds, matches12);
+	
 	matchIds.clear();
 	matchIds.reserve(nmatches);
 
-	for (size_t i = 0, iend = matches12.size(); i < iend; i++)
+	for (size_t idx1 = 0; idx1 < matches12.size(); idx1++)
 	{
-		if (matches12[i] < 0)
-			continue;
-		matchIds.push_back(make_pair(i, matches12[i]));
+		if (matches12[idx1] >= 0)
+			matchIds.push_back(std::make_pair(idx1, matches12[idx1]));
 	}
 
 	return nmatches;
