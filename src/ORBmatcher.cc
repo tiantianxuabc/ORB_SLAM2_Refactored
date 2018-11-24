@@ -1315,9 +1315,9 @@ int ORBmatcher::SearchByProjection(Frame& currFrame, KeyFrame* keyframe, const s
 {
 	int nmatches = 0;
 
-	const cv::Mat Rcw = currFrame.pose.Tcw.rowRange(0, 3).colRange(0, 3);
-	const cv::Mat tcw = currFrame.pose.Tcw.rowRange(0, 3).col(3);
-	const cv::Mat Ow = -Rcw.t()*tcw;
+	const cv::Mat Rcw = CameraPose::GetR(currFrame.pose.Tcw);
+	const cv::Mat tcw = CameraPose::Gett(currFrame.pose.Tcw);
+	const cv::Mat Ow = -Rcw.t() * tcw;
 
 	// Rotation Histogram (to check rotation consistency)
 	vector<int> rotHist[HISTO_LENGTH];
