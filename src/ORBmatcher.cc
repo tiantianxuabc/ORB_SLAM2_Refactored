@@ -456,12 +456,12 @@ int ORBmatcher::SearchByProjection(const KeyFrame* keyframe, const cv::Mat& Scw,
 			if (scale < predictedScale - 1 || scale > predictedScale)
 				continue;
 
-			const cv::Mat desc2 = keyframe->descriptorsL.row(idx);
+			const cv::Mat desc2 = keyframe->descriptorsL.row(static_cast<int>(idx));
 			const int dist = DescriptorDistance(desc1, desc2);
 			if (dist < bestDist)
 			{
 				bestDist = dist;
-				bestIdx = idx;
+				bestIdx = static_cast<int>(idx);
 			}
 		}
 
@@ -982,12 +982,12 @@ int ORBmatcher::Fuse(KeyFrame* keyframe, const cv::Mat& Scw, const std::vector<M
 			if (scale < predictedScale - 1 || scale > predictedScale)
 				continue;
 
-			const cv::Mat &desc2 = keyframe->descriptorsL.row(idx);
+			const cv::Mat &desc2 = keyframe->descriptorsL.row(static_cast<int>(idx));
 			int dist = DescriptorDistance(desc1, desc2);
 			if (dist < bestDist)
 			{
 				bestDist = dist;
-				bestIdx = idx;
+				bestIdx = static_cast<int>(idx);
 			}
 		}
 
@@ -1115,7 +1115,7 @@ int ORBmatcher::SearchBySim3(KeyFrame* keyframe1, KeyFrame* keyframe2, std::vect
 			if (dist < bestDist)
 			{
 				bestDist = dist;
-				bestIdx = idx;
+				bestIdx = static_cast<int>(idx);
 			}
 		}
 
@@ -1182,7 +1182,7 @@ int ORBmatcher::SearchBySim3(KeyFrame* keyframe1, KeyFrame* keyframe2, std::vect
 			if (dist < bestDist)
 			{
 				bestDist = dist;
-				bestIdx = idx;
+				bestIdx = static_cast<int>(idx);
 			}
 		}
 
@@ -1284,7 +1284,7 @@ int ORBmatcher::SearchByProjection(Frame& currFrame, const Frame& lastFrame, flo
 					continue;
 			}
 
-			const cv::Mat desc2 = currFrame.descriptorsL.row(idx2);
+			const cv::Mat desc2 = currFrame.descriptorsL.row(static_cast<int>(idx2));
 			const int dist = DescriptorDistance(desc1, desc2);
 			if (dist < bestDist)
 			{
