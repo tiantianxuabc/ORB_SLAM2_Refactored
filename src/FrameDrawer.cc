@@ -44,7 +44,7 @@ cv::Mat FrameDrawer::DrawFrame()
 
 	//Copy variables within scoped mutex
 	{
-		unique_lock<mutex> lock(mMutex);
+		std::unique_lock<std::mutex> lock(mutex_);
 		state = state_;
 		if (state_ == Tracking::STATE_NOT_READY)
 			state_ = Tracking::STATE_NO_IMAGES;
@@ -163,40 +163,39 @@ void FrameDrawer::DrawTextInfo(cv::Mat& src, int state, cv::Mat& dst)
 	cv::putText(dst, ss.str(), cv::Point(5, dst.rows - 5), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(255, 255, 255), 1, 8);
 }
 
-void FrameDrawer::Update(Tracking *pTracker)
+void FrameDrawer::Update(Tracking* tracker)
 {
-	unique_lock<mutex> lock(mMutex);
-	pTracker->GetImGray().copyTo(image_);
-	currKeyPoints_ = pTracker->GetCurrentFrame().keypointsL;
-	N = currKeyPoints_.size();
-	isVO_ = vector<bool>(N, false);
-	isMap_ = vector<bool>(N, false);
-	localizationMode_ = pTracker->OnlyTracking();
+	std::unique_lock<std::mutex> lock(mutex_);
 
+	tracker->GetImGray().copyTo(image_);
+	currKeyPoints_ = tracker->GetCurrentFrame().keypointsL;
 
-	if (pTracker->GetLastProcessedState() == Tracking::STATE_NOT_INITIALIZED)
+	const int N = static_cast<int>(currKeyPoints_.size());
+	isVO_.assign(N, false);
+	isMap_.assign(N, false);
+	localizationMode_ = tracker->OnlyTracking();
+
+	const int state = tracker->GetLastProcessedState();
+	if (state == Tracking::STATE_NOT_INITIALIZED)
 	{
-		initKeyPoints_ = pTracker->GetInitialFrame().keypointsL;
-		initMatches_ = pTracker->GetIniMatches();
+		initKeyPoints_ = tracker->GetInitialFrame().keypointsL;
+		initMatches_ = tracker->GetIniMatches();
 	}
-	else if (pTracker->GetLastProcessedState() == Tracking::STATE_OK)
+	else if (state == Tracking::STATE_OK)
 	{
 		for (int i = 0; i < N; i++)
 		{
-			MapPoint* pMP = pTracker->GetCurrentFrame().mappoints[i];
-			if (pMP)
-			{
-				if (!pTracker->GetCurrentFrame().outlier[i])
-				{
-					if (pMP->Observations() > 0)
-						isMap_[i] = true;
-					else
-						isVO_[i] = true;
-				}
-			}
+			const MapPoint* mappint = tracker->GetCurrentFrame().mappoints[i];
+			if (!mappint || tracker->GetCurrentFrame().outlier[i])
+				continue;
+
+			if (mappint->Observations() > 0)
+				isMap_[i] = true;
+			else
+				isVO_[i] = true;
 		}
 	}
-	state_ = static_cast<int>(pTracker->GetLastProcessedState());
+	state_ = state;
 }
 
 } //namespace ORB_SLAM

@@ -51,7 +51,7 @@ protected:
 
 	// Info of the frame to be drawn
 	cv::Mat image_;
-	int N;
+	//int N;
 	std::vector<cv::KeyPoint> currKeyPoints_;
 	std::vector<bool> isMap_, isVO_;
 	bool localizationMode_;
@@ -62,7 +62,7 @@ protected:
 
 	Map* map_;
 
-	std::mutex mMutex;
+	std::mutex mutex_;
 };
 
 } //namespace ORB_SLAM
