@@ -44,7 +44,7 @@ static void CopySim3(const Sim3& src, Sim3& dst)
 	dst.scale = src.scale;
 }
 
-static void ComputeCentroid(const cv::Mat &P, cv::Mat &Pr, cv::Mat &C)
+static void ComputeCentroid(const cv::Mat& P, cv::Mat& Pr, cv::Mat& C)
 {
 	cv::reduce(P, C, 1, CV_REDUCE_SUM);
 	C = C / P.cols;
