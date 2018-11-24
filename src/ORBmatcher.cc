@@ -1035,7 +1035,7 @@ int ORBmatcher::Fuse(KeyFrame *pKF, cv::Mat Scw, const vector<MapPoint *> &vpPoi
 }
 
 int ORBmatcher::SearchBySim3(KeyFrame *pKF1, KeyFrame *pKF2, vector<MapPoint*> &vpMatches12,
-	const float &s12, const cv::Mat &R12, const cv::Mat &t12, const float th)
+	float s12, const cv::Mat &R12, const cv::Mat &t12, float th)
 {
 	const float &fx = pKF1->camera.fx;
 	const float &fy = pKF1->camera.fy;
