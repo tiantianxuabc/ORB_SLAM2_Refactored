@@ -33,8 +33,8 @@ namespace ORB_SLAM2
 {
 
 class System;
-class FrameDrawer;
-class MapDrawer;
+//class FrameDrawer;
+//class MapDrawer;
 class Map;
 class KeyFrameDatabase;
 class LocalMapping;
@@ -68,8 +68,8 @@ public:
 		STATE_LOST = 3
 	};
 
-	static std::shared_ptr<Tracking> Create(System* system, ORBVocabulary* voc, FrameDrawer* frameDrawer,
-		MapDrawer* mapDrawer, Map* map, KeyFrameDatabase* keyframeDB, const string& settingsFile, int sensor);
+	static std::shared_ptr<Tracking> Create(System* system, ORBVocabulary* voc, Map* map,
+		KeyFrameDatabase* keyframeDB, const string& settingsFile, int sensor);
 
 	// Preprocess the input and call Track(). Extract features and performs stereo matching.
 	virtual cv::Mat GrabImageStereo(const cv::Mat& imageL, const cv::Mat& imageR, double timestamp) = 0;

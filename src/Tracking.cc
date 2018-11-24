@@ -27,7 +27,7 @@
 #include <opencv2/opencv.hpp>
 
 #include "Viewer.h"
-#include "FrameDrawer.h"
+//#include "FrameDrawer.h"
 #include "Map.h"
 #include "LocalMapping.h"
 #include "LoopClosing.h"
@@ -37,7 +37,7 @@
 #include "KeyFrameDatabase.h"
 #include "ORBextractor.h"
 #include "Initializer.h"
-#include "MapDrawer.h"
+//#include "MapDrawer.h"
 #include "System.h"
 #include "PnPsolver.h"
 #include "Usleep.h"
@@ -1079,11 +1079,11 @@ public:
 
 	using Parameters = TrackerParameters;
 
-	TrackerCore(Tracking* tracking, System* system, FrameDrawer* frameDrawer, MapDrawer* mapDrawer, Map* map,
-		KeyFrameDatabase* keyFrameDB, int sensor, const Parameters& param)
+	TrackerCore(Tracking* tracking, System* system, Map* map, KeyFrameDatabase* keyFrameDB,
+		int sensor, const Parameters& param)
 		: state_(STATE_NO_IMAGES), sensor_(sensor), localization_(false), keyFrameDB_(keyFrameDB),
-		initializer_(nullptr), tracking_(tracking), system_(system), frameDrawer_(frameDrawer), mapDrawer_(mapDrawer),
-		map_(map), localMap_(map), newKeyFrameCondition_(map, localMap_, param, sensor),
+		initializer_(nullptr), tracking_(tracking), system_(system), map_(map), localMap_(map),
+		newKeyFrameCondition_(map, localMap_, param, sensor),
 		trackerIni_(map, keyFrameDB, localMap_, relocalizer_, trajectory_, sensor, param.thDepth), param_(param)
 	{
 	}
@@ -1139,8 +1139,9 @@ public:
 
 		map_->keyFrameOrigins.push_back(keyframe);
 
-		mapDrawer_->SetCurrentCameraPose(currFrame.pose.Tcw);
-
+		if (viewer_)
+			viewer_->SetCurrentCameraPose(currFrame.pose.Tcw);
+		
 		state_ = STATE_OK;
 	}
 
@@ -1312,7 +1313,8 @@ public:
 
 		map_->SetReferenceMapPoints(localMap_.mappoints);
 
-		mapDrawer_->SetCurrentCameraPose(pKFcur->GetPose());
+		if (viewer_)
+			viewer_->SetCurrentCameraPose(pKFcur->GetPose());
 
 		map_->keyFrameOrigins.push_back(pKFini);
 
@@ -1347,7 +1349,8 @@ public:
 		{
 			Initialization(currFrame, sensor_);
 
-			frameDrawer_->Update(tracking_);
+			if (viewer_)
+				viewer_->UpdateFrame(tracking_);
 
 			if (state_ == STATE_OK)
 				trajectory_.push_back(TrackPoint(currFrame, false));
@@ -1389,7 +1392,8 @@ public:
 		state_ = success ? STATE_OK : STATE_LOST;
 
 		// Update drawer
-		frameDrawer_->Update(tracking_);
+		if (viewer_)
+			viewer_->UpdateFrame(tracking_);
 
 		// If tracking were good, check if we insert a keyframe
 		if (success)
@@ -1405,7 +1409,8 @@ public:
 			else
 				velocity_ = cv::Mat();
 
-			mapDrawer_->SetCurrentCameraPose(currFrame.pose.Tcw);
+			if (viewer_)
+				viewer_->SetCurrentCameraPose(currFrame.pose.Tcw);
 
 			// Clean VO matches
 			for (int i = 0; i < currFrame.N; i++)
@@ -1505,6 +1510,11 @@ public:
 		loopClosing_ = pLoopClosing;
 	}
 
+	void SetViewer(Viewer* viewer)
+	{
+		viewer_ = viewer;
+	}
+
 	void InformOnlyTracking(const bool &flag)
 	{
 		localization_ = flag;
@@ -1591,9 +1601,8 @@ private:
 	System* system_;
 
 	//Drawers
-	FrameDrawer* frameDrawer_;
-	MapDrawer* mapDrawer_;
-
+	Viewer* viewer_;
+	
 	//Map
 	Map* map_;
 
@@ -1621,8 +1630,8 @@ class TrackingImpl : public Tracking
 
 public:
 
-	TrackingImpl(System* system, ORBVocabulary* voc, FrameDrawer* frameDrawer, MapDrawer* mapDrawer,
-		Map* map, KeyFrameDatabase* keyframeDB, const string& settingsFile, int sensor)
+	TrackingImpl(System* system, ORBVocabulary* voc, Map* map, KeyFrameDatabase* keyframeDB,
+		const string& settingsFile, int sensor)
 		: voc_(voc), keyframeDB_(keyframeDB), viewer_(nullptr), map_(map)
 	{
 		cv::FileStorage settings(settingsFile, cv::FileStorage::READ);
@@ -1665,7 +1674,7 @@ public:
 		}
 
 		// Initialize tracker core
-		tracker_ = std::make_unique<TrackerCore>(this, system, frameDrawer, mapDrawer, map, keyframeDB, sensor,
+		tracker_ = std::make_unique<TrackerCore>(this, system, map, keyframeDB, sensor,
 			TrackerCore::Parameters(minFrames, maxFrames, thDepth_));
 	}
 
@@ -1727,6 +1736,7 @@ public:
 	void SetViewer(Viewer* viewer) override
 	{
 		viewer_ = viewer;
+		tracker_->SetViewer(viewer);
 	}
 
 	// Load new settings
@@ -1864,10 +1874,10 @@ private:
 	float thDepth_;
 };
 
-std::shared_ptr<Tracking> Tracking::Create(System* system, ORBVocabulary* voc, FrameDrawer* frameDrawer,
-	MapDrawer* mapDrawer, Map* map, KeyFrameDatabase* keyframeDB, const string& settingsFile, int sensor)
+std::shared_ptr<Tracking> Tracking::Create(System* system, ORBVocabulary* voc, Map* map,
+	KeyFrameDatabase* keyframeDB, const string& settingsFile, int sensor)
 {
-	return std::make_shared<TrackingImpl>(system, voc, frameDrawer, mapDrawer, map, keyframeDB, settingsFile, sensor);
+	return std::make_shared<TrackingImpl>(system, voc, map, keyframeDB, settingsFile, sensor);
 }
 
 } //namespace ORB_SLAM

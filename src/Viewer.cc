@@ -113,9 +113,8 @@ static void DrawCurrentCamera(const pangolin::OpenGlMatrix &Twc, float cameraSiz
 	glPopMatrix();
 }
 
-Viewer::Viewer(System* system, FrameDrawer* frameDrawer, MapDrawer* mapDrawer, Tracking* tracker, const string &settingsFile)
-	: system_(system), frameDrawer_(frameDrawer), mapDrawer_(mapDrawer), tracker_(tracker),
-	finishRequested_(false), finished_(true), stopped_(true), stopRequested_(false)
+Viewer::Viewer(System* system, Map* map, const std::string& settingsFile)
+	: system_(system), finishRequested_(false), finished_(true), stopped_(true), stopRequested_(false)
 {
 	cv::FileStorage settings(settingsFile, cv::FileStorage::READ);
 
@@ -131,6 +130,13 @@ Viewer::Viewer(System* system, FrameDrawer* frameDrawer, MapDrawer* mapDrawer, T
 
 	cameraSize_ = settings["Viewer.CameraSize"];
 	cameraLineWidth_ = settings["Viewer.CameraLineWidth"];
+
+	frameDrawer_ = std::make_unique<FrameDrawer>(map);
+	mapDrawer_ = std::make_unique<MapDrawer>(map, settingsFile);
+}
+
+Viewer::~Viewer()
+{
 }
 
 void Viewer::Run()
@@ -311,6 +317,16 @@ void Viewer::Release()
 {
 	unique_lock<mutex> lock(mMutexStop);
 	stopped_ = false;
+}
+
+void Viewer::SetCurrentCameraPose(const cv::Mat& Tcw)
+{
+	mapDrawer_->SetCurrentCameraPose(Tcw);
+}
+
+void Viewer::UpdateFrame(Tracking* tracker)
+{
+	frameDrawer_->Update(tracker);
 }
 
 }

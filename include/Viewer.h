@@ -27,23 +27,27 @@
 //#include "Tracking.h"
 //#include "System.h"
 
+#include <opencv2/opencv.hpp>
+
 #include <string>
 #include <mutex>
+#include <memory>
 
 namespace ORB_SLAM2
 {
 
+class System;
+class Map;
 class Tracking;
 class FrameDrawer;
 class MapDrawer;
-class System;
 
 class Viewer
 {
 public:
 
-	Viewer(System* pSystem, FrameDrawer* pFrameDrawer, MapDrawer* pMapDrawer, Tracking *pTracking,
-		const std::string &strSettingPath);
+	Viewer(System* system, Map* map, const std::string& settingsFile);
+	~Viewer();
 
 	// Main thread function. Draw points, keyframes, the current camera pose and the last processed
 	// frame. Drawing is refreshed according to the camera fps. We use Pangolin.
@@ -59,14 +63,17 @@ public:
 
 	void Release();
 
+	void SetCurrentCameraPose(const cv::Mat& Tcw);
+	void UpdateFrame(Tracking* tracker);
+
 private:
 
 	bool Stop();
 
 	System* system_;
-	FrameDrawer* frameDrawer_;
-	MapDrawer* mapDrawer_;
-	Tracking* tracker_;
+	std::unique_ptr<FrameDrawer> frameDrawer_;
+	std::unique_ptr<MapDrawer> mapDrawer_;
+	//Tracking* tracker_;
 
 	// 1/fps in ms
 	int waittime_;
