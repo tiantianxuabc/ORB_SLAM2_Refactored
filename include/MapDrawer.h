@@ -36,29 +36,29 @@ class KeyFrame;
 class MapDrawer
 {
 public:
-    MapDrawer(Map* pMap, const std::string &strSettingPath);
+	MapDrawer(Map* pMap, const std::string &strSettingPath);
 
-    Map* mpMap;
+	Map* mpMap;
 
-    void DrawMapPoints();
-    void DrawKeyFrames(const bool bDrawKF, const bool bDrawGraph);
+	void DrawMapPoints();
+	void DrawKeyFrames(const bool bDrawKF, const bool bDrawGraph);
 	void DrawCurrentCamera(const pangolin::OpenGlMatrix &Twc);
-    void SetCurrentCameraPose(const cv::Mat &Tcw);
-    void SetReferenceKeyFrame(KeyFrame *pKF);
+	void SetCurrentCameraPose(const cv::Mat &Tcw);
+	void SetReferenceKeyFrame(KeyFrame *pKF);
 	void GetCurrentOpenGLCameraMatrix(pangolin::OpenGlMatrix &M);
 
 private:
 
-    float mKeyFrameSize;
-    float mKeyFrameLineWidth;
-    float mGraphLineWidth;
-    float mPointSize;
-    float mCameraSize;
-    float mCameraLineWidth;
+	float mKeyFrameSize;
+	float mKeyFrameLineWidth;
+	float mGraphLineWidth;
+	float mPointSize;
+	float mCameraSize;
+	float mCameraLineWidth;
 
-    cv::Mat mCameraPose;
+	cv::Mat mCameraPose;
 
-    mutable std::mutex mMutexCamera;
+	mutable std::mutex mMutexCamera;
 };
 
 } //namespace ORB_SLAM
