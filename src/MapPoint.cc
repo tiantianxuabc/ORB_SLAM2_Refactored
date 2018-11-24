@@ -320,10 +320,11 @@ cv::Mat MapPoint::GetDescriptor() const
 	return descriptor_.clone();
 }
 
-int MapPoint::GetIndexInKeyFrame(KeyFrame *pKF) const
+int MapPoint::GetIndexInKeyFrame(const KeyFrame* keyframe) const
 {
 	LOCK_MUTEX_FEATURES();
-	return observations_.count(pKF) ? static_cast<int>(observations_.at(pKF)) : -1;
+	KeyFrame* _keyframe = const_cast<KeyFrame*>(keyframe);
+	return observations_.count(_keyframe) ? static_cast<int>(observations_.at(_keyframe)) : -1;
 }
 
 bool MapPoint::IsInKeyFrame(KeyFrame *pKF) const

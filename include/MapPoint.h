@@ -56,7 +56,7 @@ public:
 	void AddObservation(KeyFrame* keyframe, size_t idx);
 	void EraseObservation(KeyFrame* keyframe);
 
-	int GetIndexInKeyFrame(KeyFrame* keyframe) const;
+	int GetIndexInKeyFrame(const KeyFrame* keyframe) const;
 	bool IsInKeyFrame(KeyFrame* keyframe) const;
 
 	void SetBadFlag();

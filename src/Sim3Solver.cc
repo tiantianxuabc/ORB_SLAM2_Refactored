@@ -203,7 +203,7 @@ static void FromCameraToImage(const std::vector<cv::Mat> &vP3Dc, std::vector<cv:
 	}
 }
 
-Sim3Solver::Sim3Solver(KeyFrame *pKF1, KeyFrame *pKF2, const std::vector<MapPoint *> &vpMatched12, const bool bFixScale) :
+Sim3Solver::Sim3Solver(const KeyFrame *pKF1, const KeyFrame *pKF2, const std::vector<MapPoint *> &vpMatched12, bool bFixScale) :
 	mnIterations(0), mnBestInliers(0), mbFixScale(bFixScale)
 {
 	std::vector<MapPoint*> vpKeyFrameMP1 = pKF1->GetMapPointMatches();
