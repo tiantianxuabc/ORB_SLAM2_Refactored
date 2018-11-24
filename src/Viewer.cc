@@ -122,7 +122,7 @@ Viewer::Viewer(System* system, FrameDrawer* frameDrawer, MapDrawer* mapDrawer, T
 	float fps = settings["Camera.fps"];
 	if (fps < 1) fps = 30;
 
-	waittime_ = 1e3 / fps;
+	waittime_ = static_cast<int>(1e3 / fps);
 
 	viewpointX_ = settings["Viewer.ViewpointX"];
 	viewpointY_ = settings["Viewer.ViewpointY"];
@@ -171,39 +171,39 @@ void Viewer::Run()
 
 	cv::namedWindow("ORB-SLAM2: Current Frame");
 
-	bool bFollow = true;
-	bool bLocalizationMode = false;
+	bool followCamera = true;
+	bool localizationMode = false;
 
-	while (1)
+	while (true)
 	{
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		GetCurrentOpenGLCameraMatrix(mapDrawer_->GetCurrentCameraPose(), Twc);
 
-		if (menuFollowCamera && bFollow)
+		if (menuFollowCamera && followCamera)
 		{
 			s_cam.Follow(Twc);
 		}
-		else if (menuFollowCamera && !bFollow)
+		else if (menuFollowCamera && !followCamera)
 		{
 			s_cam.SetModelViewMatrix(pangolin::ModelViewLookAt(viewpointX_, viewpointY_, viewpointZ_, 0, 0, 0, 0.0, -1.0, 0.0));
 			s_cam.Follow(Twc);
-			bFollow = true;
+			followCamera = true;
 		}
-		else if (!menuFollowCamera && bFollow)
+		else if (!menuFollowCamera && followCamera)
 		{
-			bFollow = false;
+			followCamera = false;
 		}
 
-		if (menuLocalizationMode && !bLocalizationMode)
+		if (menuLocalizationMode && !localizationMode)
 		{
 			system_->ActivateLocalizationMode();
-			bLocalizationMode = true;
+			localizationMode = true;
 		}
-		else if (!menuLocalizationMode && bLocalizationMode)
+		else if (!menuLocalizationMode && localizationMode)
 		{
 			system_->DeactivateLocalizationMode();
-			bLocalizationMode = false;
+			localizationMode = false;
 		}
 
 		d_cam.Activate(s_cam);
@@ -216,8 +216,8 @@ void Viewer::Run()
 
 		pangolin::FinishFrame();
 
-		cv::Mat im = frameDrawer_->DrawFrame();
-		cv::imshow("ORB-SLAM2: Current Frame", im);
+		const cv::Mat image = frameDrawer_->DrawFrame();
+		cv::imshow("ORB-SLAM2: Current Frame", image);
 		cv::waitKey(waittime_);
 
 		if (menuReset)
@@ -226,10 +226,10 @@ void Viewer::Run()
 			menuShowKeyFrames = true;
 			menuShowPoints = true;
 			menuLocalizationMode = false;
-			if (bLocalizationMode)
+			if (localizationMode)
 				system_->DeactivateLocalizationMode();
-			bLocalizationMode = false;
-			bFollow = true;
+			localizationMode = false;
+			followCamera = true;
 			menuFollowCamera = true;
 			system_->Reset();
 			menuReset = false;
