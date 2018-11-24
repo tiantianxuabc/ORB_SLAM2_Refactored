@@ -198,13 +198,13 @@ static bool CheckDistEpipolarLine(const cv::KeyPoint &kp1, const cv::KeyPoint &k
 	return dsqr < 3.84*pKF2->pyramid.sigmaSq[kp2.octave];
 }
 
-int ORBmatcher::SearchByBoW(KeyFrame* pKF, Frame &F, vector<MapPoint*> &vpMapPointMatches)
+int ORBmatcher::SearchByBoW(KeyFrame* keyframe, Frame& frame, std::vector<MapPoint*>& matches)
 {
-	const vector<MapPoint*> vpMapPointsKF = pKF->GetMapPointMatches();
+	const vector<MapPoint*> mappoints1 = keyframe->GetMapPointMatches();
 
-	vpMapPointMatches = vector<MapPoint*>(F.N, static_cast<MapPoint*>(NULL));
+	matches.assign(frame.N, nullptr);
 
-	const DBoW2::FeatureVector &vFeatVecKF = pKF->featureVector;
+	const DBoW2::FeatureVector &vFeatVecKF = keyframe->featureVector;
 
 	int nmatches = 0;
 
@@ -215,9 +215,9 @@ int ORBmatcher::SearchByBoW(KeyFrame* pKF, Frame &F, vector<MapPoint*> &vpMapPoi
 
 	// We perform the matching over ORB that belong to the same vocabulary node (at a certain level)
 	DBoW2::FeatureVector::const_iterator KFit = vFeatVecKF.begin();
-	DBoW2::FeatureVector::const_iterator Fit = F.featureVector.begin();
+	DBoW2::FeatureVector::const_iterator Fit = frame.featureVector.begin();
 	DBoW2::FeatureVector::const_iterator KFend = vFeatVecKF.end();
-	DBoW2::FeatureVector::const_iterator Fend = F.featureVector.end();
+	DBoW2::FeatureVector::const_iterator Fend = frame.featureVector.end();
 
 	while (KFit != KFend && Fit != Fend)
 	{
@@ -230,7 +230,7 @@ int ORBmatcher::SearchByBoW(KeyFrame* pKF, Frame &F, vector<MapPoint*> &vpMapPoi
 			{
 				const unsigned int realIdxKF = vIndicesKF[iKF];
 
-				MapPoint* pMP = vpMapPointsKF[realIdxKF];
+				MapPoint* pMP = mappoints1[realIdxKF];
 
 				if (!pMP)
 					continue;
@@ -238,7 +238,7 @@ int ORBmatcher::SearchByBoW(KeyFrame* pKF, Frame &F, vector<MapPoint*> &vpMapPoi
 				if (pMP->isBad())
 					continue;
 
-				const cv::Mat &dKF = pKF->descriptorsL.row(realIdxKF);
+				const cv::Mat &dKF = keyframe->descriptorsL.row(realIdxKF);
 
 				int bestDist1 = 256;
 				int bestIdxF = -1;
@@ -248,10 +248,10 @@ int ORBmatcher::SearchByBoW(KeyFrame* pKF, Frame &F, vector<MapPoint*> &vpMapPoi
 				{
 					const unsigned int realIdxF = vIndicesF[iF];
 
-					if (vpMapPointMatches[realIdxF])
+					if (matches[realIdxF])
 						continue;
 
-					const cv::Mat &dF = F.descriptorsL.row(realIdxF);
+					const cv::Mat &dF = frame.descriptorsL.row(realIdxF);
 
 					const int dist = DescriptorDistance(dKF, dF);
 
@@ -271,13 +271,13 @@ int ORBmatcher::SearchByBoW(KeyFrame* pKF, Frame &F, vector<MapPoint*> &vpMapPoi
 				{
 					if (static_cast<float>(bestDist1) < mfNNratio*static_cast<float>(bestDist2))
 					{
-						vpMapPointMatches[bestIdxF] = pMP;
+						matches[bestIdxF] = pMP;
 
-						const cv::KeyPoint &kp = pKF->keypointsUn[realIdxKF];
+						const cv::KeyPoint &kp = keyframe->keypointsUn[realIdxKF];
 
 						if (checkOrientation_)
 						{
-							float rot = kp.angle - F.keypointsL[bestIdxF].angle;
+							float rot = kp.angle - frame.keypointsL[bestIdxF].angle;
 							if (rot < 0.0)
 								rot += 360.0f;
 							int bin = round(rot*factor);
@@ -301,7 +301,7 @@ int ORBmatcher::SearchByBoW(KeyFrame* pKF, Frame &F, vector<MapPoint*> &vpMapPoi
 		}
 		else
 		{
-			Fit = F.featureVector.lower_bound(KFit->first);
+			Fit = frame.featureVector.lower_bound(KFit->first);
 		}
 	}
 
@@ -320,7 +320,7 @@ int ORBmatcher::SearchByBoW(KeyFrame* pKF, Frame &F, vector<MapPoint*> &vpMapPoi
 				continue;
 			for (size_t j = 0, jend = rotHist[i].size(); j < jend; j++)
 			{
-				vpMapPointMatches[rotHist[i][j]] = static_cast<MapPoint*>(NULL);
+				matches[rotHist[i][j]] = static_cast<MapPoint*>(NULL);
 				nmatches--;
 			}
 		}
