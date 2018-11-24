@@ -1150,70 +1150,57 @@ int ORBmatcher::SearchBySim3(KeyFrame* keyframe1, KeyFrame* keyframe2, std::vect
 	// Transform from KF2 to KF2 and search
 	for (int i2 = 0; i2 < N2; i2++)
 	{
-		MapPoint* pMP = mappoints2[i2];
-
-		if (!pMP || alreadyMatched2[i2])
+		MapPoint* mappoint2 = mappoints2[i2];
+		if (!mappoint2 || alreadyMatched2[i2] || mappoint2->isBad())
 			continue;
 
-		if (pMP->isBad())
-			continue;
-
-		cv::Mat p3Dw = pMP->GetWorldPos();
-		cv::Mat p3Dc2 = R2w*p3Dw + t2w;
-		cv::Mat p3Dc1 = sR12*p3Dc2 + t12;
+		const cv::Mat Xw2 = mappoint2->GetWorldPos();
+		const cv::Mat Xc2 = R2w * Xw2 + t2w;
+		const cv::Mat Xc1 = sR12 * Xc2 + t12;
 
 		// Depth must be positive
-		if (p3Dc1.at<float>(2) < 0.0)
+		if (Xc1.at<float>(2) < 0.f)
 			continue;
 
-		const float invz = 1.0 / p3Dc1.at<float>(2);
-		const float x = p3Dc1.at<float>(0)*invz;
-		const float y = p3Dc1.at<float>(1)*invz;
-
-		const float u = fx*x + cx;
-		const float v = fy*y + cy;
+		const float invZ = 1.f / Xc1.at<float>(2);
+		const float u = fx * Xc1.at<float>(0) * invZ + cx;
+		const float v = fy * Xc1.at<float>(1) * invZ + cy;
 
 		// Point must be inside the image
 		if (!keyframe1->IsInImage(u, v))
 			continue;
 
-		const float maxDistance = pMP->GetMaxDistanceInvariance();
-		const float minDistance = pMP->GetMinDistanceInvariance();
-		const float dist3D = cv::norm(p3Dc1);
+		const float maxDistance = mappoint2->GetMaxDistanceInvariance();
+		const float minDistance = mappoint2->GetMinDistanceInvariance();
+		const float dist3D = static_cast<float>(cv::norm(Xc1));
 
 		// Depth must be inside the scale pyramid of the image
-		if (dist3D<minDistance || dist3D>maxDistance)
+		if (dist3D < minDistance || dist3D > maxDistance)
 			continue;
 
 		// Compute predicted octave
-		const int nPredictedLevel = pMP->PredictScale(dist3D, keyframe1);
+		const int predictedScale = mappoint2->PredictScale(dist3D, keyframe1);
 
 		// Search in a radius of 2.5*sigma(ScaleLevel)
-		const float radius = th*keyframe1->pyramid.scaleFactors[nPredictedLevel];
+		const float radius = th * keyframe1->pyramid.scaleFactors[predictedScale];
 
-		const vector<size_t> vIndices = keyframe1->GetFeaturesInArea(u, v, radius);
-
-		if (vIndices.empty())
+		const std::vector<size_t> indices = keyframe1->GetFeaturesInArea(u, v, radius);
+		if (indices.empty())
 			continue;
 
 		// Match to the most similar keypoint in the radius
-		const cv::Mat dMP = pMP->GetDescriptor();
+		const cv::Mat desc2 = mappoint2->GetDescriptor();
 
-		int bestDist = INT_MAX;
+		int bestDist = std::numeric_limits<int>::max();
 		int bestIdx = -1;
-		for (vector<size_t>::const_iterator vit = vIndices.begin(), vend = vIndices.end(); vit != vend; vit++)
+		for (size_t idx : indices)
 		{
-			const size_t idx = *vit;
-
-			const cv::KeyPoint &kp = keyframe1->keypointsUn[idx];
-
-			if (kp.octave<nPredictedLevel - 1 || kp.octave>nPredictedLevel)
+			const cv::KeyPoint& keypoints1 = keyframe1->keypointsUn[idx];
+			if (keypoints1.octave < predictedScale - 1 || keypoints1.octave > predictedScale)
 				continue;
 
-			const cv::Mat &dKF = keyframe1->descriptorsL.row(idx);
-
-			const int dist = DescriptorDistance(dMP, dKF);
-
+			const cv::Mat desc1 = keyframe1->descriptorsL.row(static_cast<int>(idx));
+			const int dist = DescriptorDistance(desc2, desc1);
 			if (dist < bestDist)
 			{
 				bestDist = dist;
@@ -1228,24 +1215,22 @@ int ORBmatcher::SearchBySim3(KeyFrame* keyframe1, KeyFrame* keyframe2, std::vect
 	}
 
 	// Check agreement
-	int nFound = 0;
-
+	int nfound = 0;
 	for (int i1 = 0; i1 < N1; i1++)
 	{
-		int idx2 = match1[i1];
-
+		const int idx2 = match1[i1];
 		if (idx2 >= 0)
 		{
-			int idx1 = match2[idx2];
+			const int idx1 = match2[idx2];
 			if (idx1 == i1)
 			{
 				matches12[i1] = mappoints2[idx2];
-				nFound++;
+				nfound++;
 			}
 		}
 	}
 
-	return nFound;
+	return nfound;
 }
 
 int ORBmatcher::SearchByProjection(Frame& currFrame, const Frame& lastFrame, float th, bool monocular)
