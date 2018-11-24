@@ -53,7 +53,8 @@ public:
 
 	// Project MapPoints seen in KeyFrame into the Frame and search matches.
 	// Used in relocalisation (Tracking)
-	int SearchByProjection(Frame &CurrentFrame, KeyFrame* pKF, const std::set<MapPoint*> &sAlreadyFound, const float th, const int ORBdist);
+	int SearchByProjection(Frame& currFrame, KeyFrame* keyframe, const std::set<MapPoint*>& alreadyFound,
+		float th, int ORBdist);
 
 	// Project MapPoints using a Similarity Transformation and search matches.
 	// Used in loop detection (Loop Closing)

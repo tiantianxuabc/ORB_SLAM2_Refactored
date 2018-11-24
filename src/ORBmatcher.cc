@@ -1311,7 +1311,7 @@ int ORBmatcher::SearchByProjection(Frame& currFrame, const Frame& lastFrame, flo
 }
 
 int ORBmatcher::SearchByProjection(Frame& currFrame, KeyFrame* keyframe, const std::set<MapPoint*>& alreadyFound,
-	const float th, const int ORBdist)
+	float th, int ORBdist)
 {
 	int nmatches = 0;
 
