@@ -38,12 +38,9 @@ const int ORBmatcher::TH_HIGH = 100;
 const int ORBmatcher::TH_LOW = 50;
 static const int HISTO_LENGTH = 30;
 
-static float RadiusByViewingCos(const float &viewCos)
+static inline float RadiusByViewingCos(float viewCos)
 {
-	if (viewCos > 0.998)
-		return 2.5;
-	else
-		return 4.0;
+	return viewCos > 0.998 ? 2.5f : 4.f;
 }
 
 using MatchIdx = std::pair<int, int>;
