@@ -733,9 +733,6 @@ int ORBmatcher::SearchByBoW(KeyFrame *pKF1, KeyFrame *pKF2, vector<MapPoint *> &
 int ORBmatcher::SearchForTriangulation(const KeyFrame* keyframe1, const KeyFrame* keyframe2, const cv::Mat& F12,
 	std::vector<std::pair<size_t, size_t>>& matchIds, bool onlyStereo)
 {
-	const DBoW2::FeatureVector &vFeatVec1 = keyframe1->featureVector;
-	const DBoW2::FeatureVector &vFeatVec2 = keyframe2->featureVector;
-
 	//Compute epipole in second image
 	cv::Mat Cw = keyframe1->GetCameraCenter();
 	cv::Mat R2w = keyframe2->GetRotation();
@@ -759,108 +756,92 @@ int ORBmatcher::SearchForTriangulation(const KeyFrame* keyframe1, const KeyFrame
 
 	const float factor = 1.0f / HISTO_LENGTH;
 
-	DBoW2::FeatureVector::const_iterator f1it = vFeatVec1.begin();
-	DBoW2::FeatureVector::const_iterator f2it = vFeatVec2.begin();
-	DBoW2::FeatureVector::const_iterator f1end = vFeatVec1.end();
-	DBoW2::FeatureVector::const_iterator f2end = vFeatVec2.end();
-
-	while (f1it != f1end && f2it != f2end)
+	FeatureVectorIterator iterator(keyframe1->featureVector, keyframe2->featureVector);
+	while (iterator.next())
 	{
-		if (f1it->first == f2it->first)
+		const auto& indices1 = iterator.indices1();
+		const auto& indices2 = iterator.indices2();
+		for (size_t i1 = 0, iend1 = indices1.size(); i1 < iend1; i1++)
 		{
-			for (size_t i1 = 0, iend1 = f1it->second.size(); i1 < iend1; i1++)
-			{
-				const size_t idx1 = f1it->second[i1];
+			const size_t idx1 = indices1[i1];
 
-				MapPoint* pMP1 = keyframe1->GetMapPoint(idx1);
+			MapPoint* pMP1 = keyframe1->GetMapPoint(idx1);
 
-				// If there is already a MapPoint skip
-				if (pMP1)
+			// If there is already a MapPoint skip
+			if (pMP1)
+				continue;
+
+			const bool bStereo1 = keyframe1->uright[idx1] >= 0;
+
+			if (onlyStereo)
+				if (!bStereo1)
 					continue;
 
-				const bool bStereo1 = keyframe1->uright[idx1] >= 0;
+			const cv::KeyPoint &kp1 = keyframe1->keypointsUn[idx1];
+
+			const cv::Mat &d1 = keyframe1->descriptorsL.row(idx1);
+
+			int bestDist = TH_LOW;
+			int bestIdx2 = -1;
+
+			for (size_t i2 = 0, iend2 = indices2.size(); i2 < iend2; i2++)
+			{
+				size_t idx2 = indices2[i2];
+
+				MapPoint* pMP2 = keyframe2->GetMapPoint(idx2);
+
+				// If we have already matched or there is a MapPoint skip
+				if (vbMatched2[idx2] || pMP2)
+					continue;
+
+				const bool bStereo2 = keyframe2->uright[idx2] >= 0;
 
 				if (onlyStereo)
-					if (!bStereo1)
+					if (!bStereo2)
 						continue;
 
-				const cv::KeyPoint &kp1 = keyframe1->keypointsUn[idx1];
+				const cv::Mat &d2 = keyframe2->descriptorsL.row(idx2);
 
-				const cv::Mat &d1 = keyframe1->descriptorsL.row(idx1);
+				const int dist = DescriptorDistance(d1, d2);
 
-				int bestDist = TH_LOW;
-				int bestIdx2 = -1;
+				if (dist > TH_LOW || dist > bestDist)
+					continue;
 
-				for (size_t i2 = 0, iend2 = f2it->second.size(); i2 < iend2; i2++)
+				const cv::KeyPoint &kp2 = keyframe2->keypointsUn[idx2];
+
+				if (!bStereo1 && !bStereo2)
 				{
-					size_t idx2 = f2it->second[i2];
-
-					MapPoint* pMP2 = keyframe2->GetMapPoint(idx2);
-
-					// If we have already matched or there is a MapPoint skip
-					if (vbMatched2[idx2] || pMP2)
+					const float distex = ex - kp2.pt.x;
+					const float distey = ey - kp2.pt.y;
+					if (distex*distex + distey*distey < 100 * keyframe2->pyramid.scaleFactors[kp2.octave])
 						continue;
-
-					const bool bStereo2 = keyframe2->uright[idx2] >= 0;
-
-					if (onlyStereo)
-						if (!bStereo2)
-							continue;
-
-					const cv::Mat &d2 = keyframe2->descriptorsL.row(idx2);
-
-					const int dist = DescriptorDistance(d1, d2);
-
-					if (dist > TH_LOW || dist > bestDist)
-						continue;
-
-					const cv::KeyPoint &kp2 = keyframe2->keypointsUn[idx2];
-
-					if (!bStereo1 && !bStereo2)
-					{
-						const float distex = ex - kp2.pt.x;
-						const float distey = ey - kp2.pt.y;
-						if (distex*distex + distey*distey < 100 * keyframe2->pyramid.scaleFactors[kp2.octave])
-							continue;
-					}
-
-					if (CheckDistEpipolarLine(kp1, kp2, F12, keyframe2))
-					{
-						bestIdx2 = idx2;
-						bestDist = dist;
-					}
 				}
 
-				if (bestIdx2 >= 0)
+				if (CheckDistEpipolarLine(kp1, kp2, F12, keyframe2))
 				{
-					const cv::KeyPoint &kp2 = keyframe2->keypointsUn[bestIdx2];
-					vMatches12[idx1] = bestIdx2;
-					nmatches++;
-
-					if (checkOrientation_)
-					{
-						float rot = kp1.angle - kp2.angle;
-						if (rot < 0.0)
-							rot += 360.0f;
-						int bin = round(rot*factor);
-						if (bin == HISTO_LENGTH)
-							bin = 0;
-						assert(bin >= 0 && bin < HISTO_LENGTH);
-						rotHist[bin].push_back(idx1);
-					}
+					bestIdx2 = idx2;
+					bestDist = dist;
 				}
 			}
 
-			f1it++;
-			f2it++;
-		}
-		else if (f1it->first < f2it->first)
-		{
-			f1it = vFeatVec1.lower_bound(f2it->first);
-		}
-		else
-		{
-			f2it = vFeatVec2.lower_bound(f1it->first);
+			if (bestIdx2 >= 0)
+			{
+				const cv::KeyPoint &kp2 = keyframe2->keypointsUn[bestIdx2];
+				vMatches12[idx1] = bestIdx2;
+				nmatches++;
+
+				if (checkOrientation_)
+				{
+					float rot = kp1.angle - kp2.angle;
+					if (rot < 0.0)
+						rot += 360.0f;
+					int bin = round(rot*factor);
+					if (bin == HISTO_LENGTH)
+						bin = 0;
+					assert(bin >= 0 && bin < HISTO_LENGTH);
+					rotHist[bin].push_back(idx1);
+				}
+			}
 		}
 	}
 
