@@ -202,7 +202,7 @@ int ORBmatcher::SearchByProjection(Frame& frame, const std::vector<MapPoint*>& m
 					continue;
 			}
 
-			const cv::Mat desc2 = frame.descriptorsL.row(idx);
+			const cv::Mat desc2 = frame.descriptorsL.row(static_cast<int>(idx));
 			const int dist = DescriptorDistance(desc1, desc2);
 			if (dist < bestDist)
 			{
@@ -874,7 +874,7 @@ int ORBmatcher::Fuse(KeyFrame* keyframe, const std::vector<MapPoint*>& mappoints
 					continue;
 			}
 
-			const cv::Mat desc2 = keyframe->descriptorsL.row(idx);
+			const cv::Mat desc2 = keyframe->descriptorsL.row(static_cast<int>(idx));
 			const int dist = DescriptorDistance(desc1, desc2);
 			if (dist < bestDist)
 			{
