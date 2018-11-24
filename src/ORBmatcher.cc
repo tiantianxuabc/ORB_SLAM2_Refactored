@@ -22,6 +22,14 @@
 
 #include <Thirdparty/DBoW2/DBoW2/FeatureVector.h>
 
+#ifdef _WIN32
+#define popcnt32 __popcnt
+#define popcnt64 __popcnt64
+#else
+#define popcnt32 __builtin_popcount
+#define popcnt64 __builtin_popcountll
+#endif
+
 namespace ORB_SLAM2
 {
 
@@ -1319,21 +1327,13 @@ int ORBmatcher::SearchByProjection(Frame& frame, KeyFrame* keyframe, const std::
 
 // Bit set count operation from
 // http://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetParallel
-int ORBmatcher::DescriptorDistance(const cv::Mat &a, const cv::Mat &b)
+int ORBmatcher::DescriptorDistance(const cv::Mat& a, const cv::Mat& b)
 {
-	const int *pa = a.ptr<int32_t>();
-	const int *pb = b.ptr<int32_t>();
-
+	const int* ptra = a.ptr<int32_t>();
+	const int* ptrb = b.ptr<int32_t>();
 	int dist = 0;
-
-	for (int i = 0; i < 8; i++, pa++, pb++)
-	{
-		unsigned  int v = *pa ^ *pb;
-		v = v - ((v >> 1) & 0x55555555);
-		v = (v & 0x33333333) + ((v >> 2) & 0x33333333);
-		dist += (((v + (v >> 4)) & 0xF0F0F0F) * 0x1010101) >> 24;
-	}
-
+	for (int i = 0; i < 8; i++)
+		dist += static_cast<int>(popcnt32(*ptra++ ^ *ptrb++));
 	return dist;
 }
 
