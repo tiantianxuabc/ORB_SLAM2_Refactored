@@ -117,25 +117,17 @@ Viewer::Viewer(System* system, FrameDrawer* frameDrawer, MapDrawer* mapDrawer, T
 	cv::FileStorage settings(settingsFile, cv::FileStorage::READ);
 
 	float fps = settings["Camera.fps"];
-	if (fps < 1)
-		fps = 30;
-	mT = 1e3 / fps;
+	if (fps < 1) fps = 30;
 
-	mImageWidth = settings["Camera.width"];
-	mImageHeight = settings["Camera.height"];
-	if (mImageWidth < 1 || mImageHeight < 1)
-	{
-		mImageWidth = 640;
-		mImageHeight = 480;
-	}
+	waittime_ = 1e3 / fps;
 
-	mViewpointX = settings["Viewer.ViewpointX"];
-	mViewpointY = settings["Viewer.ViewpointY"];
-	mViewpointZ = settings["Viewer.ViewpointZ"];
-	mViewpointF = settings["Viewer.ViewpointF"];
+	viewpointX_ = settings["Viewer.ViewpointX"];
+	viewpointY_ = settings["Viewer.ViewpointY"];
+	viewpointZ_ = settings["Viewer.ViewpointZ"];
+	viewpointF_ = settings["Viewer.ViewpointF"];
 
-	mCameraSize = settings["Viewer.CameraSize"];
-	mCameraLineWidth = settings["Viewer.CameraLineWidth"];
+	cameraSize_ = settings["Viewer.CameraSize"];
+	cameraLineWidth_ = settings["Viewer.CameraLineWidth"];
 }
 
 void Viewer::Run()
@@ -162,8 +154,8 @@ void Viewer::Run()
 
 	// Define Camera Render Object (for view / scene browsing)
 	pangolin::OpenGlRenderState s_cam(
-		pangolin::ProjectionMatrix(1024, 768, mViewpointF, mViewpointF, 512, 389, 0.1, 1000),
-		pangolin::ModelViewLookAt(mViewpointX, mViewpointY, mViewpointZ, 0, 0, 0, 0.0, -1.0, 0.0)
+		pangolin::ProjectionMatrix(1024, 768, viewpointF_, viewpointF_, 512, 389, 0.1, 1000),
+		pangolin::ModelViewLookAt(viewpointX_, viewpointY_, viewpointZ_, 0, 0, 0, 0.0, -1.0, 0.0)
 	);
 
 	// Add named OpenGL viewport to window and provide 3D Handler
@@ -191,7 +183,7 @@ void Viewer::Run()
 		}
 		else if (menuFollowCamera && !bFollow)
 		{
-			s_cam.SetModelViewMatrix(pangolin::ModelViewLookAt(mViewpointX, mViewpointY, mViewpointZ, 0, 0, 0, 0.0, -1.0, 0.0));
+			s_cam.SetModelViewMatrix(pangolin::ModelViewLookAt(viewpointX_, viewpointY_, viewpointZ_, 0, 0, 0, 0.0, -1.0, 0.0));
 			s_cam.Follow(Twc);
 			bFollow = true;
 		}
@@ -213,7 +205,7 @@ void Viewer::Run()
 
 		d_cam.Activate(s_cam);
 		glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
-		DrawCurrentCamera(Twc, mCameraSize, mCameraLineWidth);
+		DrawCurrentCamera(Twc, cameraSize_, cameraLineWidth_);
 		if (menuShowKeyFrames || menuShowGraph)
 			mapDrawer_->DrawKeyFrames(menuShowKeyFrames, menuShowGraph);
 		if (menuShowPoints)
@@ -223,7 +215,7 @@ void Viewer::Run()
 
 		cv::Mat im = frameDrawer_->DrawFrame();
 		cv::imshow("ORB-SLAM2: Current Frame", im);
-		cv::waitKey(mT);
+		cv::waitKey(waittime_);
 
 		if (menuReset)
 		{

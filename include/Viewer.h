@@ -69,9 +69,8 @@ private:
 	Tracking* tracker_;
 
 	// 1/fps in ms
-	double mT;
-	float mImageWidth, mImageHeight;
-
+	double waittime_;
+	
 	float mViewpointX, mViewpointY, mViewpointZ, mViewpointF;
 	float mCameraSize, mCameraLineWidth;
 
