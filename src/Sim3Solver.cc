@@ -55,7 +55,49 @@ static void ComputeCentroid(const cv::Mat &P, cv::Mat &Pr, cv::Mat &C)
 	}
 }
 
-static void ComputeSim3(const cv::Mat &P1, const cv::Mat &P2, Sim3& S12, Sim3& S21, bool mbFixScale)
+static void ComputeRotation(const cv::Mat1f& M, cv::Mat& R)
+{
+	// Step 3: Compute N matrix
+
+	float N11, N12, N13, N14, N22, N23, N24, N33, N34, N44;
+
+	N11 = M(0, 0) + M(1, 1) + M(2, 2);
+	N12 = M(1, 2) - M(2, 1);
+	N13 = M(2, 0) - M(0, 2);
+	N14 = M(0, 1) - M(1, 0);
+	N22 = M(0, 0) - M(1, 1) - M(2, 2);
+	N23 = M(0, 1) + M(1, 0);
+	N24 = M(2, 0) + M(0, 2);
+	N33 = -M(0, 0) + M(1, 1) - M(2, 2);
+	N34 = M(1, 2) + M(2, 1);
+	N44 = -M(0, 0) - M(1, 1) + M(2, 2);
+
+	cv::Mat1f N = (cv::Mat1f(4, 4) <<
+		N11, N12, N13, N14,
+		N12, N22, N23, N24,
+		N13, N23, N33, N34,
+		N14, N24, N34, N44);
+
+	// Step 4: Eigenvector of the highest eigenvalue
+
+	cv::Mat eval, evec;
+
+	cv::eigen(N, eval, evec); //evec[0] is the quaternion of the desired rotation
+
+	cv::Mat vec(1, 3, evec.type());
+	(evec.row(0).colRange(1, 4)).copyTo(vec); //extract imaginary part of the quaternion (sin*axis)
+
+	// Rotation angle. sin is the norm of the imaginary part, cos is the real part
+	double ang = atan2(norm(vec), evec.at<float>(0, 0));
+
+	vec = 2 * ang*vec / norm(vec); //Angle-axis representation. quaternion angle is the half
+
+	R.create(3, 3, CV_32F);
+
+	cv::Rodrigues(vec, R); // computes the rotation matrix from angle-axis
+}
+
+static void ComputeSim3(const cv::Mat& P1, const cv::Mat& P2, Sim3& S12, Sim3& S21, bool fixScale)
 {
 	// Custom implementation of:
 	// Horn 1987, Closed-form solution of absolute orientataion using unit quaternions
@@ -74,98 +116,49 @@ static void ComputeSim3(const cv::Mat &P1, const cv::Mat &P2, Sim3& S12, Sim3& S
 
 	cv::Mat M = Pr2*Pr1.t();
 
-	// Step 3: Compute N matrix
+	// Step 3 ~ Step 4
+	ComputeRotation(M, S12.R);
 
-	double N11, N12, N13, N14, N22, N23, N24, N33, N34, N44;
+	// Step 5: Rotate set 2
 
-	cv::Mat N(4, 4, P1.type());
-
-	N11 = M.at<float>(0, 0) + M.at<float>(1, 1) + M.at<float>(2, 2);
-	N12 = M.at<float>(1, 2) - M.at<float>(2, 1);
-	N13 = M.at<float>(2, 0) - M.at<float>(0, 2);
-	N14 = M.at<float>(0, 1) - M.at<float>(1, 0);
-	N22 = M.at<float>(0, 0) - M.at<float>(1, 1) - M.at<float>(2, 2);
-	N23 = M.at<float>(0, 1) + M.at<float>(1, 0);
-	N24 = M.at<float>(2, 0) + M.at<float>(0, 2);
-	N33 = -M.at<float>(0, 0) + M.at<float>(1, 1) - M.at<float>(2, 2);
-	N34 = M.at<float>(1, 2) + M.at<float>(2, 1);
-	N44 = -M.at<float>(0, 0) - M.at<float>(1, 1) + M.at<float>(2, 2);
-
-	N = (cv::Mat_<float>(4, 4) << N11, N12, N13, N14,
-		N12, N22, N23, N24,
-		N13, N23, N33, N34,
-		N14, N24, N34, N44);
-
-
-	// Step 4: Eigenvector of the highest eigenvalue
-
-	cv::Mat eval, evec;
-
-	cv::eigen(N, eval, evec); //evec[0] is the quaternion of the desired rotation
-
-	cv::Mat vec(1, 3, evec.type());
-	(evec.row(0).colRange(1, 4)).copyTo(vec); //extract imaginary part of the quaternion (sin*axis)
-
-											  // Rotation angle. sin is the norm of the imaginary part, cos is the real part
-	double ang = atan2(norm(vec), evec.at<float>(0, 0));
-
-	vec = 2 * ang*vec / norm(vec); //Angle-axis representation. quaternion angle is the half
-
-	S12.R.create(3, 3, P1.type());
-
-	cv::Rodrigues(vec, S12.R); // computes the rotation matrix from angle-axis
-
-							   // Step 5: Rotate set 2
-
-	cv::Mat P3 = S12.R*Pr2;
+	cv::Mat P3 = S12.R * Pr2;
 
 	// Step 6: Scale
-
-	if (!mbFixScale)
+	S12.scale = 1.f;
+	if (!fixScale)
 	{
-		double nom = Pr1.dot(P3);
-		cv::Mat aux_P3(P3.size(), P3.type());
-		aux_P3 = P3;
-		cv::pow(P3, 2, aux_P3);
+		auto Squared = [](float x) { return x * x; };
+		const double nom = Pr1.dot(P3);
 		double den = 0;
-
-		for (int i = 0; i < aux_P3.rows; i++)
-		{
-			for (int j = 0; j < aux_P3.cols; j++)
-			{
-				den += aux_P3.at<float>(i, j);
-			}
-		}
-
-		S12.scale = nom / den;
+		for (int i = 0; i < P3.rows; i++)
+			for (int j = 0; j < P3.cols; j++)
+				den += Squared(P3.at<float>(i, j) * P3.at<float>(i, j));
+		S12.scale = static_cast<float>(nom / den);
 	}
-	else
-		S12.scale = 1.0f;
 
 	// Step 7: Translation
 
 	S12.t.create(1, 3, P1.type());
-	S12.t = O1 - S12.scale*S12.R*O2;
+	S12.t = O1 - S12.scale * S12.R * O2;
 
 	// Step 8: Transformation
+	cv::Mat sR12, sR21;
 
-	// Step 8.1 T12
 	S12.T = cv::Mat::eye(4, 4, P1.type());
-
-	cv::Mat sR = S12.scale*S12.R;
-
-	sR.copyTo(S12.T.rowRange(0, 3).colRange(0, 3));
-	S12.t.copyTo(S12.T.rowRange(0, 3).col(3));
-
-	// Step 8.2 T21
-
 	S21.T = cv::Mat::eye(4, 4, P1.type());
 
-	cv::Mat sRinv = (1.0 / S12.scale)*S12.R.t();
+	// Step 8.1 T12
+	sR12 = S12.scale * S12.R;
+	sR12.copyTo(CameraPose::GetR(S12.T));
+	S12.t.copyTo(CameraPose::Gett(S12.T));
 
-	sRinv.copyTo(S21.T.rowRange(0, 3).colRange(0, 3));
-	cv::Mat tinv = -sRinv*S12.t;
-	tinv.copyTo(S21.T.rowRange(0, 3).col(3));
+	// Step 8.2 T21
+	S21.R = S12.R.t();
+	S21.scale = 1.f / S12.scale;
+	sR21 = S21.scale * S21.R;
+	S21.t = -sR21 * S12.t;
+	sR21.copyTo(CameraPose::GetR(S21.T));
+	S21.t.copyTo(CameraPose::Gett(S21.T));
 }
 
 static void Project(const std::vector<cv::Mat>& points3D, std::vector<cv::Mat>& points2D, const cv::Mat& Tcw,
