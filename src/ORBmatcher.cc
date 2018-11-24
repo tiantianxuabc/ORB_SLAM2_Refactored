@@ -384,9 +384,9 @@ int ORBmatcher::SearchByProjection(const KeyFrame* keyframe, const cv::Mat& Scw,
 	// Decompose Scw
 	const cv::Mat sRcw = CameraPose::GetR(Scw);
 	const float scale = static_cast<float>(sqrt(sRcw.row(0).dot(sRcw.row(0))));
-	cv::Mat Rcw = sRcw / scale;
-	cv::Mat tcw = CameraPose::Gett(Scw) / scale;
-	cv::Mat Ow = -Rcw.t() * tcw;
+	const cv::Mat Rcw = sRcw / scale;
+	const cv::Mat tcw = CameraPose::Gett(Scw) / scale;
+	const cv::Mat Ow = -Rcw.t() * tcw;
 
 	// Set of MapPoints already found in the KeyFrame
 	std::set<MapPoint*> alreadyFound(std::begin(matched), std::end(matched));
@@ -901,100 +901,89 @@ int ORBmatcher::Fuse(KeyFrame* keyframe, const cv::Mat& Scw, const std::vector<M
 	float th, std::vector<MapPoint*>& replacePoints)
 {
 	// Get Calibration Parameters for later projection
-	const float &fx = keyframe->camera.fx;
-	const float &fy = keyframe->camera.fy;
-	const float &cx = keyframe->camera.cx;
-	const float &cy = keyframe->camera.cy;
+	const float fx = keyframe->camera.fx;
+	const float fy = keyframe->camera.fy;
+	const float cx = keyframe->camera.cx;
+	const float cy = keyframe->camera.cy;
 
 	// Decompose Scw
-	cv::Mat sRcw = Scw.rowRange(0, 3).colRange(0, 3);
-	const float scw = sqrt(sRcw.row(0).dot(sRcw.row(0)));
-	cv::Mat Rcw = sRcw / scw;
-	cv::Mat tcw = Scw.rowRange(0, 3).col(3) / scw;
-	cv::Mat Ow = -Rcw.t()*tcw;
+	const cv::Mat sRcw = CameraPose::GetR(Scw);
+	const float scale = static_cast<float>(sqrt(sRcw.row(0).dot(sRcw.row(0))));
+	const cv::Mat Rcw = sRcw / scale;
+	const cv::Mat tcw = CameraPose::Gett(Scw) / scale;
+	const cv::Mat Ow = -Rcw.t() * tcw;
 
 	// Set of MapPoints already found in the KeyFrame
-	const set<MapPoint*> spAlreadyFound = keyframe->GetMapPoints();
+	const std::set<MapPoint*> alreadyFound = keyframe->GetMapPoints();
 
-	int nFused = 0;
-
-	const int nPoints = mappoints.size();
+	int nfused = 0;
 
 	// For each candidate MapPoint project and match
-	for (int iMP = 0; iMP < nPoints; iMP++)
+	//for (MapPoint* mappoint : mappoints)
+	for (size_t i = 0; i < mappoints.size(); i++)
 	{
-		MapPoint* pMP = mappoints[iMP];
-
+		MapPoint* mappoint = mappoints[i];
 		// Discard Bad MapPoints and already found
-		if (pMP->isBad() || spAlreadyFound.count(pMP))
+		if (mappoint->isBad() || alreadyFound.count(mappoint))
 			continue;
 
 		// Get 3D Coords.
-		cv::Mat p3Dw = pMP->GetWorldPos();
+		const cv::Mat Xw = mappoint->GetWorldPos();
 
 		// Transform into Camera Coords.
-		cv::Mat p3Dc = Rcw*p3Dw + tcw;
+		const cv::Mat Xc = Rcw * Xw + tcw;
 
 		// Depth must be positive
-		if (p3Dc.at<float>(2) < 0.0f)
+		if (Xc.at<float>(2) < 0.f)
 			continue;
 
 		// Project into Image
-		const float invz = 1.0 / p3Dc.at<float>(2);
-		const float x = p3Dc.at<float>(0)*invz;
-		const float y = p3Dc.at<float>(1)*invz;
-
-		const float u = fx*x + cx;
-		const float v = fy*y + cy;
+		const float invZ = 1.f / Xc.at<float>(2);
+		const float u = fx * Xc.at<float>(0) * invZ + cx;
+		const float v = fy * Xc.at<float>(1) * invZ + cy;
 
 		// Point must be inside the image
 		if (!keyframe->IsInImage(u, v))
 			continue;
 
 		// Depth must be inside the scale pyramid of the image
-		const float maxDistance = pMP->GetMaxDistanceInvariance();
-		const float minDistance = pMP->GetMinDistanceInvariance();
-		cv::Mat PO = p3Dw - Ow;
-		const float dist3D = cv::norm(PO);
+		const float maxDistance = mappoint->GetMaxDistanceInvariance();
+		const float minDistance = mappoint->GetMinDistanceInvariance();
+		const cv::Mat PO = Xw - Ow;
+		const float dist3D = static_cast<float>(cv::norm(PO));
 
-		if (dist3D<minDistance || dist3D>maxDistance)
+		if (dist3D < minDistance || dist3D > maxDistance)
 			continue;
 
 		// Viewing angle must be less than 60 deg
-		cv::Mat Pn = pMP->GetNormal();
-
-		if (PO.dot(Pn) < 0.5*dist3D)
+		const cv::Mat Pn = mappoint->GetNormal();
+		if (PO.dot(Pn) < 0.5 * dist3D)
 			continue;
 
 		// Compute predicted scale level
-		const int nPredictedLevel = pMP->PredictScale(dist3D, keyframe);
+		const int predictedScale = mappoint->PredictScale(dist3D, keyframe);
 
 		// Search in a radius
-		const float radius = th*keyframe->pyramid.scaleFactors[nPredictedLevel];
+		const float radius = th*keyframe->pyramid.scaleFactors[predictedScale];
 
-		const vector<size_t> vIndices = keyframe->GetFeaturesInArea(u, v, radius);
-
-		if (vIndices.empty())
+		const std::vector<size_t> indices = keyframe->GetFeaturesInArea(u, v, radius);
+		if (indices.empty())
 			continue;
 
 		// Match to the most similar keypoint in the radius
 
-		const cv::Mat dMP = pMP->GetDescriptor();
+		const cv::Mat desc1 = mappoint->GetDescriptor();
 
-		int bestDist = INT_MAX;
+		int bestDist = std::numeric_limits<int>::max();
 		int bestIdx = -1;
-		for (vector<size_t>::const_iterator vit = vIndices.begin(); vit != vIndices.end(); vit++)
+		for (size_t idx : indices)
 		{
-			const size_t idx = *vit;
-			const int &kpLevel = keyframe->keypointsUn[idx].octave;
-
-			if (kpLevel<nPredictedLevel - 1 || kpLevel>nPredictedLevel)
+			const int scale = keyframe->keypointsUn[idx].octave;
+			if (scale < predictedScale - 1 || scale > predictedScale)
 				continue;
 
-			const cv::Mat &dKF = keyframe->descriptorsL.row(idx);
-
-			int dist = DescriptorDistance(dMP, dKF);
-
+			const cv::Mat &desc2 = keyframe->descriptorsL.row(idx);
+			int dist = DescriptorDistance(desc1, desc2);
 			if (dist < bestDist)
 			{
 				bestDist = dist;
@@ -1005,22 +994,22 @@ int ORBmatcher::Fuse(KeyFrame* keyframe, const cv::Mat& Scw, const std::vector<M
 		// If there is already a MapPoint replace otherwise add new measurement
 		if (bestDist <= TH_LOW)
 		{
-			MapPoint* pMPinKF = keyframe->GetMapPoint(bestIdx);
-			if (pMPinKF)
+			MapPoint* MPInKF = keyframe->GetMapPoint(bestIdx);
+			if (MPInKF)
 			{
-				if (!pMPinKF->isBad())
-					replacePoints[iMP] = pMPinKF;
+				if (!MPInKF->isBad())
+					replacePoints[i] = MPInKF;
 			}
 			else
 			{
-				pMP->AddObservation(keyframe, bestIdx);
-				keyframe->AddMapPoint(pMP, bestIdx);
+				mappoint->AddObservation(keyframe, bestIdx);
+				keyframe->AddMapPoint(mappoint, bestIdx);
 			}
-			nFused++;
+			nfused++;
 		}
 	}
 
-	return nFused;
+	return nfused;
 }
 
 int ORBmatcher::SearchBySim3(KeyFrame* keyframe1, KeyFrame* keyframe2, std::vector<MapPoint*>& matches12,
