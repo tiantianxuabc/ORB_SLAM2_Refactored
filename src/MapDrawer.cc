@@ -39,7 +39,7 @@ MapDrawer::MapDrawer(Map* map, const std::string &settingsFile) : map_(map)
 	cameraLineWidth_ = settings["Viewer.CameraLineWidth"];
 }
 
-void MapDrawer::DrawMapPoints()
+void MapDrawer::DrawMapPoints() const
 {
 	const std::vector<MapPoint*>& mappionts = map_->GetAllMapPoints();
 	const std::vector<MapPoint*>& _referenceMPs = map_->GetReferenceMapPoints();
@@ -77,7 +77,7 @@ void MapDrawer::DrawMapPoints()
 	glEnd();
 }
 
-void MapDrawer::DrawKeyFrames(bool drawKF, bool drawGraph)
+void MapDrawer::DrawKeyFrames(bool drawKF, bool drawGraph) const
 {
 	const float w = keyFrameSize_;
 	const float h = 0.75f * w;
@@ -170,7 +170,7 @@ void MapDrawer::DrawKeyFrames(bool drawKF, bool drawGraph)
 	}
 }
 
-void MapDrawer::DrawCurrentCamera(const pangolin::OpenGlMatrix& Twc)
+void MapDrawer::DrawCurrentCamera(const pangolin::OpenGlMatrix& Twc) const
 {
 	const float w = cameraSize_;
 	const float h = 0.75f * w;
@@ -218,7 +218,7 @@ void MapDrawer::SetCurrentCameraPose(const cv::Mat& Tcw)
 	cameraPose_ = Tcw.clone();
 }
 
-void MapDrawer::GetCurrentOpenGLCameraMatrix(pangolin::OpenGlMatrix& M)
+void MapDrawer::GetCurrentOpenGLCameraMatrix(pangolin::OpenGlMatrix& M) const
 {
 	if (!cameraPose_.empty())
 	{
