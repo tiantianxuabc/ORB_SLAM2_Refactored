@@ -22,14 +22,14 @@
 #ifndef ORBMATCHER_H
 #define ORBMATCHER_H
 
-#include<vector>
-#include<opencv2/core/core.hpp>
-#include<opencv2/features2d/features2d.hpp>
+#include <vector>
 
-#include"MapPoint.h"
-#include"KeyFrame.h"
-#include"Frame.h"
+#include <opencv2/core/core.hpp>
+#include <opencv2/features2d/features2d.hpp>
 
+#include "MapPoint.h"
+#include "KeyFrame.h"
+#include "Frame.h"
 
 namespace ORB_SLAM2
 {
@@ -89,16 +89,8 @@ public:
 
 	static const int TH_LOW;
 	static const int TH_HIGH;
-	//static const int HISTO_LENGTH;
 
-
-protected:
-
-	//bool CheckDistEpipolarLine(const cv::KeyPoint &kp1, const cv::KeyPoint &kp2, const cv::Mat &F12, const KeyFrame *pKF);
-
-	//float RadiusByViewingCos(const float &viewCos);
-
-	//void ComputeThreeMaxima(std::vector<int>* histo, const int L, int &ind1, int &ind2, int &ind3);
+private:
 
 	float fNNRatio_;
 	bool checkOrientation_;
