@@ -50,7 +50,7 @@ public:
 
 	cv::Mat find(std::vector<bool> &vbInliers12, int &nInliers);
 
-	cv::Mat iterate(int nIterations, bool &bNoMore, std::vector<bool> &vbInliers, int &nInliers);
+	cv::Mat iterate(int nIterations, bool &bNoMore, std::vector<bool> &vbInliers);
 
 	cv::Mat GetEstimatedRotation();
 	cv::Mat GetEstimatedTranslation();

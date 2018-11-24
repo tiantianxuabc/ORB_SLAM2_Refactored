@@ -286,12 +286,11 @@ void Sim3Solver::SetRansacParameters(double probability, int minInliers, int max
 	iterations_ = 0;
 }
 
-cv::Mat Sim3Solver::iterate(int maxk, bool& terminate, std::vector<bool>& isInlier, int& ninliers)
+cv::Mat Sim3Solver::iterate(int maxk, bool& terminate, std::vector<bool>& isInlier)
 {
 	terminate = false;
 	isInlier.assign(nkeypoints1_, false);
-	ninliers = 0;
-
+	
 	if (N < minInliers_)
 	{
 		terminate = true;
@@ -328,7 +327,7 @@ cv::Mat Sim3Solver::iterate(int maxk, bool& terminate, std::vector<bool>& isInli
 		Project(Xc2_, proj1, S12.T, K1_);
 		Project(Xc1_, proj2, S21.T, K2_);
 
-		int _ninliers = 0;
+		int ninliers = 0;
 		for (size_t i = 0; i < points1_.size(); i++)
 		{
 			cv::Mat diff1 = points1_[i] - proj1[i];
@@ -339,21 +338,20 @@ cv::Mat Sim3Solver::iterate(int maxk, bool& terminate, std::vector<bool>& isInli
 			const bool inlier = errorSq1 < maxErrorSq1_[i] && errorSq2 < maxErrorSq2_[i];
 			inliers_[i] = inlier;
 			if (inlier)
-				_ninliers++;
+				ninliers++;
 		}
 
-		if (_ninliers >= maxInliers_)
+		if (ninliers >= maxInliers_)
 		{
 			//bestInliers_ = inliers_;
-			maxInliers_ = _ninliers;
+			maxInliers_ = ninliers;
 			bestT12_ = S12.T.clone();
 			bestRotation_ = S12.R.clone();
 			bestTranslation_ = S12.t.clone();
 			bestScale_ = S12.scale;
 
-			if (_ninliers > minInliers_)
+			if (ninliers > minInliers_)
 			{
-				ninliers = _ninliers;
 				for (int i = 0; i < N; i++)
 					if (inliers_[i])
 						isInlier[indices1_[i]] = true;
@@ -366,12 +364,6 @@ cv::Mat Sim3Solver::iterate(int maxk, bool& terminate, std::vector<bool>& isInli
 		terminate = true;
 
 	return cv::Mat();
-}
-
-cv::Mat Sim3Solver::find(std::vector<bool> &vbInliers12, int &nInliers)
-{
-	bool bFlag;
-	return iterate(maxIterations_, bFlag, vbInliers12, nInliers);
 }
 
 cv::Mat Sim3Solver::GetEstimatedRotation()
