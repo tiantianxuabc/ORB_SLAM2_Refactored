@@ -69,7 +69,7 @@ public:
 	int SearchForInitialization(Frame &F1, Frame &F2, std::vector<cv::Point2f> &vbPrevMatched, std::vector<int> &vnMatches12, int windowSize = 10);
 
 	// Matching to triangulate new MapPoints. Check Epipolar Constraint.
-	int SearchForTriangulation(const KeyFrame *pKF1, const KeyFrame* pKF2, cv::Mat F12,
+	int SearchForTriangulation(const KeyFrame *pKF1, const KeyFrame* pKF2, const cv::Mat& F12,
 		std::vector<std::pair<size_t, size_t> > &vMatchedPairs, bool bOnlyStereo);
 
 	// Search matches between MapPoints seen in KF1 and KF2 transforming by a Sim3 [s12*R12|t12]
