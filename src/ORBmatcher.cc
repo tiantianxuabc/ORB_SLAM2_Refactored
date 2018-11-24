@@ -479,85 +479,80 @@ int ORBmatcher::SearchForInitialization(Frame& frame1, Frame& frame2, std::vecto
 	std::vector<int>& matches12, int windowSize)
 {
 	int nmatches = 0;
-	matches12 = vector<int>(frame1.keypointsUn.size(), -1);
+	matches12.assign(frame1.keypointsUn.size(), -1);
 
 	vector<int> rotHist[HISTO_LENGTH];
 	for (int i = 0; i < HISTO_LENGTH; i++)
 		rotHist[i].reserve(500);
 	const float factor = 1.0f / HISTO_LENGTH;
 
-	vector<int> vMatchedDistance(frame2.keypointsUn.size(), INT_MAX);
-	vector<int> vnMatches21(frame2.keypointsUn.size(), -1);
+	std::vector<int> matchedDistance(frame2.keypointsUn.size(), std::numeric_limits<int>::max());
+	std::vector<int> matches21(frame2.keypointsUn.size(), -1);
 
-	for (size_t i1 = 0, iend1 = frame1.keypointsUn.size(); i1 < iend1; i1++)
+	for (size_t idx1 = 0; idx1 < frame1.keypointsUn.size(); idx1++)
 	{
-		cv::KeyPoint kp1 = frame1.keypointsUn[i1];
-		int level1 = kp1.octave;
+		const cv::KeyPoint& keypoint1 = frame1.keypointsUn[idx1];
+		const int level1 = keypoint1.octave;
 		if (level1 > 0)
 			continue;
 
-		vector<size_t> vIndices2 = frame2.GetFeaturesInArea(prevMatched[i1].x, prevMatched[i1].y, windowSize, level1, level1);
-
-		if (vIndices2.empty())
+		const float u = prevMatched[idx1].x;
+		const float v = prevMatched[idx1].y;
+		const std::vector<size_t> indices2 = frame2.GetFeaturesInArea(u, v,  windowSize, level1, level1);
+		if (indices2.empty())
 			continue;
 
-		cv::Mat d1 = frame1.descriptorsL.row(i1);
+		const cv::Mat desc1 = frame1.descriptorsL.row(idx1);
 
-		int bestDist = INT_MAX;
-		int bestDist2 = INT_MAX;
+		int bestDist = std::numeric_limits<int>::max();
+		int secondBestDist = std::numeric_limits<int>::max();
 		int bestIdx2 = -1;
 
-		for (vector<size_t>::iterator vit = vIndices2.begin(); vit != vIndices2.end(); vit++)
+		for (size_t idx2 : indices2)
 		{
-			size_t i2 = *vit;
+			const cv::Mat desc2 = frame2.descriptorsL.row(static_cast<int>(idx2));
+			const int dist = DescriptorDistance(desc1, desc2);
 
-			cv::Mat d2 = frame2.descriptorsL.row(i2);
-
-			int dist = DescriptorDistance(d1, d2);
-
-			if (vMatchedDistance[i2] <= dist)
+			if (matchedDistance[idx2] <= dist)
 				continue;
 
 			if (dist < bestDist)
 			{
-				bestDist2 = bestDist;
+				secondBestDist = bestDist;
 				bestDist = dist;
-				bestIdx2 = i2;
+				bestIdx2 = static_cast<int>(idx2);
 			}
-			else if (dist < bestDist2)
+			else if (dist < secondBestDist)
 			{
-				bestDist2 = dist;
+				secondBestDist = dist;
 			}
 		}
 
-		if (bestDist <= TH_LOW)
+		if (bestDist <= TH_LOW && bestDist < secondBestDist * fNNRatio_)
 		{
-			if (bestDist < (float)bestDist2*fNNRatio_)
+			if (matches21[bestIdx2] >= 0)
 			{
-				if (vnMatches21[bestIdx2] >= 0)
-				{
-					matches12[vnMatches21[bestIdx2]] = -1;
-					nmatches--;
-				}
-				matches12[i1] = bestIdx2;
-				vnMatches21[bestIdx2] = i1;
-				vMatchedDistance[bestIdx2] = bestDist;
-				nmatches++;
+				matches12[matches21[bestIdx2]] = -1;
+				nmatches--;
+			}
 
-				if (checkOrientation_)
-				{
-					float rot = frame1.keypointsUn[i1].angle - frame2.keypointsUn[bestIdx2].angle;
-					if (rot < 0.0)
-						rot += 360.0f;
-					int bin = round(rot*factor);
-					if (bin == HISTO_LENGTH)
-						bin = 0;
-					assert(bin >= 0 && bin < HISTO_LENGTH);
-					rotHist[bin].push_back(i1);
-				}
+			matches12[idx1] = bestIdx2;
+			matches21[bestIdx2] = static_cast<int>(idx1);
+			matchedDistance[bestIdx2] = bestDist;
+			nmatches++;
+
+			if (checkOrientation_)
+			{
+				float rot = frame1.keypointsUn[idx1].angle - frame2.keypointsUn[bestIdx2].angle;
+				if (rot < 0.0)
+					rot += 360.0f;
+				int bin = round(rot*factor);
+				if (bin == HISTO_LENGTH)
+					bin = 0;
+				assert(bin >= 0 && bin < HISTO_LENGTH);
+				rotHist[bin].push_back(idx1);
 			}
 		}
-
 	}
 
 	if (checkOrientation_)
@@ -585,7 +580,7 @@ int ORBmatcher::SearchForInitialization(Frame& frame1, Frame& frame2, std::vecto
 
 	}
 
-	//Update prev matched
+	// Update prev matched
 	for (size_t i1 = 0, iend1 = matches12.size(); i1 < iend1; i1++)
 		if (matches12[i1] >= 0)
 			prevMatched[i1] = frame2.keypointsUn[matches12[i1]].pt;
