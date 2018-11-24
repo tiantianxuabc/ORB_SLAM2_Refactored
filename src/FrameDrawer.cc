@@ -123,15 +123,7 @@ cv::Mat FrameDrawer::DrawFrame()
 		}
 	}
 
-	cv::Mat imageWithInfo;
-	DrawTextInfo(image, state, imageWithInfo);
-
-	return imageWithInfo;
-}
-
-
-void FrameDrawer::DrawTextInfo(cv::Mat& src, int state, cv::Mat& dst)
-{
+	// Draw text info
 	std::stringstream ss;
 	if (state == Tracking::STATE_NO_IMAGES)
 	{
@@ -162,12 +154,15 @@ void FrameDrawer::DrawTextInfo(cv::Mat& src, int state, cv::Mat& dst)
 	}
 
 	int baseline = 0;
-	const cv::Size textSize = cv::getTextSize(ss.str(), cv::FONT_HERSHEY_PLAIN, 1, 1, &baseline);
+	const std::string text = ss.str();
+	const cv::Size textSize = cv::getTextSize(text, cv::FONT_HERSHEY_PLAIN, 1, 1, &baseline);
+	const int textH = textSize.height + 10;
 
-	dst = cv::Mat(src.rows + textSize.height + 10, src.cols, src.type());
-	src.copyTo(dst.rowRange(0, src.rows).colRange(0, src.cols));
-	dst.rowRange(src.rows, dst.rows) = cv::Mat::zeros(textSize.height + 10, src.cols, src.type());
-	cv::putText(dst, ss.str(), cv::Point(5, dst.rows - 5), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(255, 255, 255), 1, 8);
+	cv::Mat draw = cv::Mat::zeros(image.rows + textH, image.cols, image.type());
+	image.copyTo(draw(cv::Rect(0, 0, image.cols, image.rows)));
+	cv::putText(draw, text, cv::Point(5, draw.rows - 5), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(255, 255, 255), 1, 8);
+
+	return draw;
 }
 
 void FrameDrawer::Update(Tracking* tracker)
