@@ -97,7 +97,7 @@ template <> static inline int InvalidMatch<int>() { return -1; }
 
 template <typename T>
 static int CheckOrientation(const std::vector<cv::KeyPoint>& keypoints1, const std::vector<cv::KeyPoint>& keypoints2,
-	const std::vector<MatchIdx>& matches12, std::vector<T>& matchStatus)
+	const std::vector<MatchIdx>& matchIds, std::vector<T>& matchStatus)
 {
 	CV_Assert(matchStatus.size() == keypoints2.size());
 
@@ -118,7 +118,7 @@ static int CheckOrientation(const std::vector<cv::KeyPoint>& keypoints1, const s
 		return bin;
 	};
 
-	for (const auto& match : matches12)
+	for (const auto& match : matchIds)
 	{
 		const int i1 = match.first;
 		const int i2 = match.second;
@@ -154,7 +154,7 @@ static int CheckOrientation(const std::vector<cv::KeyPoint>& keypoints1, const s
 		}
 	}
 
-	return static_cast<int>(matches12.size() - reduction);
+	return static_cast<int>(matchIds.size() - reduction);
 }
 
 ORBmatcher::ORBmatcher(float nnratio, bool checkOri) : fNNRatio_(nnratio), checkOrientation_(checkOri)
@@ -613,16 +613,13 @@ int ORBmatcher::SearchByBoW(KeyFrame* keyframe1, KeyFrame* keyframe2, std::vecto
 	const cv::Mat& descriptors1 = keyframe1->descriptorsL;
 	const cv::Mat& descriptors2 = keyframe2->descriptorsL;
 
+	int nmatches = 0;
+
 	matches12.assign(mappoints1.size(), nullptr);
 	std::vector<bool> matched2(mappoints2.size(), false);
 
-	vector<int> rotHist[HISTO_LENGTH];
-	for (int i = 0; i < HISTO_LENGTH; i++)
-		rotHist[i].reserve(500);
-
-	const float factor = 1.0f / HISTO_LENGTH;
-
-	int nmatches = 0;
+	std::vector<MatchIdx> matchIds;
+	matchIds.reserve(keypoints1.size());
 
 	FeatureVectorIterator iterator(keyframe1->featureVector, keyframe2->featureVector);
 	while (iterator.next())
@@ -665,43 +662,17 @@ int ORBmatcher::SearchByBoW(KeyFrame* keyframe1, KeyFrame* keyframe2, std::vecto
 			{
 				matches12[idx1] = mappoints2[bestIdx2];
 				matched2[bestIdx2] = true;
+				nmatches++;
 
 				if (checkOrientation_)
-				{
-					float rot = keypoints1[idx1].angle - keypoints2[bestIdx2].angle;
-					if (rot < 0.0)
-						rot += 360.0f;
-					int bin = round(rot*factor);
-					if (bin == HISTO_LENGTH)
-						bin = 0;
-					assert(bin >= 0 && bin < HISTO_LENGTH);
-					rotHist[bin].push_back(idx1);
-				}
-				nmatches++;
+					matchIds.push_back(std::make_pair(bestIdx2, static_cast<int>(idx1)));
 			}
 		}
 	}
 
 	if (checkOrientation_)
-	{
-		int ind1 = -1;
-		int ind2 = -1;
-		int ind3 = -1;
-
-		ComputeThreeMaxima(rotHist, HISTO_LENGTH, ind1, ind2, ind3);
-
-		for (int i = 0; i < HISTO_LENGTH; i++)
-		{
-			if (i == ind1 || i == ind2 || i == ind3)
-				continue;
-			for (size_t j = 0, jend = rotHist[i].size(); j < jend; j++)
-			{
-				matches12[rotHist[i][j]] = static_cast<MapPoint*>(NULL);
-				nmatches--;
-			}
-		}
-	}
-
+		nmatches = CheckOrientation(keypoints2, keypoints1, matchIds, matches12);
+	
 	return nmatches;
 }
 
