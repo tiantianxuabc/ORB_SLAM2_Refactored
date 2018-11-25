@@ -54,11 +54,11 @@ void Optimizer::GlobalBundleAdjustemnt(Map* map, int niterations, bool* stopFlag
 	BundleAdjustment(keyframes, mappoints, niterations, stopFlag, loopKFId, robust);
 }
 
-void Optimizer::BundleAdjustment(const vector<KeyFrame *> &vpKFs, const vector<MapPoint *> &vpMP,
-	int nIterations, bool* pbStopFlag, frameid_t nLoopKF, bool bRobust)
+void Optimizer::BundleAdjustment(const std::vector<KeyFrame*>& keyframes, const std::vector<MapPoint*>& mappoints,
+	int niterations, bool* stopFlag, frameid_t loopKFId, bool robust)
 {
 	vector<bool> vbNotIncludedMP;
-	vbNotIncludedMP.resize(vpMP.size());
+	vbNotIncludedMP.resize(mappoints.size());
 
 	g2o::SparseOptimizer optimizer;
 	g2o::BlockSolver_6_3::LinearSolverType * linearSolver;
@@ -70,15 +70,15 @@ void Optimizer::BundleAdjustment(const vector<KeyFrame *> &vpKFs, const vector<M
 	g2o::OptimizationAlgorithmLevenberg* solver = new g2o::OptimizationAlgorithmLevenberg(solver_ptr);
 	optimizer.setAlgorithm(solver);
 
-	if (pbStopFlag)
-		optimizer.setForceStopFlag(pbStopFlag);
+	if (stopFlag)
+		optimizer.setForceStopFlag(stopFlag);
 
 	long unsigned int maxKFid = 0;
 
 	// Set KeyFrame vertices
-	for (size_t i = 0; i < vpKFs.size(); i++)
+	for (size_t i = 0; i < keyframes.size(); i++)
 	{
-		KeyFrame* pKF = vpKFs[i];
+		KeyFrame* pKF = keyframes[i];
 		if (pKF->isBad())
 			continue;
 		g2o::VertexSE3Expmap * vSE3 = new g2o::VertexSE3Expmap();
@@ -94,9 +94,9 @@ void Optimizer::BundleAdjustment(const vector<KeyFrame *> &vpKFs, const vector<M
 	const float thHuber3D = sqrt(7.815);
 
 	// Set MapPoint vertices
-	for (size_t i = 0; i < vpMP.size(); i++)
+	for (size_t i = 0; i < mappoints.size(); i++)
 	{
-		MapPoint* pMP = vpMP[i];
+		MapPoint* pMP = mappoints[i];
 		if (pMP->isBad())
 			continue;
 		g2o::VertexSBAPointXYZ* vPoint = new g2o::VertexSBAPointXYZ();
@@ -134,7 +134,7 @@ void Optimizer::BundleAdjustment(const vector<KeyFrame *> &vpKFs, const vector<M
 				const float &invSigma2 = pKF->pyramid.invSigmaSq[kpUn.octave];
 				e->setInformation(Eigen::Matrix2d::Identity()*invSigma2);
 
-				if (bRobust)
+				if (robust)
 				{
 					g2o::RobustKernelHuber* rk = new g2o::RobustKernelHuber;
 					e->setRobustKernel(rk);
@@ -163,7 +163,7 @@ void Optimizer::BundleAdjustment(const vector<KeyFrame *> &vpKFs, const vector<M
 				Eigen::Matrix3d Info = Eigen::Matrix3d::Identity()*invSigma2;
 				e->setInformation(Info);
 
-				if (bRobust)
+				if (robust)
 				{
 					g2o::RobustKernelHuber* rk = new g2o::RobustKernelHuber;
 					e->setRobustKernel(rk);
@@ -193,19 +193,19 @@ void Optimizer::BundleAdjustment(const vector<KeyFrame *> &vpKFs, const vector<M
 
 	// Optimize!
 	optimizer.initializeOptimization();
-	optimizer.optimize(nIterations);
+	optimizer.optimize(niterations);
 
 	// Recover optimized data
 
 	//Keyframes
-	for (size_t i = 0; i < vpKFs.size(); i++)
+	for (size_t i = 0; i < keyframes.size(); i++)
 	{
-		KeyFrame* pKF = vpKFs[i];
+		KeyFrame* pKF = keyframes[i];
 		if (pKF->isBad())
 			continue;
 		g2o::VertexSE3Expmap* vSE3 = static_cast<g2o::VertexSE3Expmap*>(optimizer.vertex(pKF->id));
 		g2o::SE3Quat SE3quat = vSE3->estimate();
-		if (nLoopKF == 0)
+		if (loopKFId == 0)
 		{
 			pKF->SetPose(Converter::toCvMat(SE3quat));
 		}
@@ -213,23 +213,23 @@ void Optimizer::BundleAdjustment(const vector<KeyFrame *> &vpKFs, const vector<M
 		{
 			pKF->TcwGBA.create(4, 4, CV_32F);
 			Converter::toCvMat(SE3quat).copyTo(pKF->TcwGBA);
-			pKF->BAGlobalForKF = nLoopKF;
+			pKF->BAGlobalForKF = loopKFId;
 		}
 	}
 
 	//Points
-	for (size_t i = 0; i < vpMP.size(); i++)
+	for (size_t i = 0; i < mappoints.size(); i++)
 	{
 		if (vbNotIncludedMP[i])
 			continue;
 
-		MapPoint* pMP = vpMP[i];
+		MapPoint* pMP = mappoints[i];
 
 		if (pMP->isBad())
 			continue;
 		g2o::VertexSBAPointXYZ* vPoint = static_cast<g2o::VertexSBAPointXYZ*>(optimizer.vertex(pMP->id + maxKFid + 1));
 
-		if (nLoopKF == 0)
+		if (loopKFId == 0)
 		{
 			pMP->SetWorldPos(Converter::toCvMat(vPoint->estimate()));
 			pMP->UpdateNormalAndDepth();
@@ -238,7 +238,7 @@ void Optimizer::BundleAdjustment(const vector<KeyFrame *> &vpKFs, const vector<M
 		{
 			pMP->posGBA.create(3, 1, CV_32F);
 			Converter::toCvMat(vPoint->estimate()).copyTo(pMP->posGBA);
-			pMP->BAGlobalForKF = nLoopKF;
+			pMP->BAGlobalForKF = loopKFId;
 		}
 	}
 

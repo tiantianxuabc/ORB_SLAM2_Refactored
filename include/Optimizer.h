@@ -38,10 +38,9 @@ typedef std::map<KeyFrame*, g2o::Sim3, std::less<KeyFrame*>,
 
 namespace Optimizer
 {
-//public:
-void BundleAdjustment(const std::vector<KeyFrame*> &vpKF, const std::vector<MapPoint*> &vpMP,
-	int nIterations = 5, bool *pbStopFlag = nullptr, frameid_t nLoopKF = 0,
-	bool bRobust = true);
+
+void BundleAdjustment(const std::vector<KeyFrame*>& keyframes, const std::vector<MapPoint*>& mappoints,
+	int niterations = 5, bool* stopFlag = nullptr, frameid_t loopKFId = 0, bool robust = true);
 
 void GlobalBundleAdjustemnt(Map* map, int niterations, bool* stopFlag = nullptr, frameid_t loopKFId = 0,
 	bool robust = true);
