@@ -439,52 +439,47 @@ int Optimizer::PoseOptimization(Frame* frame)
 void Optimizer::LocalBundleAdjustment(KeyFrame* currKeyFrame, bool* stopFlag, Map* map)
 {
 	// Local KeyFrames: First Breath Search from Current Keyframe
-	list<KeyFrame*> lLocalKeyFrames;
+	std::list<KeyFrame*> localKFs;
 
-	lLocalKeyFrames.push_back(currKeyFrame);
+	localKFs.push_back(currKeyFrame);
 	currKeyFrame->BALocalForKF = currKeyFrame->id;
 
-	const vector<KeyFrame*> vNeighKFs = currKeyFrame->GetVectorCovisibleKeyFrames();
-	for (int i = 0, iend = vNeighKFs.size(); i < iend; i++)
+	for (KeyFrame* neighborKF : currKeyFrame->GetVectorCovisibleKeyFrames())
 	{
-		KeyFrame* pKFi = vNeighKFs[i];
-		pKFi->BALocalForKF = currKeyFrame->id;
-		if (!pKFi->isBad())
-			lLocalKeyFrames.push_back(pKFi);
+		neighborKF->BALocalForKF = currKeyFrame->id;
+		if (!neighborKF->isBad())
+			localKFs.push_back(neighborKF);
 	}
 
 	// Local MapPoints seen in Local KeyFrames
-	list<MapPoint*> lLocalMapPoints;
-	for (list<KeyFrame*>::iterator lit = lLocalKeyFrames.begin(), lend = lLocalKeyFrames.end(); lit != lend; lit++)
+	std::list<MapPoint*> localMPs;
+	for (KeyFrame* localKF : localKFs)
 	{
-		vector<MapPoint*> vpMPs = (*lit)->GetMapPointMatches();
-		for (vector<MapPoint*>::iterator vit = vpMPs.begin(), vend = vpMPs.end(); vit != vend; vit++)
+		for (MapPoint* mappoint : localKF->GetMapPointMatches())
 		{
-			MapPoint* pMP = *vit;
-			if (pMP)
-				if (!pMP->isBad())
-					if (pMP->BALocalForKF != currKeyFrame->id)
-					{
-						lLocalMapPoints.push_back(pMP);
-						pMP->BALocalForKF = currKeyFrame->id;
-					}
+			if (!mappoint || mappoint->isBad())
+				continue;
+
+			if (mappoint->BALocalForKF != currKeyFrame->id)
+			{
+				localMPs.push_back(mappoint);
+				mappoint->BALocalForKF = currKeyFrame->id;
+			}
 		}
 	}
 
 	// Fixed Keyframes. Keyframes that see Local MapPoints but that are not Local Keyframes
-	list<KeyFrame*> lFixedCameras;
-	for (list<MapPoint*>::iterator lit = lLocalMapPoints.begin(), lend = lLocalMapPoints.end(); lit != lend; lit++)
+	std::list<KeyFrame*> fixedCameras;
+	for (MapPoint* mappoint : localMPs)
 	{
-		map<KeyFrame*, size_t> observations = (*lit)->GetObservations();
-		for (map<KeyFrame*, size_t>::iterator mit = observations.begin(), mend = observations.end(); mit != mend; mit++)
+		for (const auto& observation : mappoint->GetObservations())
 		{
-			KeyFrame* pKFi = mit->first;
-
-			if (pKFi->BALocalForKF != currKeyFrame->id && pKFi->BAFixedForKF != currKeyFrame->id)
+			KeyFrame* fixedKF = observation.first;
+			if (fixedKF->BALocalForKF != currKeyFrame->id && fixedKF->BAFixedForKF != currKeyFrame->id)
 			{
-				pKFi->BAFixedForKF = currKeyFrame->id;
-				if (!pKFi->isBad())
-					lFixedCameras.push_back(pKFi);
+				fixedKF->BAFixedForKF = currKeyFrame->id;
+				if (!fixedKF->isBad())
+					fixedCameras.push_back(fixedKF);
 			}
 		}
 	}
@@ -506,7 +501,7 @@ void Optimizer::LocalBundleAdjustment(KeyFrame* currKeyFrame, bool* stopFlag, Ma
 	unsigned long maxKFid = 0;
 
 	// Set Local KeyFrame vertices
-	for (list<KeyFrame*>::iterator lit = lLocalKeyFrames.begin(), lend = lLocalKeyFrames.end(); lit != lend; lit++)
+	for (list<KeyFrame*>::iterator lit = localKFs.begin(), lend = localKFs.end(); lit != lend; lit++)
 	{
 		KeyFrame* pKFi = *lit;
 		g2o::VertexSE3Expmap * vSE3 = new g2o::VertexSE3Expmap();
@@ -519,7 +514,7 @@ void Optimizer::LocalBundleAdjustment(KeyFrame* currKeyFrame, bool* stopFlag, Ma
 	}
 
 	// Set Fixed KeyFrame vertices
-	for (list<KeyFrame*>::iterator lit = lFixedCameras.begin(), lend = lFixedCameras.end(); lit != lend; lit++)
+	for (list<KeyFrame*>::iterator lit = fixedCameras.begin(), lend = fixedCameras.end(); lit != lend; lit++)
 	{
 		KeyFrame* pKFi = *lit;
 		g2o::VertexSE3Expmap * vSE3 = new g2o::VertexSE3Expmap();
@@ -532,7 +527,7 @@ void Optimizer::LocalBundleAdjustment(KeyFrame* currKeyFrame, bool* stopFlag, Ma
 	}
 
 	// Set MapPoint vertices
-	const int nExpectedSize = (lLocalKeyFrames.size() + lFixedCameras.size())*lLocalMapPoints.size();
+	const int nExpectedSize = (localKFs.size() + fixedCameras.size())*localMPs.size();
 
 	vector<g2o::EdgeSE3ProjectXYZ*> vpEdgesMono;
 	vpEdgesMono.reserve(nExpectedSize);
@@ -555,7 +550,7 @@ void Optimizer::LocalBundleAdjustment(KeyFrame* currKeyFrame, bool* stopFlag, Ma
 	const float thHuberMono = sqrt(5.991);
 	const float thHuberStereo = sqrt(7.815);
 
-	for (list<MapPoint*>::iterator lit = lLocalMapPoints.begin(), lend = lLocalMapPoints.end(); lit != lend; lit++)
+	for (list<MapPoint*>::iterator lit = localMPs.begin(), lend = localMPs.end(); lit != lend; lit++)
 	{
 		MapPoint* pMP = *lit;
 		g2o::VertexSBAPointXYZ* vPoint = new g2o::VertexSBAPointXYZ();
@@ -565,10 +560,10 @@ void Optimizer::LocalBundleAdjustment(KeyFrame* currKeyFrame, bool* stopFlag, Ma
 		vPoint->setMarginalized(true);
 		optimizer.addVertex(vPoint);
 
-		const map<KeyFrame*, size_t> observations = pMP->GetObservations();
+		const std::map<KeyFrame*, size_t> observations = pMP->GetObservations();
 
 		//Set edges
-		for (map<KeyFrame*, size_t>::const_iterator mit = observations.begin(), mend = observations.end(); mit != mend; mit++)
+		for (std::map<KeyFrame*, size_t>::const_iterator mit = observations.begin(), mend = observations.end(); mit != mend; mit++)
 		{
 			KeyFrame* pKFi = mit->first;
 
@@ -745,7 +740,7 @@ void Optimizer::LocalBundleAdjustment(KeyFrame* currKeyFrame, bool* stopFlag, Ma
 	// Recover optimized data
 
 	//Keyframes
-	for (list<KeyFrame*>::iterator lit = lLocalKeyFrames.begin(), lend = lLocalKeyFrames.end(); lit != lend; lit++)
+	for (list<KeyFrame*>::iterator lit = localKFs.begin(), lend = localKFs.end(); lit != lend; lit++)
 	{
 		KeyFrame* pKF = *lit;
 		g2o::VertexSE3Expmap* vSE3 = static_cast<g2o::VertexSE3Expmap*>(optimizer.vertex(pKF->id));
@@ -754,7 +749,7 @@ void Optimizer::LocalBundleAdjustment(KeyFrame* currKeyFrame, bool* stopFlag, Ma
 	}
 
 	//Points
-	for (list<MapPoint*>::iterator lit = lLocalMapPoints.begin(), lend = lLocalMapPoints.end(); lit != lend; lit++)
+	for (list<MapPoint*>::iterator lit = localMPs.begin(), lend = localMPs.end(); lit != lend; lit++)
 	{
 		MapPoint* pMP = *lit;
 		g2o::VertexSBAPointXYZ* vPoint = static_cast<g2o::VertexSBAPointXYZ*>(optimizer.vertex(pMP->id + maxKFid + 1));
