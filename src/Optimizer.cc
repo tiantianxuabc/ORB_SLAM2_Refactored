@@ -650,6 +650,10 @@ void Optimizer::LocalBundleAdjustment(KeyFrame* currKeyFrame, bool* stopFlag, Ma
 	}
 }
 
+static std::pair<frameid_t, frameid_t> MakeMinMaxPair(frameid_t v1, frameid_t v2)
+{
+	return std::make_pair(std::min(v1, v2), std::max(v1, v2));
+}
 
 void Optimizer::OptimizeEssentialGraph(Map* map, KeyFrame* loopKF, KeyFrame* currKF,
 	const KeyFrameAndPose& nonCorrectedSim3, const KeyFrameAndPose& correctedSim3,
@@ -708,39 +712,36 @@ void Optimizer::OptimizeEssentialGraph(Map* map, KeyFrame* loopKF, KeyFrame* cur
 		vertices[id] = vertex;
 	}
 
-	set<pair<long unsigned int, long unsigned int> > sInsertedEdges;
+	std::set<std::pair<frameid_t, frameid_t>> insertedEdges;
 
-	const Eigen::Matrix<double, 7, 7> matLambda = Eigen::Matrix<double, 7, 7>::Identity();
+	const Eigen::Matrix<double, 7, 7> lambda = Eigen::Matrix<double, 7, 7>::Identity();
 
 	// Set Loop edges
 	const int minWeight = 100;
-	for (std::map<KeyFrame *, set<KeyFrame *> >::const_iterator mit = loopConnections.begin(), mend = loopConnections.end(); mit != mend; mit++)
+	//for (std::map<KeyFrame *, set<KeyFrame *> >::const_iterator mit = loopConnections.begin(), mend = loopConnections.end(); mit != mend; mit++)
+	for (const auto& connection : loopConnections)
 	{
-		KeyFrame* pKF = mit->first;
-		const long unsigned int nIDi = pKF->id;
-		const set<KeyFrame*> &spConnections = mit->second;
-		const g2o::Sim3 Siw = nonCorrectedScw[nIDi];
+		KeyFrame* keyframe = connection.first;
+		const frameid_t id1 = keyframe->id;
+		const g2o::Sim3 Siw = nonCorrectedScw[id1];
 		const g2o::Sim3 Swi = Siw.inverse();
 
-		for (set<KeyFrame*>::const_iterator sit = spConnections.begin(), send = spConnections.end(); sit != send; sit++)
+		for (KeyFrame* connectedKF : connection.second)
 		{
-			const long unsigned int nIDj = (*sit)->id;
-			if ((nIDi != currKF->id || nIDj != loopKF->id) && pKF->GetWeight(*sit) < minWeight)
+			const frameid_t id2 = connectedKF->id;
+			if ((id1 != currKF->id || id2 != loopKF->id) && keyframe->GetWeight(connectedKF) < minWeight)
 				continue;
 
-			const g2o::Sim3 Sjw = nonCorrectedScw[nIDj];
+			const g2o::Sim3 Sjw = nonCorrectedScw[id2];
 			const g2o::Sim3 Sji = Sjw * Swi;
 
 			g2o::EdgeSim3* e = new g2o::EdgeSim3();
-			e->setVertex(1, dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(nIDj)));
-			e->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(nIDi)));
+			e->setVertex(1, optimizer.vertex(id2));
+			e->setVertex(0, optimizer.vertex(id1));
 			e->setMeasurement(Sji);
-
-			e->information() = matLambda;
-
+			e->information() = lambda;
 			optimizer.addEdge(e);
-
-			sInsertedEdges.insert(make_pair(min(nIDi, nIDj), max(nIDi, nIDj)));
+			insertedEdges.insert(MakeMinMaxPair(id1, id2));
 		}
 	}
 
@@ -783,7 +784,7 @@ void Optimizer::OptimizeEssentialGraph(Map* map, KeyFrame* loopKF, KeyFrame* cur
 			e->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(nIDi)));
 			e->setMeasurement(Sji);
 
-			e->information() = matLambda;
+			e->information() = lambda;
 			optimizer.addEdge(e);
 		}
 
@@ -808,7 +809,7 @@ void Optimizer::OptimizeEssentialGraph(Map* map, KeyFrame* loopKF, KeyFrame* cur
 				el->setVertex(1, dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(pLKF->id)));
 				el->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(nIDi)));
 				el->setMeasurement(Sli);
-				el->information() = matLambda;
+				el->information() = lambda;
 				optimizer.addEdge(el);
 			}
 		}
@@ -822,7 +823,7 @@ void Optimizer::OptimizeEssentialGraph(Map* map, KeyFrame* loopKF, KeyFrame* cur
 			{
 				if (!pKFn->isBad() && pKFn->id < pKF->id)
 				{
-					if (sInsertedEdges.count(make_pair(min(pKF->id, pKFn->id), max(pKF->id, pKFn->id))))
+					if (insertedEdges.count(make_pair(min(pKF->id, pKFn->id), max(pKF->id, pKFn->id))))
 						continue;
 
 					g2o::Sim3 Snw;
@@ -840,7 +841,7 @@ void Optimizer::OptimizeEssentialGraph(Map* map, KeyFrame* loopKF, KeyFrame* cur
 					en->setVertex(1, dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(pKFn->id)));
 					en->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(nIDi)));
 					en->setMeasurement(Sni);
-					en->information() = matLambda;
+					en->information() = lambda;
 					optimizer.addEdge(en);
 				}
 			}
