@@ -686,7 +686,7 @@ void Optimizer::OptimizeEssentialGraph(Map* map, KeyFrame* loopKF, KeyFrame* cur
 
 		auto it = correctedSim3.find(keyframe);
 
-		if (it != correctedSim3.end())
+		if (it != std::end(correctedSim3))
 		{
 			nonCorrectedScw[id] = it->second;
 			vertex->setEstimate(it->second);
@@ -718,7 +718,6 @@ void Optimizer::OptimizeEssentialGraph(Map* map, KeyFrame* loopKF, KeyFrame* cur
 
 	// Set Loop edges
 	const int minWeight = 100;
-	//for (std::map<KeyFrame *, set<KeyFrame *> >::const_iterator mit = loopConnections.begin(), mend = loopConnections.end(); mit != mend; mit++)
 	for (const auto& connection : loopConnections)
 	{
 		KeyFrame* keyframe = connection.first;
@@ -772,62 +771,51 @@ void Optimizer::OptimizeEssentialGraph(Map* map, KeyFrame* loopKF, KeyFrame* cur
 		}
 
 		// Loop edges
-		const set<KeyFrame*> sLoopEdges = keyframe->GetLoopEdges();
-		for (set<KeyFrame*>::const_iterator sit = sLoopEdges.begin(), send = sLoopEdges.end(); sit != send; sit++)
+		const std::set<KeyFrame*> loopEdges = keyframe->GetLoopEdges();
+		for (KeyFrame* loopEdge : loopEdges)
 		{
-			KeyFrame* pLKF = *sit;
-			if (pLKF->id < keyframe->id)
-			{
-				g2o::Sim3 Slw;
+			if (loopEdge->id >= keyframe->id)
+				continue;
 
-				KeyFrameAndPose::const_iterator itl = nonCorrectedSim3.find(pLKF);
+			const frameid_t id3 = loopEdge->id;
+			const auto it3 = nonCorrectedSim3.find(loopEdge);
+			const g2o::Sim3 Slw = it3 != std::end(nonCorrectedSim3) ? it3->second : nonCorrectedScw[id3];
+			const g2o::Sim3 Sli = Slw * Swi;
 
-				if (itl != nonCorrectedSim3.end())
-					Slw = itl->second;
-				else
-					Slw = nonCorrectedScw[pLKF->id];
-
-				g2o::Sim3 Sli = Slw * Swi;
-				g2o::EdgeSim3* el = new g2o::EdgeSim3();
-				el->setVertex(1, dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(pLKF->id)));
-				el->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(id1)));
-				el->setMeasurement(Sli);
-				el->information() = lambda;
-				optimizer.addEdge(el);
-			}
+			g2o::EdgeSim3* e = new g2o::EdgeSim3();
+			e->setVertex(1, optimizer.vertex(id3));
+			e->setVertex(0, optimizer.vertex(id1));
+			e->setMeasurement(Sli);
+			e->information() = lambda;
+			optimizer.addEdge(e);
 		}
 
 		// Covisibility graph edges
-		const vector<KeyFrame*> vpConnectedKFs = keyframe->GetCovisiblesByWeight(minWeight);
-		for (vector<KeyFrame*>::const_iterator vit = vpConnectedKFs.begin(); vit != vpConnectedKFs.end(); vit++)
+		for (KeyFrame* connectedKF : keyframe->GetCovisiblesByWeight(minWeight))
 		{
-			KeyFrame* pKFn = *vit;
-			if (pKFn && pKFn != parentKF && !keyframe->hasChild(pKFn) && !sLoopEdges.count(pKFn))
-			{
-				if (!pKFn->isBad() && pKFn->id < keyframe->id)
-				{
-					if (insertedEdges.count(make_pair(min(keyframe->id, pKFn->id), max(keyframe->id, pKFn->id))))
-						continue;
+			if (!connectedKF)
+				continue;
 
-					g2o::Sim3 Snw;
+			if (connectedKF == parentKF || keyframe->hasChild(connectedKF) || loopEdges.count(connectedKF))
+				continue;
 
-					KeyFrameAndPose::const_iterator itn = nonCorrectedSim3.find(pKFn);
+			if (connectedKF->isBad() || connectedKF->id >= keyframe->id)
+				continue;
 
-					if (itn != nonCorrectedSim3.end())
-						Snw = itn->second;
-					else
-						Snw = nonCorrectedScw[pKFn->id];
+			if (insertedEdges.count(MakeMinMaxPair(keyframe->id, connectedKF->id)))
+				continue;
 
-					g2o::Sim3 Sni = Snw * Swi;
+			const frameid_t id4 = connectedKF->id;
+			const auto it4 = nonCorrectedSim3.find(connectedKF);
+			const g2o::Sim3 Snw = it4 != std::end(nonCorrectedSim3) ? it4->second : nonCorrectedScw[id4];
+			const g2o::Sim3 Sni = Snw * Swi;
 
-					g2o::EdgeSim3* en = new g2o::EdgeSim3();
-					en->setVertex(1, dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(pKFn->id)));
-					en->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(id1)));
-					en->setMeasurement(Sni);
-					en->information() = lambda;
-					optimizer.addEdge(en);
-				}
-			}
+			g2o::EdgeSim3* e = new g2o::EdgeSim3();
+			e->setVertex(1, optimizer.vertex(id4));
+			e->setVertex(0, optimizer.vertex(id1));
+			e->setMeasurement(Sni);
+			e->information() = lambda;
+			optimizer.addEdge(e);
 		}
 	}
 
