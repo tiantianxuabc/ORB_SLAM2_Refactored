@@ -436,19 +436,19 @@ int Optimizer::PoseOptimization(Frame* frame)
 	return nedges - noutliers;
 }
 
-void Optimizer::LocalBundleAdjustment(KeyFrame *pKF, bool* pbStopFlag, Map* pMap)
+void Optimizer::LocalBundleAdjustment(KeyFrame* currKeyFrame, bool* stopFlag, Map* map)
 {
 	// Local KeyFrames: First Breath Search from Current Keyframe
 	list<KeyFrame*> lLocalKeyFrames;
 
-	lLocalKeyFrames.push_back(pKF);
-	pKF->BALocalForKF = pKF->id;
+	lLocalKeyFrames.push_back(currKeyFrame);
+	currKeyFrame->BALocalForKF = currKeyFrame->id;
 
-	const vector<KeyFrame*> vNeighKFs = pKF->GetVectorCovisibleKeyFrames();
+	const vector<KeyFrame*> vNeighKFs = currKeyFrame->GetVectorCovisibleKeyFrames();
 	for (int i = 0, iend = vNeighKFs.size(); i < iend; i++)
 	{
 		KeyFrame* pKFi = vNeighKFs[i];
-		pKFi->BALocalForKF = pKF->id;
+		pKFi->BALocalForKF = currKeyFrame->id;
 		if (!pKFi->isBad())
 			lLocalKeyFrames.push_back(pKFi);
 	}
@@ -463,10 +463,10 @@ void Optimizer::LocalBundleAdjustment(KeyFrame *pKF, bool* pbStopFlag, Map* pMap
 			MapPoint* pMP = *vit;
 			if (pMP)
 				if (!pMP->isBad())
-					if (pMP->BALocalForKF != pKF->id)
+					if (pMP->BALocalForKF != currKeyFrame->id)
 					{
 						lLocalMapPoints.push_back(pMP);
-						pMP->BALocalForKF = pKF->id;
+						pMP->BALocalForKF = currKeyFrame->id;
 					}
 		}
 	}
@@ -480,9 +480,9 @@ void Optimizer::LocalBundleAdjustment(KeyFrame *pKF, bool* pbStopFlag, Map* pMap
 		{
 			KeyFrame* pKFi = mit->first;
 
-			if (pKFi->BALocalForKF != pKF->id && pKFi->BAFixedForKF != pKF->id)
+			if (pKFi->BALocalForKF != currKeyFrame->id && pKFi->BAFixedForKF != currKeyFrame->id)
 			{
-				pKFi->BAFixedForKF = pKF->id;
+				pKFi->BAFixedForKF = currKeyFrame->id;
 				if (!pKFi->isBad())
 					lFixedCameras.push_back(pKFi);
 			}
@@ -500,8 +500,8 @@ void Optimizer::LocalBundleAdjustment(KeyFrame *pKF, bool* pbStopFlag, Map* pMap
 	g2o::OptimizationAlgorithmLevenberg* solver = new g2o::OptimizationAlgorithmLevenberg(solver_ptr);
 	optimizer.setAlgorithm(solver);
 
-	if (pbStopFlag)
-		optimizer.setForceStopFlag(pbStopFlag);
+	if (stopFlag)
+		optimizer.setForceStopFlag(stopFlag);
 
 	unsigned long maxKFid = 0;
 
@@ -638,8 +638,8 @@ void Optimizer::LocalBundleAdjustment(KeyFrame *pKF, bool* pbStopFlag, Map* pMap
 		}
 	}
 
-	if (pbStopFlag)
-		if (*pbStopFlag)
+	if (stopFlag)
+		if (*stopFlag)
 			return;
 
 	optimizer.initializeOptimization();
@@ -647,8 +647,8 @@ void Optimizer::LocalBundleAdjustment(KeyFrame *pKF, bool* pbStopFlag, Map* pMap
 
 	bool bDoMore = true;
 
-	if (pbStopFlag)
-		if (*pbStopFlag)
+	if (stopFlag)
+		if (*stopFlag)
 			bDoMore = false;
 
 	if (bDoMore)
@@ -729,7 +729,7 @@ void Optimizer::LocalBundleAdjustment(KeyFrame *pKF, bool* pbStopFlag, Map* pMap
 	}
 
 	// Get Map Mutex
-	unique_lock<mutex> lock(pMap->mutexMapUpdate);
+	unique_lock<mutex> lock(map->mutexMapUpdate);
 
 	if (!vToErase.empty())
 	{
