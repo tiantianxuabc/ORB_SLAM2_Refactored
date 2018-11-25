@@ -251,6 +251,16 @@ static void CreateOptimizer(g2o::SparseOptimizer& optimizer)
 	optimizer.setAlgorithm(algorithm);
 }
 
+using VertexSE3 = g2o::VertexSE3Expmap;
+static VertexSE3* CreateVertexSE3(const VertexSE3::EstimateType& estimate, int id, bool fixed)
+{
+	VertexSE3* v = new VertexSE3();
+	v->setEstimate(estimate);
+	v->setId(id);
+	v->setFixed(fixed);
+	return v;
+}
+
 int Optimizer::PoseOptimization(Frame *pFrame)
 {
 	g2o::SparseOptimizer optimizer;
@@ -259,10 +269,7 @@ int Optimizer::PoseOptimization(Frame *pFrame)
 	int nInitialCorrespondences = 0;
 
 	// Set Frame vertex
-	g2o::VertexSE3Expmap * vSE3 = new g2o::VertexSE3Expmap();
-	vSE3->setEstimate(Converter::toSE3Quat(pFrame->pose.Tcw));
-	vSE3->setId(0);
-	vSE3->setFixed(false);
+	auto vSE3 = CreateVertexSE3(Converter::toSE3Quat(pFrame->pose.Tcw), 0, false);
 	optimizer.addVertex(vSE3);
 
 	// Set MapPoint vertices
