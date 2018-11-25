@@ -159,9 +159,6 @@ void Optimizer::BundleAdjustment(const std::vector<KeyFrame*>& keyframes, const 
 		maxKFId = std::max(maxKFId, keyframe->id);
 	}
 
-	const float thHuber2D = sqrt(5.99);
-	const float thHuber3D = sqrt(7.815);
-
 	// Set MapPoint vertices
 	std::vector<bool> notIncludedMP;
 	notIncludedMP.resize(mappoints.size());
@@ -180,7 +177,7 @@ void Optimizer::BundleAdjustment(const std::vector<KeyFrame*>& keyframes, const 
 		for (const auto& observation : mappoint->GetObservations())
 		{
 			KeyFrame* keyframe = observation.first;
-			const int idx = observation.second;
+			const size_t idx = observation.second;
 			if (keyframe->isBad() || keyframe->id > maxKFId)
 				continue;
 
@@ -479,7 +476,7 @@ void Optimizer::LocalBundleAdjustment(KeyFrame* currKeyFrame, bool* stopFlag, Ma
 	}
 
 	// Set MapPoint vertices
-	const int expectedSize = (localKFs.size() + fixedCameras.size()) * localMPs.size();
+	const size_t expectedSize = (localKFs.size() + fixedCameras.size()) * localMPs.size();
 
 	enum { EDGE_MONO = 0, EDGE_STEREO = 1 };
 	std::vector<int> edgeTypes;
@@ -500,7 +497,7 @@ void Optimizer::LocalBundleAdjustment(KeyFrame* currKeyFrame, bool* stopFlag, Ma
 		for (const auto& observation : mappoint->GetObservations())
 		{
 			KeyFrame* keyframe = observation.first;
-			const int idx = observation.second;
+			const size_t idx = observation.second;
 			if (keyframe->isBad())
 				continue;
 
