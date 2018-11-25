@@ -316,28 +316,20 @@ int Optimizer::PoseOptimization(Frame* frame)
 	g2o::SparseOptimizer optimizer;
 	CreateOptimizer<g2o::LinearSolverDense, g2o::BlockSolver_6_3>(optimizer);
 
-	int nInitialCorrespondences = 0;
-
 	// Set Frame vertex
-	auto vSE3 = CreateVertexSE3(Converter::toSE3Quat(frame->pose.Tcw), 0, false);
-	optimizer.addVertex(vSE3);
+	auto vertex = CreateVertexSE3(Converter::toSE3Quat(frame->pose.Tcw), 0, false);
+	optimizer.addVertex(vertex);
 
 	// Set MapPoint vertices
 	const int N = frame->N;
 
-	vector<g2o::EdgeSE3ProjectXYZOnlyPose*> vpEdgesMono;
-	vector<size_t> vnIndexEdgeMono;
-	vpEdgesMono.reserve(N);
-	vnIndexEdgeMono.reserve(N);
-
-	vector<g2o::EdgeStereoSE3ProjectXYZOnlyPose*> vpEdgesStereo;
-	vector<size_t> vnIndexEdgeStereo;
-	vpEdgesStereo.reserve(N);
-	vnIndexEdgeStereo.reserve(N);
-
 	const float deltaMono = sqrt(5.991);
 	const float deltaStereo = sqrt(7.815);
 
+	enum { EDGE_MONO = 0, EDGE_STEREO = 1 };
+	std::vector<int> indices;
+	std::vector<int> edgeTypes;
+	std::vector<g2o::HyperGraph::Edge*> edges;
 
 	{
 		unique_lock<mutex> lock(MapPoint::globalMutex_);
@@ -348,7 +340,6 @@ int Optimizer::PoseOptimization(Frame* frame)
 			if (!mappoint)
 				continue;
 
-			nInitialCorrespondences++;
 			frame->outlier[i] = false;
 
 			const cv::KeyPoint& keypoint = frame->keypointsUn[i];
@@ -360,7 +351,7 @@ int Optimizer::PoseOptimization(Frame* frame)
 			{
 				g2o::EdgeSE3ProjectXYZOnlyPose* e = new g2o::EdgeSE3ProjectXYZOnlyPose();
 
-				e->setVertex(0, vSE3);
+				e->setVertex(0, vertex);
 				SetMeasurement(e, keypoint.pt);
 				SetInformation<2>(e, invSigmaSq);
 				SetHuberKernel(e, deltaMono);
@@ -368,15 +359,14 @@ int Optimizer::PoseOptimization(Frame* frame)
 				SetXw(e, mappoint->GetWorldPos());
 
 				optimizer.addEdge(e);
-
-				vpEdgesMono.push_back(e);
-				vnIndexEdgeMono.push_back(i);
+				edges.push_back(e);
+				edgeTypes.push_back(EDGE_MONO);
 			}
 			else  // Stereo observation
 			{
 				g2o::EdgeStereoSE3ProjectXYZOnlyPose* e = new g2o::EdgeStereoSE3ProjectXYZOnlyPose();
 
-				e->setVertex(0, vSE3);
+				e->setVertex(0, vertex);
 				SetMeasurement(e, keypoint.pt, ur);
 				SetInformation<3>(e, invSigmaSq);
 				SetHuberKernel(e, deltaStereo);
@@ -384,102 +374,65 @@ int Optimizer::PoseOptimization(Frame* frame)
 				SetXw(e, mappoint->GetWorldPos());
 
 				optimizer.addEdge(e);
-
-				vpEdgesStereo.push_back(e);
-				vnIndexEdgeStereo.push_back(i);
+				edges.push_back(e);
+				edgeTypes.push_back(EDGE_STEREO);
 			}
 
+			indices.push_back(i);
 		}
 	}
 
-
-	if (nInitialCorrespondences < 3)
+	const int nedges = static_cast<int>(edges.size());
+	if (nedges < 3)
 		return 0;
 
 	// We perform 4 optimizations, after each optimization we classify observation as inlier/outlier
 	// At the next optimization, outliers are not included, but at the end they can be classified as inliers again.
-	const float chi2Mono[4] = { 5.991,5.991,5.991,5.991 };
-	const float chi2Stereo[4] = { 7.815,7.815,7.815, 7.815 };
-	const int its[4] = { 10,10,10,10 };
+	const int iterations = 10;
+	const double maxChi2[2] = { 5.991, 7.815 };
 
-	int nBad = 0;
-	for (size_t it = 0; it < 4; it++)
+	auto AsMonocular = [](g2o::HyperGraph::Edge* e) { return dynamic_cast<g2o::EdgeSE3ProjectXYZOnlyPose*>(e); };
+	auto AsStereo = [](g2o::HyperGraph::Edge* e) { return dynamic_cast<g2o::EdgeStereoSE3ProjectXYZOnlyPose*>(e); };
+
+	int noutliers = 0;
+	for (int k = 0; k < 4; k++)
 	{
-
-		vSE3->setEstimate(Converter::toSE3Quat(frame->pose.Tcw));
+		vertex->setEstimate(Converter::toSE3Quat(frame->pose.Tcw));
 		optimizer.initializeOptimization(0);
-		optimizer.optimize(its[it]);
+		optimizer.optimize(iterations);
 
-		nBad = 0;
-		for (size_t i = 0, iend = vpEdgesMono.size(); i < iend; i++)
+		noutliers = 0;
+		for (size_t i = 0; i < edges.size(); i++)
 		{
-			g2o::EdgeSE3ProjectXYZOnlyPose* e = vpEdgesMono[i];
-
-			const size_t idx = vnIndexEdgeMono[i];
+			g2o::HyperGraph::Edge* e = edges[i];
+			const int idx = indices[i];
+			const int type = edgeTypes[i];
+			const bool monocular = type == EDGE_MONO;
 
 			if (frame->outlier[idx])
-			{
-				e->computeError();
-			}
+				monocular ? AsMonocular(e)->computeError() : AsStereo(e)->computeError();
 
-			const float chi2 = e->chi2();
+			const double chi2 = monocular ? AsMonocular(e)->chi2() : AsStereo(e)->chi2();
+			const bool outlier = chi2 > maxChi2[type];
+			const int level = outlier ? 1 : 0;
 
-			if (chi2 > chi2Mono[it])
-			{
-				frame->outlier[idx] = true;
-				e->setLevel(1);
-				nBad++;
-			}
-			else
-			{
-				frame->outlier[idx] = false;
-				e->setLevel(0);
-			}
+			monocular ? AsMonocular(e)->setLevel(level) : AsStereo(e)->setLevel(level);
 
-			if (it == 2)
-				e->setRobustKernel(0);
+			frame->outlier[idx] = outlier;
+			if (outlier)
+				noutliers++;
+
+			if (k == 2)
+				monocular ? AsMonocular(e)->setRobustKernel(0) : AsStereo(e)->setRobustKernel(0);
 		}
-
-		for (size_t i = 0, iend = vpEdgesStereo.size(); i < iend; i++)
-		{
-			g2o::EdgeStereoSE3ProjectXYZOnlyPose* e = vpEdgesStereo[i];
-
-			const size_t idx = vnIndexEdgeStereo[i];
-
-			if (frame->outlier[idx])
-			{
-				e->computeError();
-			}
-
-			const float chi2 = e->chi2();
-
-			if (chi2 > chi2Stereo[it])
-			{
-				frame->outlier[idx] = true;
-				e->setLevel(1);
-				nBad++;
-			}
-			else
-			{
-				e->setLevel(0);
-				frame->outlier[idx] = false;
-			}
-
-			if (it == 2)
-				e->setRobustKernel(0);
-		}
-
 		if (optimizer.edges().size() < 10)
 			break;
 	}
 
 	// Recover optimized pose and return number of inliers
-	g2o::VertexSE3Expmap* vSE3_recov = static_cast<g2o::VertexSE3Expmap*>(optimizer.vertex(0));
-	g2o::SE3Quat SE3quat_recov = vSE3_recov->estimate();
-	cv::Mat pose = Converter::toCvMat(SE3quat_recov);
-	frame->SetPose(pose);
+	frame->SetPose(Converter::toCvMat(vertex->estimate()));
 
-	return nInitialCorrespondences - nBad;
+	return nedges - noutliers;
 }
 
 void Optimizer::LocalBundleAdjustment(KeyFrame *pKF, bool* pbStopFlag, Map* pMap)
