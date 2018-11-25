@@ -325,7 +325,7 @@ int Optimizer::PoseOptimization(Frame* frame)
 	optimizer.addVertex(vertex);
 
 	// Set MapPoint vertices
-	const int N = frame->N;
+	const int nkeypoints = frame->N;
 
 	enum { EDGE_MONO = 0, EDGE_STEREO = 1 };
 	std::vector<int> indices;
@@ -335,7 +335,7 @@ int Optimizer::PoseOptimization(Frame* frame)
 	{
 		unique_lock<mutex> lock(MapPoint::globalMutex_);
 
-		for (int i = 0; i < N; i++)
+		for (int i = 0; i < nkeypoints; i++)
 		{
 			MapPoint* mappoint = frame->mappoints[i];
 			if (!mappoint)
