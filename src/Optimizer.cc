@@ -533,85 +533,61 @@ void Optimizer::LocalBundleAdjustment(KeyFrame* currKeyFrame, bool* stopFlag, Ma
 	const float thHuberMono = sqrt(5.991);
 	const float thHuberStereo = sqrt(7.815);
 
-	for (list<MapPoint*>::iterator lit = localMPs.begin(), lend = localMPs.end(); lit != lend; lit++)
+	for (MapPoint* mappoint : localMPs)
 	{
-		MapPoint* pMP = *lit;
 		g2o::VertexSBAPointXYZ* vPoint = new g2o::VertexSBAPointXYZ();
-		vPoint->setEstimate(Converter::toVector3d(pMP->GetWorldPos()));
-		int id = pMP->id + maxKFId + 1;
+		vPoint->setEstimate(Converter::toVector3d(mappoint->GetWorldPos()));
+		int id = mappoint->id + maxKFId + 1;
 		vPoint->setId(id);
 		vPoint->setMarginalized(true);
 		optimizer.addVertex(vPoint);
 
-		const std::map<KeyFrame*, size_t> observations = pMP->GetObservations();
-
 		//Set edges
-		for (std::map<KeyFrame*, size_t>::const_iterator mit = observations.begin(), mend = observations.end(); mit != mend; mit++)
+		for (const auto& observation : mappoint->GetObservations())
 		{
-			KeyFrame* pKFi = mit->first;
+			KeyFrame* keyframe = observation.first;
+			const int idx = observation.second;
+			if (keyframe->isBad())
+				continue;
 
-			if (!pKFi->isBad())
+			const cv::KeyPoint& keypoint = keyframe->keypointsUn[idx];
+			const float ur = keyframe->uright[idx];
+			const float invSigmaSq = keyframe->pyramid.invSigmaSq[keypoint.octave];
+
+			// Monocular observation
+			if (ur < 0)
 			{
-				const cv::KeyPoint &kpUn = pKFi->keypointsUn[mit->second];
+				g2o::EdgeSE3ProjectXYZ* e = new g2o::EdgeSE3ProjectXYZ();
 
-				// Monocular observation
-				if (pKFi->uright[mit->second] < 0)
-				{
-					Eigen::Matrix<double, 2, 1> obs;
-					obs << kpUn.pt.x, kpUn.pt.y;
+				e->setVertex(0, optimizer.vertex(id));
+				e->setVertex(1, optimizer.vertex(keyframe->id));
 
-					g2o::EdgeSE3ProjectXYZ* e = new g2o::EdgeSE3ProjectXYZ();
+				SetMeasurement(e, keypoint.pt);
+				SetInformation<2>(e, invSigmaSq);
+				SetHuberKernel(e, DELTA_MONO);
+				SetCalibration(e, keyframe->camera);
 
-					e->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(id)));
-					e->setVertex(1, dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(pKFi->id)));
-					e->setMeasurement(obs);
-					const float &invSigma2 = pKFi->pyramid.invSigmaSq[kpUn.octave];
-					e->setInformation(Eigen::Matrix2d::Identity()*invSigma2);
+				optimizer.addEdge(e);
+				vpEdgesMono.push_back(e);
+				vpEdgeKFMono.push_back(keyframe);
+				vpMapPointEdgeMono.push_back(mappoint);
+			}
+			else // Stereo observation
+			{
+				g2o::EdgeStereoSE3ProjectXYZ* e = new g2o::EdgeStereoSE3ProjectXYZ();
 
-					g2o::RobustKernelHuber* rk = new g2o::RobustKernelHuber;
-					e->setRobustKernel(rk);
-					rk->setDelta(thHuberMono);
+				e->setVertex(0, optimizer.vertex(id));
+				e->setVertex(1, optimizer.vertex(keyframe->id));
 
-					e->fx = pKFi->camera.fx;
-					e->fy = pKFi->camera.fy;
-					e->cx = pKFi->camera.cx;
-					e->cy = pKFi->camera.cy;
+				SetMeasurement(e, keypoint.pt, ur);
+				SetInformation<3>(e, invSigmaSq);
+				SetHuberKernel(e, DELTA_STEREO);
+				SetCalibration(e, keyframe->camera, keyframe->camera.bf);
 
-					optimizer.addEdge(e);
-					vpEdgesMono.push_back(e);
-					vpEdgeKFMono.push_back(pKFi);
-					vpMapPointEdgeMono.push_back(pMP);
-				}
-				else // Stereo observation
-				{
-					Eigen::Matrix<double, 3, 1> obs;
-					const float kp_ur = pKFi->uright[mit->second];
-					obs << kpUn.pt.x, kpUn.pt.y, kp_ur;
-
-					g2o::EdgeStereoSE3ProjectXYZ* e = new g2o::EdgeStereoSE3ProjectXYZ();
-
-					e->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(id)));
-					e->setVertex(1, dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(pKFi->id)));
-					e->setMeasurement(obs);
-					const float &invSigma2 = pKFi->pyramid.invSigmaSq[kpUn.octave];
-					Eigen::Matrix3d Info = Eigen::Matrix3d::Identity()*invSigma2;
-					e->setInformation(Info);
-
-					g2o::RobustKernelHuber* rk = new g2o::RobustKernelHuber;
-					e->setRobustKernel(rk);
-					rk->setDelta(thHuberStereo);
-
-					e->fx = pKFi->camera.fx;
-					e->fy = pKFi->camera.fy;
-					e->cx = pKFi->camera.cx;
-					e->cy = pKFi->camera.cy;
-					e->bf = pKFi->camera.bf;
-
-					optimizer.addEdge(e);
-					vpEdgesStereo.push_back(e);
-					vpEdgeKFStereo.push_back(pKFi);
-					vpMapPointEdgeStereo.push_back(pMP);
-				}
+				optimizer.addEdge(e);
+				vpEdgesStereo.push_back(e);
+				vpEdgeKFStereo.push_back(keyframe);
+				vpMapPointEdgeStereo.push_back(mappoint);
 			}
 		}
 	}
