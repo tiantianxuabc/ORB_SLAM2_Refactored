@@ -318,17 +318,18 @@ int Optimizer::PoseOptimization(Frame* frame)
 			if (!mappoint)
 				continue;
 
-			// Monocular observation
-			if (frame->uright[i] < 0)
-			{
-				nInitialCorrespondences++;
-				frame->outlier[i] = false;
+			nInitialCorrespondences++;
+			frame->outlier[i] = false;
 
-				const cv::KeyPoint& keypoint = frame->keypointsUn[i];
-				
+			const cv::KeyPoint& keypoint = frame->keypointsUn[i];
+			const float ur = frame->uright[i];
+
+			// Monocular observation
+			if (ur < 0)
+			{
 				g2o::EdgeSE3ProjectXYZOnlyPose* e = new g2o::EdgeSE3ProjectXYZOnlyPose();
 
-				e->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(0)));
+				e->setVertex(0, vSE3);
 				SetMeasurement(e, keypoint.pt);
 				const float invSigma2 = frame->pyramid.invSigmaSq[keypoint.octave];
 				e->setInformation(Eigen::Matrix2d::Identity()*invSigma2);
@@ -351,15 +352,9 @@ int Optimizer::PoseOptimization(Frame* frame)
 			}
 			else  // Stereo observation
 			{
-				nInitialCorrespondences++;
-				frame->outlier[i] = false;
-
-				const cv::KeyPoint& keypoint = frame->keypointsUn[i];
-				const float ur = frame->uright[i];
-
 				g2o::EdgeStereoSE3ProjectXYZOnlyPose* e = new g2o::EdgeStereoSE3ProjectXYZOnlyPose();
 
-				e->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(0)));
+				e->setVertex(0, vSE3);
 				SetMeasurement(e, keypoint.pt, ur);
 				const float invSigma2 = frame->pyramid.invSigmaSq[keypoint.octave];
 				Eigen::Matrix3d Info = Eigen::Matrix3d::Identity()*invSigma2;
