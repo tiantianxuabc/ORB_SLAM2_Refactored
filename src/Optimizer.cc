@@ -241,17 +241,20 @@ void Optimizer::BundleAdjustment(const vector<KeyFrame *> &vpKFs, const vector<M
 
 }
 
+template <template<class> class LinearSolver, class BlockSolver>
+static void CreateOptimizer(g2o::SparseOptimizer& optimizer)
+{
+	using MatrixType = typename BlockSolver::PoseMatrixType;
+	auto linearSolver = new LinearSolver<MatrixType>();
+	auto solver = new BlockSolver(linearSolver);
+	auto algorithm = new g2o::OptimizationAlgorithmLevenberg(solver);
+	optimizer.setAlgorithm(algorithm);
+}
+
 int Optimizer::PoseOptimization(Frame *pFrame)
 {
 	g2o::SparseOptimizer optimizer;
-	g2o::BlockSolver_6_3::LinearSolverType * linearSolver;
-
-	linearSolver = new g2o::LinearSolverDense<g2o::BlockSolver_6_3::PoseMatrixType>();
-
-	g2o::BlockSolver_6_3 * solver_ptr = new g2o::BlockSolver_6_3(linearSolver);
-
-	g2o::OptimizationAlgorithmLevenberg* solver = new g2o::OptimizationAlgorithmLevenberg(solver_ptr);
-	optimizer.setAlgorithm(solver);
+	CreateOptimizer<g2o::LinearSolverDense, g2o::BlockSolver_6_3>(optimizer);
 
 	int nInitialCorrespondences = 0;
 
