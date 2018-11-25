@@ -40,8 +40,8 @@ namespace Optimizer
 {
 //public:
 void BundleAdjustment(const std::vector<KeyFrame*> &vpKF, const std::vector<MapPoint*> &vpMP,
-	int nIterations = 5, bool *pbStopFlag = NULL, const unsigned long nLoopKF = 0,
-	const bool bRobust = true);
+	int nIterations = 5, bool *pbStopFlag = nullptr, frameid_t nLoopKF = 0,
+	bool bRobust = true);
 
 void GlobalBundleAdjustemnt(Map* map, int niterations, bool* stopFlag = nullptr, frameid_t loopKFId = 0,
 	bool robust = true);

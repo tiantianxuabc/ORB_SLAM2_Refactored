@@ -49,14 +49,13 @@ static const double DELTA_STEREO = sqrt(CHI2_STEREO);
 
 void Optimizer::GlobalBundleAdjustemnt(Map* map, int niterations, bool* stopFlag, frameid_t loopKFId, bool robust)
 {
-	vector<KeyFrame*> vpKFs = map->GetAllKeyFrames();
-	vector<MapPoint*> vpMP = map->GetAllMapPoints();
-	BundleAdjustment(vpKFs, vpMP, niterations, stopFlag, loopKFId, robust);
+	std::vector<KeyFrame*> keyframes = map->GetAllKeyFrames();
+	std::vector<MapPoint*> mappoints = map->GetAllMapPoints();
+	BundleAdjustment(keyframes, mappoints, niterations, stopFlag, loopKFId, robust);
 }
 
-
 void Optimizer::BundleAdjustment(const vector<KeyFrame *> &vpKFs, const vector<MapPoint *> &vpMP,
-	int nIterations, bool* pbStopFlag, const unsigned long nLoopKF, const bool bRobust)
+	int nIterations, bool* pbStopFlag, frameid_t nLoopKF, bool bRobust)
 {
 	vector<bool> vbNotIncludedMP;
 	vbNotIncludedMP.resize(vpMP.size());
