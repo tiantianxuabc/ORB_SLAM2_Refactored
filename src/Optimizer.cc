@@ -649,10 +649,10 @@ void Optimizer::LocalBundleAdjustment(KeyFrame* currKeyFrame, bool* stopFlag, Ma
 }
 
 
-void Optimizer::OptimizeEssentialGraph(Map* pMap, KeyFrame* pLoopKF, KeyFrame* pCurKF,
-	const KeyFrameAndPose &NonCorrectedSim3,
-	const KeyFrameAndPose &CorrectedSim3,
-	const map<KeyFrame *, set<KeyFrame *> > &LoopConnections, const bool &bFixScale)
+void Optimizer::OptimizeEssentialGraph(Map* map, KeyFrame* loopKF, KeyFrame* currKF,
+	const KeyFrameAndPose& NonCorrectedSim3,
+	const KeyFrameAndPose& CorrectedSim3,
+	const std::map<KeyFrame*, std::set<KeyFrame*>>& LoopConnections, const bool& fixScale)
 {
 	// Setup optimizer
 	g2o::SparseOptimizer optimizer;
@@ -665,10 +665,10 @@ void Optimizer::OptimizeEssentialGraph(Map* pMap, KeyFrame* pLoopKF, KeyFrame* p
 	solver->setUserLambdaInit(1e-16);
 	optimizer.setAlgorithm(solver);
 
-	const vector<KeyFrame*> vpKFs = pMap->GetAllKeyFrames();
-	const vector<MapPoint*> vpMPs = pMap->GetAllMapPoints();
+	const vector<KeyFrame*> vpKFs = map->GetAllKeyFrames();
+	const vector<MapPoint*> vpMPs = map->GetAllMapPoints();
 
-	const unsigned int nMaxKFid = pMap->GetMaxKFid();
+	const unsigned int nMaxKFid = map->GetMaxKFid();
 
 	vector<g2o::Sim3, Eigen::aligned_allocator<g2o::Sim3> > vScw(nMaxKFid + 1);
 	vector<g2o::Sim3, Eigen::aligned_allocator<g2o::Sim3> > vCorrectedSwc(nMaxKFid + 1);
@@ -702,12 +702,12 @@ void Optimizer::OptimizeEssentialGraph(Map* pMap, KeyFrame* pLoopKF, KeyFrame* p
 			VSim3->setEstimate(Siw);
 		}
 
-		if (pKF == pLoopKF)
+		if (pKF == loopKF)
 			VSim3->setFixed(true);
 
 		VSim3->setId(nIDi);
 		VSim3->setMarginalized(false);
-		VSim3->_fix_scale = bFixScale;
+		VSim3->_fix_scale = fixScale;
 
 		optimizer.addVertex(VSim3);
 
@@ -731,7 +731,7 @@ void Optimizer::OptimizeEssentialGraph(Map* pMap, KeyFrame* pLoopKF, KeyFrame* p
 		for (set<KeyFrame*>::const_iterator sit = spConnections.begin(), send = spConnections.end(); sit != send; sit++)
 		{
 			const long unsigned int nIDj = (*sit)->id;
-			if ((nIDi != pCurKF->id || nIDj != pLoopKF->id) && pKF->GetWeight(*sit) < minFeat)
+			if ((nIDi != currKF->id || nIDj != loopKF->id) && pKF->GetWeight(*sit) < minFeat)
 				continue;
 
 			const g2o::Sim3 Sjw = vScw[nIDj];
@@ -857,7 +857,7 @@ void Optimizer::OptimizeEssentialGraph(Map* pMap, KeyFrame* pLoopKF, KeyFrame* p
 	optimizer.initializeOptimization();
 	optimizer.optimize(20);
 
-	unique_lock<mutex> lock(pMap->mutexMapUpdate);
+	unique_lock<mutex> lock(map->mutexMapUpdate);
 
 	// SE3 Pose Recovering. Sim3:[sR t;0 1] -> SE3:[R t/s;0 1]
 	for (size_t i = 0; i < vpKFs.size(); i++)
@@ -889,7 +889,7 @@ void Optimizer::OptimizeEssentialGraph(Map* pMap, KeyFrame* pLoopKF, KeyFrame* p
 			continue;
 
 		int nIDr;
-		if (pMP->correctedByKF == pCurKF->id)
+		if (pMP->correctedByKF == currKF->id)
 		{
 			nIDr = pMP->correctedReference;
 		}
