@@ -57,8 +57,8 @@ void OptimizeEssentialGraph(Map* pMap, KeyFrame* pLoopKF, KeyFrame* pCurKF,
 	const bool &bFixScale);
 
 // if bFixScale is true, optimize SE3 (stereo,rgbd), Sim3 otherwise (mono)
-int OptimizeSim3(KeyFrame* pKF1, KeyFrame* pKF2, std::vector<MapPoint *> &vpMatches1,
-	g2o::Sim3 &g2oS12, const float th2, const bool bFixScale);
+int OptimizeSim3(KeyFrame *pKF1, KeyFrame *pKF2, std::vector<MapPoint *> &vpMatches1, g2o::Sim3 &g2oS12,
+	float th2, bool bFixScale);
 }
 
 } //namespace ORB_SLAM
