@@ -392,8 +392,8 @@ int Optimizer::PoseOptimization(Frame* frame)
 	const int iterations = 10;
 	const double maxChi2[2] = { CHI2_MONO, CHI2_STEREO };
 
-	auto AsMonocular = [](g2o::HyperGraph::Edge* e) { return dynamic_cast<g2o::EdgeSE3ProjectXYZOnlyPose*>(e); };
-	auto AsStereo = [](g2o::HyperGraph::Edge* e) { return dynamic_cast<g2o::EdgeStereoSE3ProjectXYZOnlyPose*>(e); };
+	auto AsMonocular = [](g2o::HyperGraph::Edge* e) { return static_cast<g2o::EdgeSE3ProjectXYZOnlyPose*>(e); };
+	auto AsStereo = [](g2o::HyperGraph::Edge* e) { return static_cast<g2o::EdgeStereoSE3ProjectXYZOnlyPose*>(e); };
 
 	int noutliers = 0;
 	for (int k = 0; k < 4; k++)
@@ -592,8 +592,8 @@ void Optimizer::LocalBundleAdjustment(KeyFrame* currKeyFrame, bool* stopFlag, Ma
 	if (stopFlag && *stopFlag)
 		doMore = false;
 
-	auto AsMonocular = [](g2o::HyperGraph::Edge* e) { return dynamic_cast<g2o::EdgeSE3ProjectXYZ*>(e); };
-	auto AsStereo = [](g2o::HyperGraph::Edge* e) { return dynamic_cast<g2o::EdgeStereoSE3ProjectXYZ*>(e); };
+	auto AsMonocular = [](g2o::HyperGraph::Edge* e) { return static_cast<g2o::EdgeSE3ProjectXYZ*>(e); };
+	auto AsStereo = [](g2o::HyperGraph::Edge* e) { return static_cast<g2o::EdgeStereoSE3ProjectXYZ*>(e); };
 	const double maxChi2[2] = { CHI2_MONO, CHI2_STEREO };
 
 	if (doMore)
