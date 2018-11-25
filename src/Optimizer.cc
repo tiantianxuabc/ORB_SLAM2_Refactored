@@ -20,6 +20,12 @@
 
 #include "Optimizer.h"
 
+#include "Map.h"
+#include "MapPoint.h"
+#include "KeyFrame.h"
+#include "LoopClosing.h"
+#include "Frame.h"
+
 #include "Thirdparty/g2o/g2o/core/block_solver.h"
 #include "Thirdparty/g2o/g2o/core/optimization_algorithm_levenberg.h"
 #include "Thirdparty/g2o/g2o/solvers/linear_solver_eigen.h"
