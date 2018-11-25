@@ -651,7 +651,7 @@ void Optimizer::LocalBundleAdjustment(KeyFrame* currKeyFrame, bool* stopFlag, Ma
 
 void Optimizer::OptimizeEssentialGraph(Map* map, KeyFrame* loopKF, KeyFrame* currKF,
 	const KeyFrameAndPose& nonCorrectedSim3, const KeyFrameAndPose& correctedSim3,
-	const std::map<KeyFrame*, std::set<KeyFrame*>>& loopConnections, bool fixScale)
+	const LoopConnections& loopConnections, bool fixScale)
 {
 	// Setup optimizer
 	g2o::SparseOptimizer optimizer;

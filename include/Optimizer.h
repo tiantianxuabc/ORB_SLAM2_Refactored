@@ -33,8 +33,10 @@ class MapPoint;
 class Frame;
 class KeyFrame;
 
-typedef std::map<KeyFrame*, g2o::Sim3, std::less<KeyFrame*>,
-	Eigen::aligned_allocator<std::pair<const KeyFrame*, g2o::Sim3> > > KeyFrameAndPose;
+
+using KeyFrameAndPoseAlloc = Eigen::aligned_allocator<std::pair<const KeyFrame*, g2o::Sim3>>;
+using KeyFrameAndPose = std::map<KeyFrame*, g2o::Sim3, std::less<KeyFrame*>, KeyFrameAndPoseAlloc>;
+using LoopConnections = std::map<KeyFrame*, std::set<KeyFrame*>>;
 
 namespace Optimizer
 {
@@ -52,7 +54,7 @@ int PoseOptimization(Frame* pFrame);
 // if bFixScale is true, 6DoF optimization (stereo,rgbd), 7DoF otherwise (mono)
 void OptimizeEssentialGraph(Map* map, KeyFrame* loopKF, KeyFrame* currKF,
 	const KeyFrameAndPose& nonCorrectedSim3, const KeyFrameAndPose& correctedSim3,
-	const std::map<KeyFrame*, std::set<KeyFrame*>>& loopConnections, bool fixScale);
+	const LoopConnections& loopConnections, bool fixScale);
 
 // if bFixScale is true, optimize SE3 (stereo,rgbd), Sim3 otherwise (mono)
 int OptimizeSim3(KeyFrame* keyframe1, KeyFrame* keyframe2, std::vector<MapPoint*>& matches1,
