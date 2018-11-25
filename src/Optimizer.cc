@@ -918,14 +918,7 @@ int Optimizer::OptimizeSim3(KeyFrame* keyframe1, KeyFrame* keyframe2, std::vecto
 	g2o::Sim3& S12, float maxChi2, bool fixScale)
 {
 	g2o::SparseOptimizer optimizer;
-	g2o::BlockSolverX::LinearSolverType * linearSolver;
-
-	linearSolver = new g2o::LinearSolverDense<g2o::BlockSolverX::PoseMatrixType>();
-
-	g2o::BlockSolverX * solver_ptr = new g2o::BlockSolverX(linearSolver);
-
-	g2o::OptimizationAlgorithmLevenberg* solver = new g2o::OptimizationAlgorithmLevenberg(solver_ptr);
-	optimizer.setAlgorithm(solver);
+	CreateOptimizer<g2o::LinearSolverDense, g2o::BlockSolverX>(optimizer);
 
 	// Calibration
 	const cv::Mat &K1 = keyframe1->camera.Mat();
