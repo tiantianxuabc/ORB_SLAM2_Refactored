@@ -47,11 +47,11 @@ static const double CHI2_STEREO = 7.815;
 static const double DELTA_MONO = sqrt(CHI2_MONO);
 static const double DELTA_STEREO = sqrt(CHI2_STEREO);
 
-void Optimizer::GlobalBundleAdjustemnt(Map* pMap, int nIterations, bool* pbStopFlag, const unsigned long nLoopKF, const bool bRobust)
+void Optimizer::GlobalBundleAdjustemnt(Map* map, int niterations, bool* stopFlag, frameid_t loopKFId, bool robust)
 {
-	vector<KeyFrame*> vpKFs = pMap->GetAllKeyFrames();
-	vector<MapPoint*> vpMP = pMap->GetAllMapPoints();
-	BundleAdjustment(vpKFs, vpMP, nIterations, pbStopFlag, nLoopKF, bRobust);
+	vector<KeyFrame*> vpKFs = map->GetAllKeyFrames();
+	vector<MapPoint*> vpMP = map->GetAllMapPoints();
+	BundleAdjustment(vpKFs, vpMP, niterations, stopFlag, loopKFId, robust);
 }
 
 

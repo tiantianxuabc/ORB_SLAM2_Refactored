@@ -48,8 +48,8 @@ namespace Optimizer
 {
 
 int PoseOptimization(Frame* pFrame);
-void GlobalBundleAdjustemnt(Map* pMap, int nIterations = 5, bool *pbStopFlag = NULL,
-	const unsigned long nLoopKF = 0, const bool bRobust = true);
+void GlobalBundleAdjustemnt(Map* map, int niterations, bool* stopFlag = nullptr, frameid_t loopKFId = 0,
+	bool robust = true);
 
 }
 
