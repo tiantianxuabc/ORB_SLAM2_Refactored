@@ -921,8 +921,8 @@ int Optimizer::OptimizeSim3(KeyFrame* keyframe1, KeyFrame* keyframe2, std::vecto
 	CreateOptimizer<g2o::LinearSolverDense, g2o::BlockSolverX>(optimizer);
 
 	// Calibration
-	const cv::Mat &K1 = keyframe1->camera.Mat();
-	const cv::Mat &K2 = keyframe2->camera.Mat();
+	const CameraParams& camera1 = keyframe1->camera;
+	const CameraParams& camera2 = keyframe2->camera;
 
 	// Camera poses
 	const cv::Mat R1w = keyframe1->GetRotation();
@@ -931,76 +931,60 @@ int Optimizer::OptimizeSim3(KeyFrame* keyframe1, KeyFrame* keyframe2, std::vecto
 	const cv::Mat t2w = keyframe2->GetTranslation();
 
 	// Set Sim3 vertex
-	g2o::VertexSim3Expmap * vSim3 = new g2o::VertexSim3Expmap();
-	vSim3->_fix_scale = fixScale;
-	vSim3->setEstimate(S12);
-	vSim3->setId(0);
-	vSim3->setFixed(false);
-	vSim3->_principle_point1[0] = K1.at<float>(0, 2);
-	vSim3->_principle_point1[1] = K1.at<float>(1, 2);
-	vSim3->_focal_length1[0] = K1.at<float>(0, 0);
-	vSim3->_focal_length1[1] = K1.at<float>(1, 1);
-	vSim3->_principle_point2[0] = K2.at<float>(0, 2);
-	vSim3->_principle_point2[1] = K2.at<float>(1, 2);
-	vSim3->_focal_length2[0] = K2.at<float>(0, 0);
-	vSim3->_focal_length2[1] = K2.at<float>(1, 1);
-	optimizer.addVertex(vSim3);
+	g2o::VertexSim3Expmap * vertex = new g2o::VertexSim3Expmap();
+	vertex->_fix_scale = fixScale;
+	vertex->setEstimate(S12);
+	vertex->setId(0);
+	vertex->setFixed(false);
+	vertex->_principle_point1[0] = camera1.cx;
+	vertex->_principle_point1[1] = camera1.cy;
+	vertex->_focal_length1[0] = camera1.fx;
+	vertex->_focal_length1[1] = camera1.fy;
+	vertex->_principle_point2[0] = camera2.cx;
+	vertex->_principle_point2[1] = camera2.cy;
+	vertex->_focal_length2[0] = camera2.fx;
+	vertex->_focal_length2[1] = camera2.fy;
+	optimizer.addVertex(vertex);
 
 	// Set MapPoint vertices
-	const int N = matches1.size();
-	const vector<MapPoint*> vpMapPoints1 = keyframe1->GetMapPointMatches();
-	vector<g2o::EdgeSim3ProjectXYZ*> vpEdges12;
-	vector<g2o::EdgeInverseSim3ProjectXYZ*> vpEdges21;
-	vector<size_t> vnIndexEdge;
+	const int nmatches = static_cast<int>(matches1.size());
+	const std::vector<MapPoint*> mappoints1 = keyframe1->GetMapPointMatches();
+	std::vector<g2o::EdgeSim3ProjectXYZ*> edges12;
+	std::vector<g2o::EdgeInverseSim3ProjectXYZ*> edges21;
+	std::vector<size_t> indices;
 
-	vnIndexEdge.reserve(2 * N);
-	vpEdges12.reserve(2 * N);
-	vpEdges21.reserve(2 * N);
+	indices.reserve(2 * nmatches);
+	edges12.reserve(2 * nmatches);
+	edges21.reserve(2 * nmatches);
 
-	const float deltaHuber = sqrt(maxChi2);
+	const double deltaHuber = sqrt(maxChi2);
 
-	int nCorrespondences = 0;
+	int ncorrespondences = 0;
 
-	for (int i = 0; i < N; i++)
+	for (int i = 0; i < nmatches; i++)
 	{
-		if (!matches1[i])
+		MapPoint* mappoint1 = mappoints1[i];
+		MapPoint* mappoint2 = matches1[i];
+
+		if (!mappoint1 || !mappoint2)
 			continue;
 
-		MapPoint* pMP1 = vpMapPoints1[i];
-		MapPoint* pMP2 = matches1[i];
+		const int i2 = mappoint2->GetIndexInKeyFrame(keyframe2);
+		if (mappoint1->isBad() || mappoint2->isBad() || i2 < 0)
+			continue;
 
 		const int id1 = 2 * i + 1;
 		const int id2 = 2 * (i + 1);
 
-		const int i2 = pMP2->GetIndexInKeyFrame(keyframe2);
+		const cv::Mat Xw1 = mappoint1->GetWorldPos();
+		const cv::Mat Xc1 = R1w * Xw1 + t1w;
+		optimizer.addVertex(CreateVertexSBA(Converter::toVector3d(Xc1), id1, true));
 
-		if (pMP1 && pMP2)
-		{
-			if (!pMP1->isBad() && !pMP2->isBad() && i2 >= 0)
-			{
-				g2o::VertexSBAPointXYZ* vPoint1 = new g2o::VertexSBAPointXYZ();
-				cv::Mat P3D1w = pMP1->GetWorldPos();
-				cv::Mat P3D1c = R1w*P3D1w + t1w;
-				vPoint1->setEstimate(Converter::toVector3d(P3D1c));
-				vPoint1->setId(id1);
-				vPoint1->setFixed(true);
-				optimizer.addVertex(vPoint1);
+		const cv::Mat Xw2 = mappoint2->GetWorldPos();
+		const cv::Mat Xc2 = R2w * Xw2 + t2w;
+		optimizer.addVertex(CreateVertexSBA(Converter::toVector3d(Xc2), id2, true));
 
-				g2o::VertexSBAPointXYZ* vPoint2 = new g2o::VertexSBAPointXYZ();
-				cv::Mat P3D2w = pMP2->GetWorldPos();
-				cv::Mat P3D2c = R2w*P3D2w + t2w;
-				vPoint2->setEstimate(Converter::toVector3d(P3D2c));
-				vPoint2->setId(id2);
-				vPoint2->setFixed(true);
-				optimizer.addVertex(vPoint2);
-			}
-			else
-				continue;
-		}
-		else
-			continue;
-
-		nCorrespondences++;
+		ncorrespondences++;
 
 		// Set edge x1 = S12*X2
 		Eigen::Matrix<double, 2, 1> obs1;
@@ -1037,9 +1021,9 @@ int Optimizer::OptimizeSim3(KeyFrame* keyframe1, KeyFrame* keyframe2, std::vecto
 		rk2->setDelta(deltaHuber);
 		optimizer.addEdge(e21);
 
-		vpEdges12.push_back(e12);
-		vpEdges21.push_back(e21);
-		vnIndexEdge.push_back(i);
+		edges12.push_back(e12);
+		edges21.push_back(e21);
+		indices.push_back(i);
 	}
 
 	// Optimize!
@@ -1048,21 +1032,21 @@ int Optimizer::OptimizeSim3(KeyFrame* keyframe1, KeyFrame* keyframe2, std::vecto
 
 	// Check inliers
 	int nBad = 0;
-	for (size_t i = 0; i < vpEdges12.size(); i++)
+	for (size_t i = 0; i < edges12.size(); i++)
 	{
-		g2o::EdgeSim3ProjectXYZ* e12 = vpEdges12[i];
-		g2o::EdgeInverseSim3ProjectXYZ* e21 = vpEdges21[i];
+		g2o::EdgeSim3ProjectXYZ* e12 = edges12[i];
+		g2o::EdgeInverseSim3ProjectXYZ* e21 = edges21[i];
 		if (!e12 || !e21)
 			continue;
 
 		if (e12->chi2() > maxChi2 || e21->chi2() > maxChi2)
 		{
-			size_t idx = vnIndexEdge[i];
+			size_t idx = indices[i];
 			matches1[idx] = static_cast<MapPoint*>(NULL);
 			optimizer.removeEdge(e12);
 			optimizer.removeEdge(e21);
-			vpEdges12[i] = static_cast<g2o::EdgeSim3ProjectXYZ*>(NULL);
-			vpEdges21[i] = static_cast<g2o::EdgeInverseSim3ProjectXYZ*>(NULL);
+			edges12[i] = static_cast<g2o::EdgeSim3ProjectXYZ*>(NULL);
+			edges21[i] = static_cast<g2o::EdgeInverseSim3ProjectXYZ*>(NULL);
 			nBad++;
 		}
 	}
@@ -1073,7 +1057,7 @@ int Optimizer::OptimizeSim3(KeyFrame* keyframe1, KeyFrame* keyframe2, std::vecto
 	else
 		nMoreIterations = 5;
 
-	if (nCorrespondences - nBad < 10)
+	if (ncorrespondences - nBad < 10)
 		return 0;
 
 	// Optimize again only with inliers
@@ -1082,16 +1066,16 @@ int Optimizer::OptimizeSim3(KeyFrame* keyframe1, KeyFrame* keyframe2, std::vecto
 	optimizer.optimize(nMoreIterations);
 
 	int nIn = 0;
-	for (size_t i = 0; i < vpEdges12.size(); i++)
+	for (size_t i = 0; i < edges12.size(); i++)
 	{
-		g2o::EdgeSim3ProjectXYZ* e12 = vpEdges12[i];
-		g2o::EdgeInverseSim3ProjectXYZ* e21 = vpEdges21[i];
+		g2o::EdgeSim3ProjectXYZ* e12 = edges12[i];
+		g2o::EdgeInverseSim3ProjectXYZ* e21 = edges21[i];
 		if (!e12 || !e21)
 			continue;
 
 		if (e12->chi2() > maxChi2 || e21->chi2() > maxChi2)
 		{
-			size_t idx = vnIndexEdge[i];
+			size_t idx = indices[i];
 			matches1[idx] = static_cast<MapPoint*>(NULL);
 		}
 		else
