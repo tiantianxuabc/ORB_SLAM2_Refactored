@@ -987,38 +987,27 @@ int Optimizer::OptimizeSim3(KeyFrame* keyframe1, KeyFrame* keyframe2, std::vecto
 		ncorrespondences++;
 
 		// Set edge x1 = S12*X2
-		Eigen::Matrix<double, 2, 1> obs1;
-		const cv::KeyPoint &kpUn1 = keyframe1->keypointsUn[i];
-		obs1 << kpUn1.pt.x, kpUn1.pt.y;
-
 		g2o::EdgeSim3ProjectXYZ* e12 = new g2o::EdgeSim3ProjectXYZ();
-		e12->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(id2)));
-		e12->setVertex(1, dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(0)));
-		e12->setMeasurement(obs1);
-		const float &invSigmaSquare1 = keyframe1->pyramid.invSigmaSq[kpUn1.octave];
-		e12->setInformation(Eigen::Matrix2d::Identity()*invSigmaSquare1);
+		e12->setVertex(0, optimizer.vertex(id2));
+		e12->setVertex(1, optimizer.vertex(0));
 
-		g2o::RobustKernelHuber* rk1 = new g2o::RobustKernelHuber;
-		e12->setRobustKernel(rk1);
-		rk1->setDelta(deltaHuber);
+		const cv::KeyPoint& keypoint1 = keyframe1->keypointsUn[i];
+		const float invSigmaSq1 = keyframe1->pyramid.invSigmaSq[keypoint1.octave];
+		SetMeasurement(e12, keypoint1.pt);
+		SetInformation<2>(e12, invSigmaSq1);
+		SetHuberKernel(e12, deltaHuber);
 		optimizer.addEdge(e12);
 
 		// Set edge x2 = S21*X1
-		Eigen::Matrix<double, 2, 1> obs2;
-		const cv::KeyPoint &kpUn2 = keyframe2->keypointsUn[i2];
-		obs2 << kpUn2.pt.x, kpUn2.pt.y;
-
 		g2o::EdgeInverseSim3ProjectXYZ* e21 = new g2o::EdgeInverseSim3ProjectXYZ();
+		e21->setVertex(0, optimizer.vertex(id1));
+		e21->setVertex(1, optimizer.vertex(0));
 
-		e21->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(id1)));
-		e21->setVertex(1, dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(0)));
-		e21->setMeasurement(obs2);
-		float invSigmaSquare2 = keyframe2->pyramid.invSigmaSq[kpUn2.octave];
-		e21->setInformation(Eigen::Matrix2d::Identity()*invSigmaSquare2);
-
-		g2o::RobustKernelHuber* rk2 = new g2o::RobustKernelHuber;
-		e21->setRobustKernel(rk2);
-		rk2->setDelta(deltaHuber);
+		const cv::KeyPoint& keypoint2 = keyframe2->keypointsUn[i2];
+		const float invSigmaSq2 = keyframe2->pyramid.invSigmaSq[keypoint2.octave];
+		SetMeasurement(e21, keypoint2.pt);
+		SetInformation<2>(e21, invSigmaSq2);
+		SetHuberKernel(e21, deltaHuber);
 		optimizer.addEdge(e21);
 
 		edges12.push_back(e12);
