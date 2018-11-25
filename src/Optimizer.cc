@@ -200,7 +200,7 @@ void Optimizer::BundleAdjustment(const std::vector<KeyFrame*>& keyframes, const 
 				if (robust)
 					SetHuberKernel(e, DELTA_MONO);
 				SetCalibration(e, keyframe->camera);
-				
+
 				optimizer.addEdge(e);
 			}
 			else
@@ -215,7 +215,7 @@ void Optimizer::BundleAdjustment(const std::vector<KeyFrame*>& keyframes, const 
 				if (robust)
 					SetHuberKernel(e, DELTA_STEREO);
 				SetCalibration(e, keyframe->camera, keyframe->camera.bf);
-				
+
 				optimizer.addEdge(e);
 			}
 		}
@@ -1020,7 +1020,7 @@ int Optimizer::OptimizeSim3(KeyFrame* keyframe1, KeyFrame* keyframe2, std::vecto
 	optimizer.optimize(5);
 
 	// Check inliers
-	int nBad = 0;
+	int nbad = 0;
 	for (size_t i = 0; i < edges12.size(); i++)
 	{
 		g2o::EdgeSim3ProjectXYZ* e12 = edges12[i];
@@ -1031,30 +1031,24 @@ int Optimizer::OptimizeSim3(KeyFrame* keyframe1, KeyFrame* keyframe2, std::vecto
 		if (e12->chi2() > maxChi2 || e21->chi2() > maxChi2)
 		{
 			size_t idx = indices[i];
-			matches1[idx] = static_cast<MapPoint*>(NULL);
+			matches1[idx] = nullptr;
 			optimizer.removeEdge(e12);
 			optimizer.removeEdge(e21);
-			edges12[i] = static_cast<g2o::EdgeSim3ProjectXYZ*>(NULL);
-			edges21[i] = static_cast<g2o::EdgeInverseSim3ProjectXYZ*>(NULL);
-			nBad++;
+			edges12[i] = nullptr;
+			edges21[i] = nullptr;
+			nbad++;
 		}
 	}
 
-	int nMoreIterations;
-	if (nBad > 0)
-		nMoreIterations = 10;
-	else
-		nMoreIterations = 5;
-
-	if (ncorrespondences - nBad < 10)
+	if (ncorrespondences - nbad < 10)
 		return 0;
 
 	// Optimize again only with inliers
-
+	const int iterations = nbad > 0 ? 10 : 5;
 	optimizer.initializeOptimization();
-	optimizer.optimize(nMoreIterations);
+	optimizer.optimize(iterations);
 
-	int nIn = 0;
+	int ninliers = 0;
 	for (size_t i = 0; i < edges12.size(); i++)
 	{
 		g2o::EdgeSim3ProjectXYZ* e12 = edges12[i];
@@ -1064,19 +1058,18 @@ int Optimizer::OptimizeSim3(KeyFrame* keyframe1, KeyFrame* keyframe2, std::vecto
 
 		if (e12->chi2() > maxChi2 || e21->chi2() > maxChi2)
 		{
-			size_t idx = indices[i];
-			matches1[idx] = static_cast<MapPoint*>(NULL);
+			matches1[indices[i]] = nullptr;
 		}
 		else
-			nIn++;
+		{
+			ninliers++;
+		}
 	}
 
 	// Recover optimized Sim3
-	g2o::VertexSim3Expmap* vSim3_recov = static_cast<g2o::VertexSim3Expmap*>(optimizer.vertex(0));
-	S12 = vSim3_recov->estimate();
+	S12 = vertex->estimate();
 
-	return nIn;
+	return ninliers;
 }
-
 
 } //namespace ORB_SLAM
