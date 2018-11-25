@@ -650,9 +650,8 @@ void Optimizer::LocalBundleAdjustment(KeyFrame* currKeyFrame, bool* stopFlag, Ma
 
 
 void Optimizer::OptimizeEssentialGraph(Map* map, KeyFrame* loopKF, KeyFrame* currKF,
-	const KeyFrameAndPose& NonCorrectedSim3,
-	const KeyFrameAndPose& CorrectedSim3,
-	const std::map<KeyFrame*, std::set<KeyFrame*>>& LoopConnections, bool fixScale)
+	const KeyFrameAndPose& nonCorrectedSim3, const KeyFrameAndPose& correctedSim3,
+	const std::map<KeyFrame*, std::set<KeyFrame*>>& loopConnections, bool fixScale)
 {
 	// Setup optimizer
 	g2o::SparseOptimizer optimizer;
@@ -686,9 +685,9 @@ void Optimizer::OptimizeEssentialGraph(Map* map, KeyFrame* loopKF, KeyFrame* cur
 
 		const int nIDi = pKF->id;
 
-		KeyFrameAndPose::const_iterator it = CorrectedSim3.find(pKF);
+		KeyFrameAndPose::const_iterator it = correctedSim3.find(pKF);
 
-		if (it != CorrectedSim3.end())
+		if (it != correctedSim3.end())
 		{
 			vScw[nIDi] = it->second;
 			VSim3->setEstimate(it->second);
@@ -720,7 +719,7 @@ void Optimizer::OptimizeEssentialGraph(Map* map, KeyFrame* loopKF, KeyFrame* cur
 	const Eigen::Matrix<double, 7, 7> matLambda = Eigen::Matrix<double, 7, 7>::Identity();
 
 	// Set Loop edges
-	for (std::map<KeyFrame *, set<KeyFrame *> >::const_iterator mit = LoopConnections.begin(), mend = LoopConnections.end(); mit != mend; mit++)
+	for (std::map<KeyFrame *, set<KeyFrame *> >::const_iterator mit = loopConnections.begin(), mend = loopConnections.end(); mit != mend; mit++)
 	{
 		KeyFrame* pKF = mit->first;
 		const long unsigned int nIDi = pKF->id;
@@ -759,9 +758,9 @@ void Optimizer::OptimizeEssentialGraph(Map* map, KeyFrame* loopKF, KeyFrame* cur
 
 		g2o::Sim3 Swi;
 
-		KeyFrameAndPose::const_iterator iti = NonCorrectedSim3.find(pKF);
+		KeyFrameAndPose::const_iterator iti = nonCorrectedSim3.find(pKF);
 
-		if (iti != NonCorrectedSim3.end())
+		if (iti != nonCorrectedSim3.end())
 			Swi = (iti->second).inverse();
 		else
 			Swi = vScw[nIDi].inverse();
@@ -775,9 +774,9 @@ void Optimizer::OptimizeEssentialGraph(Map* map, KeyFrame* loopKF, KeyFrame* cur
 
 			g2o::Sim3 Sjw;
 
-			KeyFrameAndPose::const_iterator itj = NonCorrectedSim3.find(pParentKF);
+			KeyFrameAndPose::const_iterator itj = nonCorrectedSim3.find(pParentKF);
 
-			if (itj != NonCorrectedSim3.end())
+			if (itj != nonCorrectedSim3.end())
 				Sjw = itj->second;
 			else
 				Sjw = vScw[nIDj];
@@ -802,9 +801,9 @@ void Optimizer::OptimizeEssentialGraph(Map* map, KeyFrame* loopKF, KeyFrame* cur
 			{
 				g2o::Sim3 Slw;
 
-				KeyFrameAndPose::const_iterator itl = NonCorrectedSim3.find(pLKF);
+				KeyFrameAndPose::const_iterator itl = nonCorrectedSim3.find(pLKF);
 
-				if (itl != NonCorrectedSim3.end())
+				if (itl != nonCorrectedSim3.end())
 					Slw = itl->second;
 				else
 					Slw = vScw[pLKF->id];
@@ -833,9 +832,9 @@ void Optimizer::OptimizeEssentialGraph(Map* map, KeyFrame* loopKF, KeyFrame* cur
 
 					g2o::Sim3 Snw;
 
-					KeyFrameAndPose::const_iterator itn = NonCorrectedSim3.find(pKFn);
+					KeyFrameAndPose::const_iterator itn = nonCorrectedSim3.find(pKFn);
 
-					if (itn != NonCorrectedSim3.end())
+					if (itn != nonCorrectedSim3.end())
 						Snw = itn->second;
 					else
 						Snw = vScw[pKFn->id];
