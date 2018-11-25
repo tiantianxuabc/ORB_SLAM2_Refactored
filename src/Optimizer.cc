@@ -287,6 +287,22 @@ static void SetInformation(EDGE* e, float invSigmaSq)
 	e->setInformation(invSigmaSq * Eigen::Matrix<double, DIM, DIM>::Identity());
 }
 
+template <class EDGE>
+static void SetCalibration(EDGE* e, const CameraParams& camera)
+{
+	e->fx = camera.fx;
+	e->fy = camera.fy;
+	e->cx = camera.cx;
+	e->cy = camera.cy;
+}
+
+template <class EDGE>
+static void SetCalibration(EDGE* e, const CameraParams& camera, float bf)
+{
+	SetCalibration(e, camera);
+	e->bf = bf;
+}
+
 int Optimizer::PoseOptimization(Frame* frame)
 {
 	g2o::SparseOptimizer optimizer;
@@ -340,11 +356,7 @@ int Optimizer::PoseOptimization(Frame* frame)
 				SetMeasurement(e, keypoint.pt);
 				SetInformation<2>(e, invSigmaSq);
 				SetHuberKernel(e, deltaMono);
-				
-				e->fx = frame->camera.fx;
-				e->fy = frame->camera.fy;
-				e->cx = frame->camera.cx;
-				e->cy = frame->camera.cy;
+				SetCalibration(e, frame->camera);
 				cv::Mat Xw = mappoint->GetWorldPos();
 				e->Xw[0] = Xw.at<float>(0);
 				e->Xw[1] = Xw.at<float>(1);
@@ -363,12 +375,7 @@ int Optimizer::PoseOptimization(Frame* frame)
 				SetMeasurement(e, keypoint.pt, ur);
 				SetInformation<3>(e, invSigmaSq);
 				SetHuberKernel(e, deltaStereo);
-
-				e->fx = frame->camera.fx;
-				e->fy = frame->camera.fy;
-				e->cx = frame->camera.cx;
-				e->cy = frame->camera.cy;
-				e->bf = frame->camera.bf;
+				SetCalibration(e, frame->camera, frame->camera.bf);
 				cv::Mat Xw = mappoint->GetWorldPos();
 				e->Xw[0] = Xw.at<float>(0);
 				e->Xw[1] = Xw.at<float>(1);
