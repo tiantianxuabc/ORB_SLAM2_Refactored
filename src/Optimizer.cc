@@ -491,32 +491,22 @@ void Optimizer::LocalBundleAdjustment(KeyFrame* currKeyFrame, bool* stopFlag, Ma
 	if (stopFlag)
 		optimizer.setForceStopFlag(stopFlag);
 
-	unsigned long maxKFid = 0;
+	frameid_t maxKFId = 0;
 
 	// Set Local KeyFrame vertices
-	for (list<KeyFrame*>::iterator lit = localKFs.begin(), lend = localKFs.end(); lit != lend; lit++)
+	for (KeyFrame* localKF : localKFs)
 	{
-		KeyFrame* pKFi = *lit;
-		g2o::VertexSE3Expmap * vSE3 = new g2o::VertexSE3Expmap();
-		vSE3->setEstimate(Converter::toSE3Quat(pKFi->GetPose()));
-		vSE3->setId(pKFi->id);
-		vSE3->setFixed(pKFi->id == 0);
-		optimizer.addVertex(vSE3);
-		if (pKFi->id > maxKFid)
-			maxKFid = pKFi->id;
+		auto vertex = CreateVertexSE3(Converter::toSE3Quat(localKF->GetPose()), localKF->id, localKF->id == 0);
+		optimizer.addVertex(vertex);
+		maxKFId = std::max(maxKFId, localKF->id);
 	}
 
 	// Set Fixed KeyFrame vertices
-	for (list<KeyFrame*>::iterator lit = fixedCameras.begin(), lend = fixedCameras.end(); lit != lend; lit++)
+	for (KeyFrame* fixedKF : fixedCameras)
 	{
-		KeyFrame* pKFi = *lit;
-		g2o::VertexSE3Expmap * vSE3 = new g2o::VertexSE3Expmap();
-		vSE3->setEstimate(Converter::toSE3Quat(pKFi->GetPose()));
-		vSE3->setId(pKFi->id);
-		vSE3->setFixed(true);
-		optimizer.addVertex(vSE3);
-		if (pKFi->id > maxKFid)
-			maxKFid = pKFi->id;
+		auto vertex = CreateVertexSE3(Converter::toSE3Quat(fixedKF->GetPose()), fixedKF->id, true);
+		optimizer.addVertex(vertex);
+		maxKFId = std::max(maxKFId, fixedKF->id);
 	}
 
 	// Set MapPoint vertices
@@ -548,7 +538,7 @@ void Optimizer::LocalBundleAdjustment(KeyFrame* currKeyFrame, bool* stopFlag, Ma
 		MapPoint* pMP = *lit;
 		g2o::VertexSBAPointXYZ* vPoint = new g2o::VertexSBAPointXYZ();
 		vPoint->setEstimate(Converter::toVector3d(pMP->GetWorldPos()));
-		int id = pMP->id + maxKFid + 1;
+		int id = pMP->id + maxKFId + 1;
 		vPoint->setId(id);
 		vPoint->setMarginalized(true);
 		optimizer.addVertex(vPoint);
@@ -745,7 +735,7 @@ void Optimizer::LocalBundleAdjustment(KeyFrame* currKeyFrame, bool* stopFlag, Ma
 	for (list<MapPoint*>::iterator lit = localMPs.begin(), lend = localMPs.end(); lit != lend; lit++)
 	{
 		MapPoint* pMP = *lit;
-		g2o::VertexSBAPointXYZ* vPoint = static_cast<g2o::VertexSBAPointXYZ*>(optimizer.vertex(pMP->id + maxKFid + 1));
+		g2o::VertexSBAPointXYZ* vPoint = static_cast<g2o::VertexSBAPointXYZ*>(optimizer.vertex(pMP->id + maxKFId + 1));
 		pMP->SetWorldPos(Converter::toCvMat(vPoint->estimate()));
 		pMP->UpdateNormalAndDepth();
 	}
