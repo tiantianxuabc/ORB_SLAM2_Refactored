@@ -261,6 +261,14 @@ static VertexSE3* CreateVertexSE3(const VertexSE3::EstimateType& estimate, int i
 	return v;
 }
 
+template <class EDGE>
+static void SetHuberKernel(EDGE* e, double delta)
+{
+	g2o::RobustKernelHuber* kernel = new g2o::RobustKernelHuber;
+	kernel->setDelta(delta);
+	e->setRobustKernel(kernel);
+}
+
 int Optimizer::PoseOptimization(Frame* frame)
 {
 	g2o::SparseOptimizer optimizer;
@@ -315,10 +323,8 @@ int Optimizer::PoseOptimization(Frame* frame)
 				const float invSigma2 = frame->pyramid.invSigmaSq[kpUn.octave];
 				e->setInformation(Eigen::Matrix2d::Identity()*invSigma2);
 
-				g2o::RobustKernelHuber* rk = new g2o::RobustKernelHuber;
-				e->setRobustKernel(rk);
-				rk->setDelta(deltaMono);
-
+				SetHuberKernel(e, deltaMono);
+				
 				e->fx = frame->camera.fx;
 				e->fy = frame->camera.fy;
 				e->cx = frame->camera.cx;
@@ -352,9 +358,7 @@ int Optimizer::PoseOptimization(Frame* frame)
 				Eigen::Matrix3d Info = Eigen::Matrix3d::Identity()*invSigma2;
 				e->setInformation(Info);
 
-				g2o::RobustKernelHuber* rk = new g2o::RobustKernelHuber;
-				e->setRobustKernel(rk);
-				rk->setDelta(deltaStereo);
+				SetHuberKernel(e, deltaStereo);
 
 				e->fx = frame->camera.fx;
 				e->fy = frame->camera.fy;
