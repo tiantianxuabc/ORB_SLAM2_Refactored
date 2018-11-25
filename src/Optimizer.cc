@@ -303,6 +303,14 @@ static void SetCalibration(EDGE* e, const CameraParams& camera, float bf)
 	e->bf = bf;
 }
 
+template <class EDGE>
+static void SetXw(EDGE* e, const cv::Mat1f& Xw)
+{
+	e->Xw[0] = Xw(0);
+	e->Xw[1] = Xw(1);
+	e->Xw[2] = Xw(2);
+}
+
 int Optimizer::PoseOptimization(Frame* frame)
 {
 	g2o::SparseOptimizer optimizer;
@@ -357,10 +365,7 @@ int Optimizer::PoseOptimization(Frame* frame)
 				SetInformation<2>(e, invSigmaSq);
 				SetHuberKernel(e, deltaMono);
 				SetCalibration(e, frame->camera);
-				cv::Mat Xw = mappoint->GetWorldPos();
-				e->Xw[0] = Xw.at<float>(0);
-				e->Xw[1] = Xw.at<float>(1);
-				e->Xw[2] = Xw.at<float>(2);
+				SetXw(e, mappoint->GetWorldPos());
 
 				optimizer.addEdge(e);
 
@@ -376,10 +381,7 @@ int Optimizer::PoseOptimization(Frame* frame)
 				SetInformation<3>(e, invSigmaSq);
 				SetHuberKernel(e, deltaStereo);
 				SetCalibration(e, frame->camera, frame->camera.bf);
-				cv::Mat Xw = mappoint->GetWorldPos();
-				e->Xw[0] = Xw.at<float>(0);
-				e->Xw[1] = Xw.at<float>(1);
-				e->Xw[2] = Xw.at<float>(2);
+				SetXw(e, mappoint->GetWorldPos());
 
 				optimizer.addEdge(e);
 
