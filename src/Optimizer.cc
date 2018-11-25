@@ -510,34 +510,16 @@ void Optimizer::LocalBundleAdjustment(KeyFrame* currKeyFrame, bool* stopFlag, Ma
 	}
 
 	// Set MapPoint vertices
-	const int nExpectedSize = (localKFs.size() + fixedCameras.size())*localMPs.size();
-
-	vector<g2o::EdgeSE3ProjectXYZ*> vpEdgesMono;
-	vpEdgesMono.reserve(nExpectedSize);
-
-	vector<KeyFrame*> vpEdgeKFMono;
-	vpEdgeKFMono.reserve(nExpectedSize);
-
-	vector<MapPoint*> vpMapPointEdgeMono;
-	vpMapPointEdgeMono.reserve(nExpectedSize);
-
-	vector<g2o::EdgeStereoSE3ProjectXYZ*> vpEdgesStereo;
-	vpEdgesStereo.reserve(nExpectedSize);
-
-	vector<KeyFrame*> vpEdgeKFStereo;
-	vpEdgeKFStereo.reserve(nExpectedSize);
-
-	vector<MapPoint*> vpMapPointEdgeStereo;
-	vpMapPointEdgeStereo.reserve(nExpectedSize);
-
-	const float thHuberMono = sqrt(5.991);
-	const float thHuberStereo = sqrt(7.815);
+	const int expectedSize = (localKFs.size() + fixedCameras.size()) * localMPs.size();
 
 	enum { EDGE_MONO = 0, EDGE_STEREO = 1 };
 	std::vector<int> edgeTypes;
 	std::vector<g2o::HyperGraph::Edge*> edges;
 	std::vector<MapPoint*> mappoints;
 	std::vector<KeyFrame*> keyframes;
+	edges.reserve(expectedSize);
+	mappoints.reserve(expectedSize);
+	keyframes.reserve(expectedSize);
 
 	for (MapPoint* mappoint : localMPs)
 	{
@@ -574,10 +556,6 @@ void Optimizer::LocalBundleAdjustment(KeyFrame* currKeyFrame, bool* stopFlag, Ma
 				SetCalibration(e, keyframe->camera);
 
 				optimizer.addEdge(e);
-				vpEdgesMono.push_back(e);
-				vpEdgeKFMono.push_back(keyframe);
-				vpMapPointEdgeMono.push_back(mappoint);
-
 				edges.push_back(e);
 				edgeTypes.push_back(EDGE_MONO);
 			}
@@ -594,10 +572,6 @@ void Optimizer::LocalBundleAdjustment(KeyFrame* currKeyFrame, bool* stopFlag, Ma
 				SetCalibration(e, keyframe->camera, keyframe->camera.bf);
 
 				optimizer.addEdge(e);
-				vpEdgesStereo.push_back(e);
-				vpEdgeKFStereo.push_back(keyframe);
-				vpMapPointEdgeStereo.push_back(mappoint);
-
 				edges.push_back(e);
 				edgeTypes.push_back(EDGE_STEREO);
 			}
@@ -652,7 +626,7 @@ void Optimizer::LocalBundleAdjustment(KeyFrame* currKeyFrame, bool* stopFlag, Ma
 	}
 
 	std::vector<std::pair<KeyFrame*, MapPoint*>> toErase;
-	toErase.reserve(vpEdgesMono.size() + vpEdgesStereo.size());
+	toErase.reserve(edges.size());
 
 	// Check inlier observations
 	for (size_t i = 0; i < edges.size(); i++)
