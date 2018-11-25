@@ -269,6 +269,18 @@ static void SetHuberKernel(EDGE* e, double delta)
 	e->setRobustKernel(kernel);
 }
 
+template <class EDGE>
+static void SetMeasurement(EDGE* e, const cv::Point2f& pt)
+{
+	e->setMeasurement({ pt.x, pt.y });
+}
+
+template <class EDGE>
+static void SetMeasurement(EDGE* e, const cv::Point2f& pt, float ur)
+{
+	e->setMeasurement({ pt.x, pt.y, ur });
+}
+
 int Optimizer::PoseOptimization(Frame* frame)
 {
 	g2o::SparseOptimizer optimizer;
@@ -312,15 +324,13 @@ int Optimizer::PoseOptimization(Frame* frame)
 				nInitialCorrespondences++;
 				frame->outlier[i] = false;
 
-				Eigen::Matrix<double, 2, 1> obs;
-				const cv::KeyPoint &kpUn = frame->keypointsUn[i];
-				obs << kpUn.pt.x, kpUn.pt.y;
-
+				const cv::KeyPoint& keypoint = frame->keypointsUn[i];
+				
 				g2o::EdgeSE3ProjectXYZOnlyPose* e = new g2o::EdgeSE3ProjectXYZOnlyPose();
 
 				e->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(0)));
-				e->setMeasurement(obs);
-				const float invSigma2 = frame->pyramid.invSigmaSq[kpUn.octave];
+				SetMeasurement(e, keypoint.pt);
+				const float invSigma2 = frame->pyramid.invSigmaSq[keypoint.octave];
 				e->setInformation(Eigen::Matrix2d::Identity()*invSigma2);
 
 				SetHuberKernel(e, deltaMono);
@@ -344,17 +354,14 @@ int Optimizer::PoseOptimization(Frame* frame)
 				nInitialCorrespondences++;
 				frame->outlier[i] = false;
 
-				//SET EDGE
-				Eigen::Matrix<double, 3, 1> obs;
-				const cv::KeyPoint &kpUn = frame->keypointsUn[i];
-				const float &kp_ur = frame->uright[i];
-				obs << kpUn.pt.x, kpUn.pt.y, kp_ur;
+				const cv::KeyPoint& keypoint = frame->keypointsUn[i];
+				const float ur = frame->uright[i];
 
 				g2o::EdgeStereoSE3ProjectXYZOnlyPose* e = new g2o::EdgeStereoSE3ProjectXYZOnlyPose();
 
 				e->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(0)));
-				e->setMeasurement(obs);
-				const float invSigma2 = frame->pyramid.invSigmaSq[kpUn.octave];
+				SetMeasurement(e, keypoint.pt, ur);
+				const float invSigma2 = frame->pyramid.invSigmaSq[keypoint.octave];
 				Eigen::Matrix3d Info = Eigen::Matrix3d::Identity()*invSigma2;
 				e->setInformation(Info);
 
