@@ -533,6 +533,11 @@ void Optimizer::LocalBundleAdjustment(KeyFrame* currKeyFrame, bool* stopFlag, Ma
 	const float thHuberMono = sqrt(5.991);
 	const float thHuberStereo = sqrt(7.815);
 
+	enum { EDGE_MONO = 0, EDGE_STEREO = 1 };
+	std::vector<int> edgeTypes;
+	std::vector<g2o::HyperGraph::Edge*> edges;
+	std::vector<MapPoint*> mappoints;
+
 	for (MapPoint* mappoint : localMPs)
 	{
 		g2o::VertexSBAPointXYZ* vPoint = new g2o::VertexSBAPointXYZ();
@@ -571,6 +576,9 @@ void Optimizer::LocalBundleAdjustment(KeyFrame* currKeyFrame, bool* stopFlag, Ma
 				vpEdgesMono.push_back(e);
 				vpEdgeKFMono.push_back(keyframe);
 				vpMapPointEdgeMono.push_back(mappoint);
+
+				edges.push_back(e);
+				edgeTypes.push_back(EDGE_MONO);
 			}
 			else // Stereo observation
 			{
@@ -588,64 +596,57 @@ void Optimizer::LocalBundleAdjustment(KeyFrame* currKeyFrame, bool* stopFlag, Ma
 				vpEdgesStereo.push_back(e);
 				vpEdgeKFStereo.push_back(keyframe);
 				vpMapPointEdgeStereo.push_back(mappoint);
+
+				edges.push_back(e);
+				edgeTypes.push_back(EDGE_STEREO);
 			}
+
+			mappoints.push_back(mappoint);
 		}
 	}
 
-	if (stopFlag)
-		if (*stopFlag)
-			return;
+	if (stopFlag && *stopFlag)
+		return;
 
 	optimizer.initializeOptimization();
 	optimizer.optimize(5);
 
-	bool bDoMore = true;
+	bool doMore = true;
 
-	if (stopFlag)
-		if (*stopFlag)
-			bDoMore = false;
+	if (stopFlag && *stopFlag)
+		doMore = false;
 
-	if (bDoMore)
+	auto AsMonocular = [](g2o::HyperGraph::Edge* e) { return dynamic_cast<g2o::EdgeSE3ProjectXYZ*>(e); };
+	auto AsStereo = [](g2o::HyperGraph::Edge* e) { return dynamic_cast<g2o::EdgeStereoSE3ProjectXYZ*>(e); };
+	const double maxChi2[2] = { CHI2_MONO, CHI2_STEREO };
+
+	if (doMore)
 	{
-
 		// Check inlier observations
-		for (size_t i = 0, iend = vpEdgesMono.size(); i < iend; i++)
+		for (size_t i = 0; i < edges.size(); i++)
 		{
-			g2o::EdgeSE3ProjectXYZ* e = vpEdgesMono[i];
-			MapPoint* pMP = vpMapPointEdgeMono[i];
-
-			if (pMP->isBad())
+			if (mappoints[i]->isBad())
 				continue;
 
-			if (e->chi2() > 5.991 || !e->isDepthPositive())
+			g2o::HyperGraph::Edge* e = edges[i];
+
+			const int type = edgeTypes[i];
+			const bool monocular = type == EDGE_MONO;
+
+			const double chi2 = monocular ? AsMonocular(e)->chi2() : AsStereo(e)->chi2();
+			const bool isDepthPositive = monocular ? AsMonocular(e)->isDepthPositive() : AsStereo(e)->isDepthPositive();
+
+			if (chi2 > maxChi2[type] || !isDepthPositive)
 			{
-				e->setLevel(1);
+				monocular ? AsMonocular(e)->setLevel(1) : AsStereo(e)->setLevel(1);
 			}
 
-			e->setRobustKernel(0);
-		}
-
-		for (size_t i = 0, iend = vpEdgesStereo.size(); i < iend; i++)
-		{
-			g2o::EdgeStereoSE3ProjectXYZ* e = vpEdgesStereo[i];
-			MapPoint* pMP = vpMapPointEdgeStereo[i];
-
-			if (pMP->isBad())
-				continue;
-
-			if (e->chi2() > 7.815 || !e->isDepthPositive())
-			{
-				e->setLevel(1);
-			}
-
-			e->setRobustKernel(0);
+			monocular ? AsMonocular(e)->setRobustKernel(0) : AsStereo(e)->setRobustKernel(0);
 		}
 
 		// Optimize again without the outliers
-
 		optimizer.initializeOptimization(0);
 		optimizer.optimize(10);
-
 	}
 
 	vector<pair<KeyFrame*, MapPoint*> > vToErase;
