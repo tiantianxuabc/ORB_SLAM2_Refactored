@@ -238,50 +238,48 @@ void Optimizer::BundleAdjustment(const std::vector<KeyFrame*>& keyframes, const 
 	// Recover optimized data
 
 	//Keyframes
-	for (size_t i = 0; i < keyframes.size(); i++)
+	for (KeyFrame* keyframe : keyframes)
 	{
-		KeyFrame* pKF = keyframes[i];
-		if (pKF->isBad())
+		if (keyframe->isBad())
 			continue;
-		g2o::VertexSE3Expmap* vSE3 = static_cast<g2o::VertexSE3Expmap*>(optimizer.vertex(pKF->id));
-		g2o::SE3Quat SE3quat = vSE3->estimate();
+
+		const int id = keyframe->id;
+		g2o::VertexSE3Expmap* vertex = static_cast<g2o::VertexSE3Expmap*>(optimizer.vertex(id));
 		if (loopKFId == 0)
 		{
-			pKF->SetPose(Converter::toCvMat(SE3quat));
+			keyframe->SetPose(Converter::toCvMat(vertex->estimate()));
 		}
 		else
 		{
-			pKF->TcwGBA.create(4, 4, CV_32F);
-			Converter::toCvMat(SE3quat).copyTo(pKF->TcwGBA);
-			pKF->BAGlobalForKF = loopKFId;
+			keyframe->TcwGBA.create(4, 4, CV_32F);
+			Converter::toCvMat(vertex->estimate()).copyTo(keyframe->TcwGBA);
+			keyframe->BAGlobalForKF = loopKFId;
 		}
 	}
 
 	//Points
 	for (size_t i = 0; i < mappoints.size(); i++)
 	{
-		if (notIncludedMP[i])
+		MapPoint* mappoint = mappoints[i];
+
+		if (notIncludedMP[i] || mappoint->isBad())
 			continue;
 
-		MapPoint* pMP = mappoints[i];
-
-		if (pMP->isBad())
-			continue;
-		g2o::VertexSBAPointXYZ* vPoint = static_cast<g2o::VertexSBAPointXYZ*>(optimizer.vertex(pMP->id + maxKFId + 1));
+		const int id = mappoint->id + maxKFId + 1;
+		g2o::VertexSBAPointXYZ* vertex = static_cast<g2o::VertexSBAPointXYZ*>(optimizer.vertex(id));
 
 		if (loopKFId == 0)
 		{
-			pMP->SetWorldPos(Converter::toCvMat(vPoint->estimate()));
-			pMP->UpdateNormalAndDepth();
+			mappoint->SetWorldPos(Converter::toCvMat(vertex->estimate()));
+			mappoint->UpdateNormalAndDepth();
 		}
 		else
 		{
-			pMP->posGBA.create(3, 1, CV_32F);
-			Converter::toCvMat(vPoint->estimate()).copyTo(pMP->posGBA);
-			pMP->BAGlobalForKF = loopKFId;
+			mappoint->posGBA.create(3, 1, CV_32F);
+			Converter::toCvMat(vertex->estimate()).copyTo(mappoint->posGBA);
+			mappoint->BAGlobalForKF = loopKFId;
 		}
 	}
-
 }
 
 int Optimizer::PoseOptimization(Frame* frame)
