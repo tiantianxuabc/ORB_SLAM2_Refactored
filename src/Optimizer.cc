@@ -655,33 +655,32 @@ void Optimizer::LocalBundleAdjustment(KeyFrame* currKeyFrame, bool* stopFlag, Ma
 
 	if (!toErase.empty())
 	{
-		for (size_t i = 0; i < toErase.size(); i++)
+		for (auto& erase : toErase)
 		{
-			KeyFrame* pKFi = toErase[i].first;
-			MapPoint* pMPi = toErase[i].second;
-			pKFi->EraseMapPointMatch(pMPi);
-			pMPi->EraseObservation(pKFi);
+			KeyFrame* eraseKF = erase.first;
+			MapPoint* eraseMP = erase.second;
+			eraseKF->EraseMapPointMatch(eraseMP);
+			eraseMP->EraseObservation(eraseKF);
 		}
 	}
 
 	// Recover optimized data
 
 	//Keyframes
-	for (list<KeyFrame*>::iterator lit = localKFs.begin(), lend = localKFs.end(); lit != lend; lit++)
+	for (KeyFrame* localKF : localKFs)
 	{
-		KeyFrame* pKF = *lit;
-		g2o::VertexSE3Expmap* vSE3 = static_cast<g2o::VertexSE3Expmap*>(optimizer.vertex(pKF->id));
-		g2o::SE3Quat SE3quat = vSE3->estimate();
-		pKF->SetPose(Converter::toCvMat(SE3quat));
+		const int id = localKF->id;
+		g2o::VertexSE3Expmap* vertex = static_cast<g2o::VertexSE3Expmap*>(optimizer.vertex(id));
+		localKF->SetPose(Converter::toCvMat(vertex->estimate()));
 	}
 
 	//Points
-	for (list<MapPoint*>::iterator lit = localMPs.begin(), lend = localMPs.end(); lit != lend; lit++)
+	for (MapPoint* localMP : localMPs)
 	{
-		MapPoint* pMP = *lit;
-		g2o::VertexSBAPointXYZ* vPoint = static_cast<g2o::VertexSBAPointXYZ*>(optimizer.vertex(pMP->id + maxKFId + 1));
-		pMP->SetWorldPos(Converter::toCvMat(vPoint->estimate()));
-		pMP->UpdateNormalAndDepth();
+		const int id = localMP->id + maxKFId + 1;
+		g2o::VertexSBAPointXYZ* vertex = static_cast<g2o::VertexSBAPointXYZ*>(optimizer.vertex(id));
+		localMP->SetWorldPos(Converter::toCvMat(vertex->estimate()));
+		localMP->UpdateNormalAndDepth();
 	}
 }
 
