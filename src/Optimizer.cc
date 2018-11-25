@@ -51,12 +51,14 @@ using VertexSE3 = g2o::VertexSE3Expmap;
 using VertexSBA = g2o::VertexSBAPointXYZ;
 
 template <template<class> class LinearSolver, class BlockSolver>
-static void CreateOptimizer(g2o::SparseOptimizer& optimizer)
+static void CreateOptimizer(g2o::SparseOptimizer& optimizer, double lambda = -1)
 {
 	using MatrixType = typename BlockSolver::PoseMatrixType;
 	auto linearSolver = new LinearSolver<MatrixType>();
 	auto solver = new BlockSolver(linearSolver);
 	auto algorithm = new g2o::OptimizationAlgorithmLevenberg(solver);
+	if (lambda >= 0)
+		algorithm->setUserLambdaInit(lambda);
 	optimizer.setAlgorithm(algorithm);
 }
 
@@ -655,14 +657,8 @@ void Optimizer::OptimizeEssentialGraph(Map* map, KeyFrame* loopKF, KeyFrame* cur
 {
 	// Setup optimizer
 	g2o::SparseOptimizer optimizer;
+	CreateOptimizer<g2o::LinearSolverEigen, g2o::BlockSolver_7_3>(optimizer, 1e-16);
 	optimizer.setVerbose(false);
-	g2o::BlockSolver_7_3::LinearSolverType * linearSolver =
-		new g2o::LinearSolverEigen<g2o::BlockSolver_7_3::PoseMatrixType>();
-	g2o::BlockSolver_7_3 * solver_ptr = new g2o::BlockSolver_7_3(linearSolver);
-	g2o::OptimizationAlgorithmLevenberg* solver = new g2o::OptimizationAlgorithmLevenberg(solver_ptr);
-
-	solver->setUserLambdaInit(1e-16);
-	optimizer.setAlgorithm(solver);
 
 	const vector<KeyFrame*> vpKFs = map->GetAllKeyFrames();
 	const vector<MapPoint*> vpMPs = map->GetAllMapPoints();
