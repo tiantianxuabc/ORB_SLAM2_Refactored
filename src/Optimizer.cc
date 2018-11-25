@@ -914,8 +914,8 @@ void Optimizer::OptimizeEssentialGraph(Map* pMap, KeyFrame* pLoopKF, KeyFrame* p
 	}
 }
 
-int Optimizer::OptimizeSim3(KeyFrame *pKF1, KeyFrame *pKF2, vector<MapPoint *> &vpMatches1, g2o::Sim3 &g2oS12, 
-	float th2, bool bFixScale)
+int Optimizer::OptimizeSim3(KeyFrame* keyframe1, KeyFrame* keyframe2, std::vector<MapPoint*>& matches1,
+	g2o::Sim3& S12, float maxChi2, bool fixScale)
 {
 	g2o::SparseOptimizer optimizer;
 	g2o::BlockSolverX::LinearSolverType * linearSolver;
@@ -928,19 +928,19 @@ int Optimizer::OptimizeSim3(KeyFrame *pKF1, KeyFrame *pKF2, vector<MapPoint *> &
 	optimizer.setAlgorithm(solver);
 
 	// Calibration
-	const cv::Mat &K1 = pKF1->camera.Mat();
-	const cv::Mat &K2 = pKF2->camera.Mat();
+	const cv::Mat &K1 = keyframe1->camera.Mat();
+	const cv::Mat &K2 = keyframe2->camera.Mat();
 
 	// Camera poses
-	const cv::Mat R1w = pKF1->GetRotation();
-	const cv::Mat t1w = pKF1->GetTranslation();
-	const cv::Mat R2w = pKF2->GetRotation();
-	const cv::Mat t2w = pKF2->GetTranslation();
+	const cv::Mat R1w = keyframe1->GetRotation();
+	const cv::Mat t1w = keyframe1->GetTranslation();
+	const cv::Mat R2w = keyframe2->GetRotation();
+	const cv::Mat t2w = keyframe2->GetTranslation();
 
 	// Set Sim3 vertex
 	g2o::VertexSim3Expmap * vSim3 = new g2o::VertexSim3Expmap();
-	vSim3->_fix_scale = bFixScale;
-	vSim3->setEstimate(g2oS12);
+	vSim3->_fix_scale = fixScale;
+	vSim3->setEstimate(S12);
 	vSim3->setId(0);
 	vSim3->setFixed(false);
 	vSim3->_principle_point1[0] = K1.at<float>(0, 2);
@@ -954,8 +954,8 @@ int Optimizer::OptimizeSim3(KeyFrame *pKF1, KeyFrame *pKF2, vector<MapPoint *> &
 	optimizer.addVertex(vSim3);
 
 	// Set MapPoint vertices
-	const int N = vpMatches1.size();
-	const vector<MapPoint*> vpMapPoints1 = pKF1->GetMapPointMatches();
+	const int N = matches1.size();
+	const vector<MapPoint*> vpMapPoints1 = keyframe1->GetMapPointMatches();
 	vector<g2o::EdgeSim3ProjectXYZ*> vpEdges12;
 	vector<g2o::EdgeInverseSim3ProjectXYZ*> vpEdges21;
 	vector<size_t> vnIndexEdge;
@@ -964,22 +964,22 @@ int Optimizer::OptimizeSim3(KeyFrame *pKF1, KeyFrame *pKF2, vector<MapPoint *> &
 	vpEdges12.reserve(2 * N);
 	vpEdges21.reserve(2 * N);
 
-	const float deltaHuber = sqrt(th2);
+	const float deltaHuber = sqrt(maxChi2);
 
 	int nCorrespondences = 0;
 
 	for (int i = 0; i < N; i++)
 	{
-		if (!vpMatches1[i])
+		if (!matches1[i])
 			continue;
 
 		MapPoint* pMP1 = vpMapPoints1[i];
-		MapPoint* pMP2 = vpMatches1[i];
+		MapPoint* pMP2 = matches1[i];
 
 		const int id1 = 2 * i + 1;
 		const int id2 = 2 * (i + 1);
 
-		const int i2 = pMP2->GetIndexInKeyFrame(pKF2);
+		const int i2 = pMP2->GetIndexInKeyFrame(keyframe2);
 
 		if (pMP1 && pMP2)
 		{
@@ -1011,14 +1011,14 @@ int Optimizer::OptimizeSim3(KeyFrame *pKF1, KeyFrame *pKF2, vector<MapPoint *> &
 
 		// Set edge x1 = S12*X2
 		Eigen::Matrix<double, 2, 1> obs1;
-		const cv::KeyPoint &kpUn1 = pKF1->keypointsUn[i];
+		const cv::KeyPoint &kpUn1 = keyframe1->keypointsUn[i];
 		obs1 << kpUn1.pt.x, kpUn1.pt.y;
 
 		g2o::EdgeSim3ProjectXYZ* e12 = new g2o::EdgeSim3ProjectXYZ();
 		e12->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(id2)));
 		e12->setVertex(1, dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(0)));
 		e12->setMeasurement(obs1);
-		const float &invSigmaSquare1 = pKF1->pyramid.invSigmaSq[kpUn1.octave];
+		const float &invSigmaSquare1 = keyframe1->pyramid.invSigmaSq[kpUn1.octave];
 		e12->setInformation(Eigen::Matrix2d::Identity()*invSigmaSquare1);
 
 		g2o::RobustKernelHuber* rk1 = new g2o::RobustKernelHuber;
@@ -1028,7 +1028,7 @@ int Optimizer::OptimizeSim3(KeyFrame *pKF1, KeyFrame *pKF2, vector<MapPoint *> &
 
 		// Set edge x2 = S21*X1
 		Eigen::Matrix<double, 2, 1> obs2;
-		const cv::KeyPoint &kpUn2 = pKF2->keypointsUn[i2];
+		const cv::KeyPoint &kpUn2 = keyframe2->keypointsUn[i2];
 		obs2 << kpUn2.pt.x, kpUn2.pt.y;
 
 		g2o::EdgeInverseSim3ProjectXYZ* e21 = new g2o::EdgeInverseSim3ProjectXYZ();
@@ -1036,7 +1036,7 @@ int Optimizer::OptimizeSim3(KeyFrame *pKF1, KeyFrame *pKF2, vector<MapPoint *> &
 		e21->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(id1)));
 		e21->setVertex(1, dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertex(0)));
 		e21->setMeasurement(obs2);
-		float invSigmaSquare2 = pKF2->pyramid.invSigmaSq[kpUn2.octave];
+		float invSigmaSquare2 = keyframe2->pyramid.invSigmaSq[kpUn2.octave];
 		e21->setInformation(Eigen::Matrix2d::Identity()*invSigmaSquare2);
 
 		g2o::RobustKernelHuber* rk2 = new g2o::RobustKernelHuber;
@@ -1062,10 +1062,10 @@ int Optimizer::OptimizeSim3(KeyFrame *pKF1, KeyFrame *pKF2, vector<MapPoint *> &
 		if (!e12 || !e21)
 			continue;
 
-		if (e12->chi2() > th2 || e21->chi2() > th2)
+		if (e12->chi2() > maxChi2 || e21->chi2() > maxChi2)
 		{
 			size_t idx = vnIndexEdge[i];
-			vpMatches1[idx] = static_cast<MapPoint*>(NULL);
+			matches1[idx] = static_cast<MapPoint*>(NULL);
 			optimizer.removeEdge(e12);
 			optimizer.removeEdge(e21);
 			vpEdges12[i] = static_cast<g2o::EdgeSim3ProjectXYZ*>(NULL);
@@ -1096,10 +1096,10 @@ int Optimizer::OptimizeSim3(KeyFrame *pKF1, KeyFrame *pKF2, vector<MapPoint *> &
 		if (!e12 || !e21)
 			continue;
 
-		if (e12->chi2() > th2 || e21->chi2() > th2)
+		if (e12->chi2() > maxChi2 || e21->chi2() > maxChi2)
 		{
 			size_t idx = vnIndexEdge[i];
-			vpMatches1[idx] = static_cast<MapPoint*>(NULL);
+			matches1[idx] = static_cast<MapPoint*>(NULL);
 		}
 		else
 			nIn++;
@@ -1107,7 +1107,7 @@ int Optimizer::OptimizeSim3(KeyFrame *pKF1, KeyFrame *pKF2, vector<MapPoint *> &
 
 	// Recover optimized Sim3
 	g2o::VertexSim3Expmap* vSim3_recov = static_cast<g2o::VertexSim3Expmap*>(optimizer.vertex(0));
-	g2oS12 = vSim3_recov->estimate();
+	S12 = vSim3_recov->estimate();
 
 	return nIn;
 }
