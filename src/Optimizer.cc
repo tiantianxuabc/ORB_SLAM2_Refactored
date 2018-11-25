@@ -47,6 +47,9 @@ static const double CHI2_STEREO = 7.815;
 static const double DELTA_MONO = sqrt(CHI2_MONO);
 static const double DELTA_STEREO = sqrt(CHI2_STEREO);
 
+using VertexSE3 = g2o::VertexSE3Expmap;
+using VertexSBA = g2o::VertexSBAPointXYZ;
+
 template <template<class> class LinearSolver, class BlockSolver>
 static void CreateOptimizer(g2o::SparseOptimizer& optimizer)
 {
@@ -57,12 +60,21 @@ static void CreateOptimizer(g2o::SparseOptimizer& optimizer)
 	optimizer.setAlgorithm(algorithm);
 }
 
-using VertexSE3 = g2o::VertexSE3Expmap;
 static VertexSE3* CreateVertexSE3(const VertexSE3::EstimateType& estimate, int id, bool fixed)
 {
 	VertexSE3* v = new VertexSE3();
 	v->setEstimate(estimate);
 	v->setId(id);
+	v->setFixed(fixed);
+	return v;
+}
+
+static VertexSBA* CreateVertexSBA(const VertexSBA::EstimateType& estimate, int id, bool fixed = false, bool marginalized = false)
+{
+	VertexSBA* v = new VertexSBA();
+	v->setEstimate(estimate);
+	v->setId(id);
+	v->setMarginalized(marginalized);
 	v->setFixed(fixed);
 	return v;
 }
@@ -521,12 +533,9 @@ void Optimizer::LocalBundleAdjustment(KeyFrame* currKeyFrame, bool* stopFlag, Ma
 
 	for (MapPoint* mappoint : localMPs)
 	{
-		g2o::VertexSBAPointXYZ* vPoint = new g2o::VertexSBAPointXYZ();
-		vPoint->setEstimate(Converter::toVector3d(mappoint->GetWorldPos()));
-		int id = mappoint->id + maxKFId + 1;
-		vPoint->setId(id);
-		vPoint->setMarginalized(true);
-		optimizer.addVertex(vPoint);
+		const int id = mappoint->id + maxKFId + 1;
+		auto vertex = CreateVertexSBA(Converter::toVector3d(mappoint->GetWorldPos()), id, false, true);
+		optimizer.addVertex(vertex);
 
 		//Set edges
 		for (const auto& observation : mappoint->GetObservations())
