@@ -826,57 +826,44 @@ void Optimizer::OptimizeEssentialGraph(Map* map, KeyFrame* loopKF, KeyFrame* cur
 	unique_lock<mutex> lock(map->mutexMapUpdate);
 
 	// SE3 Pose Recovering. Sim3:[sR t;0 1] -> SE3:[R t/s;0 1]
-	for (size_t i = 0; i < keyframes.size(); i++)
+	for (KeyFrame* keyframe : keyframes)
 	{
-		KeyFrame* pKFi = keyframes[i];
+		const frameid_t id = keyframe->id;
 
-		const int nIDi = pKFi->id;
-
-		g2o::VertexSim3Expmap* VSim3 = static_cast<g2o::VertexSim3Expmap*>(optimizer.vertex(nIDi));
-		g2o::Sim3 CorrectedSiw = VSim3->estimate();
-		correctedSwc[nIDi] = CorrectedSiw.inverse();
-		Eigen::Matrix3d eigR = CorrectedSiw.rotation().toRotationMatrix();
-		Eigen::Vector3d eigt = CorrectedSiw.translation();
-		double s = CorrectedSiw.scale();
+		g2o::VertexSim3Expmap* vertex = static_cast<g2o::VertexSim3Expmap*>(optimizer.vertex(id));
+		g2o::Sim3 correctedSiw = vertex->estimate();
+		correctedSwc[id] = correctedSiw.inverse();
+		Eigen::Matrix3d eigR = correctedSiw.rotation().toRotationMatrix();
+		Eigen::Vector3d eigt = correctedSiw.translation();
+		const double s = correctedSiw.scale();
 
 		eigt *= (1. / s); //[R t/s;0 1]
 
 		cv::Mat Tiw = Converter::toCvSE3(eigR, eigt);
 
-		pKFi->SetPose(Tiw);
+		keyframe->SetPose(Tiw);
 	}
 
 	// Correct points. Transform to "non-optimized" reference keyframe pose and transform back with optimized pose
-	for (size_t i = 0, iend = mappoints.size(); i < iend; i++)
+	for (MapPoint* mappoint : mappoints)
 	{
-		MapPoint* pMP = mappoints[i];
-
-		if (pMP->isBad())
+		if (mappoint->isBad())
 			continue;
 
-		int nIDr;
-		if (pMP->correctedByKF == currKF->id)
-		{
-			nIDr = pMP->correctedReference;
-		}
-		else
-		{
-			KeyFrame* pRefKF = pMP->GetReferenceKeyFrame();
-			nIDr = pRefKF->id;
-		}
+		KeyFrame* referenceKF = mappoint->GetReferenceKeyFrame();
+		const int id = mappoint->correctedByKF == currKF->id ? mappoint->correctedReference : referenceKF->id;
 
+		g2o::Sim3 Srw = nonCorrectedScw[id];
+		g2o::Sim3 correctedSwr = correctedSwc[id];
 
-		g2o::Sim3 Srw = nonCorrectedScw[nIDr];
-		g2o::Sim3 correctedSwr = correctedSwc[nIDr];
-
-		cv::Mat P3Dw = pMP->GetWorldPos();
+		cv::Mat P3Dw = mappoint->GetWorldPos();
 		Eigen::Matrix<double, 3, 1> eigP3Dw = Converter::toVector3d(P3Dw);
 		Eigen::Matrix<double, 3, 1> eigCorrectedP3Dw = correctedSwr.map(Srw.map(eigP3Dw));
 
 		cv::Mat cvCorrectedP3Dw = Converter::toCvMat(eigCorrectedP3Dw);
-		pMP->SetWorldPos(cvCorrectedP3Dw);
+		mappoint->SetWorldPos(cvCorrectedP3Dw);
 
-		pMP->UpdateNormalAndDepth();
+		mappoint->UpdateNormalAndDepth();
 	}
 }
 
