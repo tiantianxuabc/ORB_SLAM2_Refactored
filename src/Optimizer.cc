@@ -42,6 +42,10 @@
 namespace ORB_SLAM2
 {
 
+static const double CHI2_MONO = 5.991;
+static const double CHI2_STEREO = 7.815;
+static const double DELTA_MONO = sqrt(CHI2_MONO);
+static const double DELTA_STEREO = sqrt(CHI2_STEREO);
 
 void Optimizer::GlobalBundleAdjustemnt(Map* pMap, int nIterations, bool* pbStopFlag, const unsigned long nLoopKF, const bool bRobust)
 {
@@ -323,9 +327,6 @@ int Optimizer::PoseOptimization(Frame* frame)
 	// Set MapPoint vertices
 	const int N = frame->N;
 
-	const float deltaMono = sqrt(5.991);
-	const float deltaStereo = sqrt(7.815);
-
 	enum { EDGE_MONO = 0, EDGE_STEREO = 1 };
 	std::vector<int> indices;
 	std::vector<int> edgeTypes;
@@ -354,7 +355,7 @@ int Optimizer::PoseOptimization(Frame* frame)
 				e->setVertex(0, vertex);
 				SetMeasurement(e, keypoint.pt);
 				SetInformation<2>(e, invSigmaSq);
-				SetHuberKernel(e, deltaMono);
+				SetHuberKernel(e, DELTA_MONO);
 				SetCalibration(e, frame->camera);
 				SetXw(e, mappoint->GetWorldPos());
 
@@ -369,7 +370,7 @@ int Optimizer::PoseOptimization(Frame* frame)
 				e->setVertex(0, vertex);
 				SetMeasurement(e, keypoint.pt, ur);
 				SetInformation<3>(e, invSigmaSq);
-				SetHuberKernel(e, deltaStereo);
+				SetHuberKernel(e, DELTA_STEREO);
 				SetCalibration(e, frame->camera, frame->camera.bf);
 				SetXw(e, mappoint->GetWorldPos());
 
@@ -389,7 +390,7 @@ int Optimizer::PoseOptimization(Frame* frame)
 	// We perform 4 optimizations, after each optimization we classify observation as inlier/outlier
 	// At the next optimization, outliers are not included, but at the end they can be classified as inliers again.
 	const int iterations = 10;
-	const double maxChi2[2] = { 5.991, 7.815 };
+	const double maxChi2[2] = { CHI2_MONO, CHI2_STEREO };
 
 	auto AsMonocular = [](g2o::HyperGraph::Edge* e) { return dynamic_cast<g2o::EdgeSE3ProjectXYZOnlyPose*>(e); };
 	auto AsStereo = [](g2o::HyperGraph::Edge* e) { return dynamic_cast<g2o::EdgeStereoSE3ProjectXYZOnlyPose*>(e); };
