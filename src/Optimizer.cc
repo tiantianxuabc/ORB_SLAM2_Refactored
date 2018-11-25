@@ -281,6 +281,12 @@ static void SetMeasurement(EDGE* e, const cv::Point2f& pt, float ur)
 	e->setMeasurement({ pt.x, pt.y, ur });
 }
 
+template <int DIM, class EDGE>
+static void SetInformation(EDGE* e, float invSigmaSq)
+{
+	e->setInformation(invSigmaSq * Eigen::Matrix<double, DIM, DIM>::Identity());
+}
+
 int Optimizer::PoseOptimization(Frame* frame)
 {
 	g2o::SparseOptimizer optimizer;
@@ -323,6 +329,7 @@ int Optimizer::PoseOptimization(Frame* frame)
 
 			const cv::KeyPoint& keypoint = frame->keypointsUn[i];
 			const float ur = frame->uright[i];
+			const float invSigmaSq = frame->pyramid.invSigmaSq[keypoint.octave];
 
 			// Monocular observation
 			if (ur < 0)
@@ -331,9 +338,7 @@ int Optimizer::PoseOptimization(Frame* frame)
 
 				e->setVertex(0, vSE3);
 				SetMeasurement(e, keypoint.pt);
-				const float invSigma2 = frame->pyramid.invSigmaSq[keypoint.octave];
-				e->setInformation(Eigen::Matrix2d::Identity()*invSigma2);
-
+				SetInformation<2>(e, invSigmaSq);
 				SetHuberKernel(e, deltaMono);
 				
 				e->fx = frame->camera.fx;
@@ -356,10 +361,7 @@ int Optimizer::PoseOptimization(Frame* frame)
 
 				e->setVertex(0, vSE3);
 				SetMeasurement(e, keypoint.pt, ur);
-				const float invSigma2 = frame->pyramid.invSigmaSq[keypoint.octave];
-				Eigen::Matrix3d Info = Eigen::Matrix3d::Identity()*invSigma2;
-				e->setInformation(Info);
-
+				SetInformation<3>(e, invSigmaSq);
 				SetHuberKernel(e, deltaStereo);
 
 				e->fx = frame->camera.fx;
