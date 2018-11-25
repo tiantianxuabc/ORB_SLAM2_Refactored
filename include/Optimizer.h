@@ -53,7 +53,7 @@ int PoseOptimization(Frame* pFrame);
 void OptimizeEssentialGraph(Map* map, KeyFrame* loopKF, KeyFrame* currKF,
 	const KeyFrameAndPose& NonCorrectedSim3,
 	const KeyFrameAndPose& CorrectedSim3,
-	const std::map<KeyFrame*, std::set<KeyFrame*>>& LoopConnections, const bool& fixScale);
+	const std::map<KeyFrame*, std::set<KeyFrame*>>& LoopConnections, bool fixScale);
 
 // if bFixScale is true, optimize SE3 (stereo,rgbd), Sim3 otherwise (mono)
 int OptimizeSim3(KeyFrame* keyframe1, KeyFrame* keyframe2, std::vector<MapPoint*>& matches1,

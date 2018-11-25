@@ -652,7 +652,7 @@ void Optimizer::LocalBundleAdjustment(KeyFrame* currKeyFrame, bool* stopFlag, Ma
 void Optimizer::OptimizeEssentialGraph(Map* map, KeyFrame* loopKF, KeyFrame* currKF,
 	const KeyFrameAndPose& NonCorrectedSim3,
 	const KeyFrameAndPose& CorrectedSim3,
-	const std::map<KeyFrame*, std::set<KeyFrame*>>& LoopConnections, const bool& fixScale)
+	const std::map<KeyFrame*, std::set<KeyFrame*>>& LoopConnections, bool fixScale)
 {
 	// Setup optimizer
 	g2o::SparseOptimizer optimizer;
@@ -720,7 +720,7 @@ void Optimizer::OptimizeEssentialGraph(Map* map, KeyFrame* loopKF, KeyFrame* cur
 	const Eigen::Matrix<double, 7, 7> matLambda = Eigen::Matrix<double, 7, 7>::Identity();
 
 	// Set Loop edges
-	for (map<KeyFrame *, set<KeyFrame *> >::const_iterator mit = LoopConnections.begin(), mend = LoopConnections.end(); mit != mend; mit++)
+	for (std::map<KeyFrame *, set<KeyFrame *> >::const_iterator mit = LoopConnections.begin(), mend = LoopConnections.end(); mit != mend; mit++)
 	{
 		KeyFrame* pKF = mit->first;
 		const long unsigned int nIDi = pKF->id;
