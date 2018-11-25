@@ -47,6 +47,76 @@ static const double CHI2_STEREO = 7.815;
 static const double DELTA_MONO = sqrt(CHI2_MONO);
 static const double DELTA_STEREO = sqrt(CHI2_STEREO);
 
+template <template<class> class LinearSolver, class BlockSolver>
+static void CreateOptimizer(g2o::SparseOptimizer& optimizer)
+{
+	using MatrixType = typename BlockSolver::PoseMatrixType;
+	auto linearSolver = new LinearSolver<MatrixType>();
+	auto solver = new BlockSolver(linearSolver);
+	auto algorithm = new g2o::OptimizationAlgorithmLevenberg(solver);
+	optimizer.setAlgorithm(algorithm);
+}
+
+using VertexSE3 = g2o::VertexSE3Expmap;
+static VertexSE3* CreateVertexSE3(const VertexSE3::EstimateType& estimate, int id, bool fixed)
+{
+	VertexSE3* v = new VertexSE3();
+	v->setEstimate(estimate);
+	v->setId(id);
+	v->setFixed(fixed);
+	return v;
+}
+
+template <class EDGE>
+static void SetHuberKernel(EDGE* e, double delta)
+{
+	g2o::RobustKernelHuber* kernel = new g2o::RobustKernelHuber;
+	kernel->setDelta(delta);
+	e->setRobustKernel(kernel);
+}
+
+template <class EDGE>
+static void SetMeasurement(EDGE* e, const cv::Point2f& pt)
+{
+	e->setMeasurement({ pt.x, pt.y });
+}
+
+template <class EDGE>
+static void SetMeasurement(EDGE* e, const cv::Point2f& pt, float ur)
+{
+	e->setMeasurement({ pt.x, pt.y, ur });
+}
+
+template <int DIM, class EDGE>
+static void SetInformation(EDGE* e, float invSigmaSq)
+{
+	e->setInformation(invSigmaSq * Eigen::Matrix<double, DIM, DIM>::Identity());
+}
+
+template <class EDGE>
+static void SetCalibration(EDGE* e, const CameraParams& camera)
+{
+	e->fx = camera.fx;
+	e->fy = camera.fy;
+	e->cx = camera.cx;
+	e->cy = camera.cy;
+}
+
+template <class EDGE>
+static void SetCalibration(EDGE* e, const CameraParams& camera, float bf)
+{
+	SetCalibration(e, camera);
+	e->bf = bf;
+}
+
+template <class EDGE>
+static void SetXw(EDGE* e, const cv::Mat1f& Xw)
+{
+	e->Xw[0] = Xw(0);
+	e->Xw[1] = Xw(1);
+	e->Xw[2] = Xw(2);
+}
+
 void Optimizer::GlobalBundleAdjustemnt(Map* map, int niterations, bool* stopFlag, frameid_t loopKFId, bool robust)
 {
 	std::vector<KeyFrame*> keyframes = map->GetAllKeyFrames();
@@ -57,9 +127,6 @@ void Optimizer::GlobalBundleAdjustemnt(Map* map, int niterations, bool* stopFlag
 void Optimizer::BundleAdjustment(const std::vector<KeyFrame*>& keyframes, const std::vector<MapPoint*>& mappoints,
 	int niterations, bool* stopFlag, frameid_t loopKFId, bool robust)
 {
-	vector<bool> vbNotIncludedMP;
-	vbNotIncludedMP.resize(mappoints.size());
-
 	g2o::SparseOptimizer optimizer;
 	g2o::BlockSolver_6_3::LinearSolverType * linearSolver;
 
@@ -94,6 +161,8 @@ void Optimizer::BundleAdjustment(const std::vector<KeyFrame*>& keyframes, const 
 	const float thHuber3D = sqrt(7.815);
 
 	// Set MapPoint vertices
+	vector<bool> vbNotIncludedMP;
+	vbNotIncludedMP.resize(mappoints.size());
 	for (size_t i = 0; i < mappoints.size(); i++)
 	{
 		MapPoint* pMP = mappoints[i];
@@ -242,76 +311,6 @@ void Optimizer::BundleAdjustment(const std::vector<KeyFrame*>& keyframes, const 
 		}
 	}
 
-}
-
-template <template<class> class LinearSolver, class BlockSolver>
-static void CreateOptimizer(g2o::SparseOptimizer& optimizer)
-{
-	using MatrixType = typename BlockSolver::PoseMatrixType;
-	auto linearSolver = new LinearSolver<MatrixType>();
-	auto solver = new BlockSolver(linearSolver);
-	auto algorithm = new g2o::OptimizationAlgorithmLevenberg(solver);
-	optimizer.setAlgorithm(algorithm);
-}
-
-using VertexSE3 = g2o::VertexSE3Expmap;
-static VertexSE3* CreateVertexSE3(const VertexSE3::EstimateType& estimate, int id, bool fixed)
-{
-	VertexSE3* v = new VertexSE3();
-	v->setEstimate(estimate);
-	v->setId(id);
-	v->setFixed(fixed);
-	return v;
-}
-
-template <class EDGE>
-static void SetHuberKernel(EDGE* e, double delta)
-{
-	g2o::RobustKernelHuber* kernel = new g2o::RobustKernelHuber;
-	kernel->setDelta(delta);
-	e->setRobustKernel(kernel);
-}
-
-template <class EDGE>
-static void SetMeasurement(EDGE* e, const cv::Point2f& pt)
-{
-	e->setMeasurement({ pt.x, pt.y });
-}
-
-template <class EDGE>
-static void SetMeasurement(EDGE* e, const cv::Point2f& pt, float ur)
-{
-	e->setMeasurement({ pt.x, pt.y, ur });
-}
-
-template <int DIM, class EDGE>
-static void SetInformation(EDGE* e, float invSigmaSq)
-{
-	e->setInformation(invSigmaSq * Eigen::Matrix<double, DIM, DIM>::Identity());
-}
-
-template <class EDGE>
-static void SetCalibration(EDGE* e, const CameraParams& camera)
-{
-	e->fx = camera.fx;
-	e->fy = camera.fy;
-	e->cx = camera.cx;
-	e->cy = camera.cy;
-}
-
-template <class EDGE>
-static void SetCalibration(EDGE* e, const CameraParams& camera, float bf)
-{
-	SetCalibration(e, camera);
-	e->bf = bf;
-}
-
-template <class EDGE>
-static void SetXw(EDGE* e, const cv::Mat1f& Xw)
-{
-	e->Xw[0] = Xw(0);
-	e->Xw[1] = Xw(1);
-	e->Xw[2] = Xw(2);
 }
 
 int Optimizer::PoseOptimization(Frame* frame)
