@@ -913,13 +913,10 @@ public:
 	{
 	}
 
-	bool Estimate(Frame& currFrame, Frame& lastFrame, const cv::Mat& velocity, int state)
+	bool Estimate(Frame& currFrame, Frame& lastFrame, const cv::Mat& velocity)
 	{
 		// Local Mapping is activated. This is the normal behaviour, unless
 		// you explicitly activate the "only tracking" mode.
-
-		if (state != Tracking::STATE_OK)
-			return relocalizer_.Relocalize(currFrame);
 
 		const int minInliers = 10;
 
@@ -947,12 +944,9 @@ public:
 		return success;
 	}
 
-	bool EstimateLocalization(Frame& currFrame, Frame& lastFrame, const cv::Mat& velocity, int state, int lastKeyFrameId)
+	bool EstimateLocalization(Frame& currFrame, Frame& lastFrame, const cv::Mat& velocity, int lastKeyFrameId)
 	{
 		// Localization Mode: Local Mapping is deactivated
-
-		if (state != Tracking::STATE_OK)
-			return relocalizer_.Relocalize(currFrame);
 
 		const int minInliers = 21;
 		const bool createPoints = sensor_ != System::MONOCULAR && lastFrame.id != lastKeyFrameId;
@@ -1139,7 +1133,7 @@ public:
 
 		if (viewer_)
 			viewer_->SetCurrentCameraPose(currFrame.pose.Tcw);
-		
+
 		state_ = STATE_OK;
 	}
 
@@ -1360,10 +1354,18 @@ public:
 		bool success = false;
 
 		// Initial camera pose estimation using motion model or relocalization (if tracking is lost)
-		if (!localization_)
-			success = initPose_.Estimate(currFrame, lastFrame_, velocity_, state_);
+		if (state_ != STATE_OK)
+		{
+			success = relocalizer_.Relocalize(currFrame);
+		}
+		else if (localization_)
+		{
+			success = initPose_.EstimateLocalization(currFrame, lastFrame_, velocity_, lastKeyFrame_->frameId);
+		}
 		else
-			success = initPose_.EstimateLocalization(currFrame, lastFrame_, velocity_, state_, lastKeyFrame_->frameId);
+		{
+			success = initPose_.Estimate(currFrame, lastFrame_, velocity_);
+		}
 
 		currFrame.referenceKF = localMap_.referenceKF;
 
@@ -1600,7 +1602,7 @@ private:
 
 	//Drawers
 	Viewer* viewer_;
-	
+
 	//Map
 	Map* map_;
 
