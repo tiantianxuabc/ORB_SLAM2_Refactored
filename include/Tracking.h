@@ -74,8 +74,8 @@ public:
 	virtual cv::Mat GrabImageRGBD(const cv::Mat& image, const cv::Mat& depth, double timestamp) = 0;
 	virtual cv::Mat GrabImageMonocular(const cv::Mat& image, double timestamp) = 0;
 
-	virtual void SetLocalMapper(LocalMapping* localMapper) = 0;
-	virtual void SetLoopClosing(LoopClosing* loopClosing) = 0;
+	virtual void SetLocalMapper(const std::shared_ptr<LocalMapping>& localMapper) = 0;
+	virtual void SetLoopClosing(const std::shared_ptr<LoopClosing>& loopClosing) = 0;
 	virtual void SetViewer(Viewer* viewer) = 0;
 
 	// Load new settings

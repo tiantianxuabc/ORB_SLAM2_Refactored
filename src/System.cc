@@ -207,8 +207,8 @@ public:
 		}
 
 		//Set pointers between threads
-		tracker_->SetLocalMapper(localMapper_.get());
-		tracker_->SetLoopClosing(loopCloser_.get());
+		tracker_->SetLocalMapper(localMapper_);
+		tracker_->SetLoopClosing(loopCloser_);
 
 		localMapper_->SetTracker(tracker_);
 		localMapper_->SetLoopCloser(loopCloser_);

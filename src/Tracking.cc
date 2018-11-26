@@ -1719,16 +1719,16 @@ public:
 		return currFrame_.pose.Tcw.clone();
 	}
 
-	void SetLocalMapper(LocalMapping* localMapper) override
+	void SetLocalMapper(const std::shared_ptr<LocalMapping>& localMapper) override
 	{
 		localMapper_ = localMapper;
-		tracker_->SetLocalMapper(localMapper);
+		tracker_->SetLocalMapper(localMapper.get());
 	}
 
-	void SetLoopClosing(LoopClosing* loopClosing) override
+	void SetLoopClosing(const std::shared_ptr<LoopClosing>& loopClosing) override
 	{
 		loopClosing_ = loopClosing;
-		tracker_->SetLoopClosing(loopClosing);
+		tracker_->SetLoopClosing(loopClosing.get());
 	}
 
 	void SetViewer(Viewer* viewer) override
@@ -1840,8 +1840,8 @@ private:
 	cv::Mat depth_;
 
 	//Other Thread Pointers
-	LocalMapping* localMapper_;
-	LoopClosing* loopClosing_;
+	std::shared_ptr<LocalMapping> localMapper_;
+	std::shared_ptr<LoopClosing> loopClosing_;
 
 	// ORB
 	std::unique_ptr<ORBextractor> extractorL_;
