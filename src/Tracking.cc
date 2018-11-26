@@ -649,143 +649,145 @@ class Relocalizer
 {
 public:
 
-	Relocalizer() : mnLastRelocFrameId(0) {}
+	Relocalizer() : lastRelocFrameId_(0) {}
 
-	bool Relocalize(Frame& mCurrentFrame, KeyFrameDatabase* mpKeyFrameDB)
+	bool Relocalize(Frame& currFrame, KeyFrameDatabase* keyFrameDB)
 	{
 		// Compute Bag of Words Vector
-		mCurrentFrame.ComputeBoW();
+		currFrame.ComputeBoW();
 
 		// Relocalization is performed when tracking is lost
 		// Track Lost: Query KeyFrame Database for keyframe candidates for relocalisation
-		vector<KeyFrame*> vpCandidateKFs = mpKeyFrameDB->DetectRelocalizationCandidates(&mCurrentFrame);
+		std::vector<KeyFrame*> candidateKFs = keyFrameDB->DetectRelocalizationCandidates(&currFrame);
 
-		if (vpCandidateKFs.empty())
+		if (candidateKFs.empty())
 			return false;
 
-		const int nKFs = static_cast<int>(vpCandidateKFs.size());
+		const int nkeyframes = static_cast<int>(candidateKFs.size());
 
 		// We perform first an ORB matching with each candidate
 		// If enough matches are found we setup a PnP solver
-		ORBmatcher matcher(0.75, true);
+		ORBmatcher matcher(0.75f, true);
 
-		vector<PnPsolver*> vpPnPsolvers;
-		vpPnPsolvers.resize(nKFs);
+		std::vector<PnPsolver*> PnPsolvers;
+		PnPsolvers.resize(nkeyframes);
 
-		vector<vector<MapPoint*> > vvpMapPointMatches;
-		vvpMapPointMatches.resize(nKFs);
+		std::vector<std::vector<MapPoint*>> vmatches;
+		vmatches.resize(nkeyframes);
 
-		vector<bool> vbDiscarded;
-		vbDiscarded.resize(nKFs);
+		std::vector<bool> discarded;
+		discarded.resize(nkeyframes);
 
-		int nCandidates = 0;
+		int ncandidates = 0;
 
-		for (int i = 0; i < nKFs; i++)
+		for (int i = 0; i < nkeyframes; i++)
 		{
-			KeyFrame* pKF = vpCandidateKFs[i];
-			if (pKF->isBad())
-				vbDiscarded[i] = true;
+			KeyFrame* keyframe = candidateKFs[i];
+			if (keyframe->isBad())
+			{
+				discarded[i] = true;
+			}
 			else
 			{
-				int nmatches = matcher.SearchByBoW(pKF, mCurrentFrame, vvpMapPointMatches[i]);
+				const int nmatches = matcher.SearchByBoW(keyframe, currFrame, vmatches[i]);
 				if (nmatches < 15)
 				{
-					vbDiscarded[i] = true;
+					discarded[i] = true;
 					continue;
 				}
 				else
 				{
-					PnPsolver* pSolver = new PnPsolver(mCurrentFrame, vvpMapPointMatches[i]);
-					pSolver->SetRansacParameters(0.99, 10, 300, 4, 0.5f, 5.991f);
-					vpPnPsolvers[i] = pSolver;
-					nCandidates++;
+					PnPsolver* solver = new PnPsolver(currFrame, vmatches[i]);
+					solver->SetRansacParameters(0.99, 10, 300, 4, 0.5f, 5.991f);
+					PnPsolvers[i] = solver;
+					ncandidates++;
 				}
 			}
 		}
 
 		// Alternatively perform some iterations of P4P RANSAC
 		// Until we found a camera pose supported by enough inliers
-		bool bMatch = false;
+		bool found = false;
 		ORBmatcher matcher2(0.9f, true);
 
-		while (nCandidates > 0 && !bMatch)
+		while (ncandidates > 0 && !found)
 		{
-			for (int i = 0; i < nKFs; i++)
+			for (int i = 0; i < nkeyframes; i++)
 			{
-				if (vbDiscarded[i])
+				if (discarded[i])
 					continue;
 
 				// Perform 5 Ransac Iterations
-				vector<bool> vbInliers;
+				std::vector<bool> isInlier;
 				int nInliers;
-				bool bNoMore;
+				bool terminate;
 
-				PnPsolver* pSolver = vpPnPsolvers[i];
-				cv::Mat Tcw = pSolver->iterate(5, bNoMore, vbInliers, nInliers);
+				PnPsolver* solver = PnPsolvers[i];
+				const cv::Mat Tcw = solver->iterate(5, terminate, isInlier, nInliers);
 
 				// If Ransac reachs max. iterations discard keyframe
-				if (bNoMore)
+				if (terminate)
 				{
-					vbDiscarded[i] = true;
-					nCandidates--;
+					discarded[i] = true;
+					ncandidates--;
 				}
 
 				// If a Camera Pose is computed, optimize
 				if (!Tcw.empty())
 				{
-					Tcw.copyTo(mCurrentFrame.pose.Tcw);
+					Tcw.copyTo(currFrame.pose.Tcw);
 
-					set<MapPoint*> sFound;
+					std::set<MapPoint*> foundPoints;
 
-					const int np = static_cast<int>(vbInliers.size());
+					const int np = static_cast<int>(isInlier.size());
 
 					for (int j = 0; j < np; j++)
 					{
-						if (vbInliers[j])
+						if (isInlier[j])
 						{
-							mCurrentFrame.mappoints[j] = vvpMapPointMatches[i][j];
-							sFound.insert(vvpMapPointMatches[i][j]);
+							currFrame.mappoints[j] = vmatches[i][j];
+							foundPoints.insert(vmatches[i][j]);
 						}
 						else
-							mCurrentFrame.mappoints[j] = NULL;
+							currFrame.mappoints[j] = nullptr;
 					}
 
-					int nGood = Optimizer::PoseOptimization(&mCurrentFrame);
+					int ngood = Optimizer::PoseOptimization(&currFrame);
 
-					if (nGood < 10)
+					if (ngood < 10)
 						continue;
 
-					for (int io = 0; io < mCurrentFrame.N; io++)
-						if (mCurrentFrame.outlier[io])
-							mCurrentFrame.mappoints[io] = static_cast<MapPoint*>(NULL);
+					for (int io = 0; io < currFrame.N; io++)
+						if (currFrame.outlier[io])
+							currFrame.mappoints[io] = nullptr;
 
 					// If few inliers, search by projection in a coarse window and optimize again
-					if (nGood < 50)
+					if (ngood < 50)
 					{
-						int nadditional = matcher2.SearchByProjection(mCurrentFrame, vpCandidateKFs[i], sFound, 10, 100);
+						int nadditional = matcher2.SearchByProjection(currFrame, candidateKFs[i], foundPoints, 10, 100);
 
-						if (nadditional + nGood >= 50)
+						if (nadditional + ngood >= 50)
 						{
-							nGood = Optimizer::PoseOptimization(&mCurrentFrame);
+							ngood = Optimizer::PoseOptimization(&currFrame);
 
 							// If many inliers but still not enough, search by projection again in a narrower window
 							// the camera has been already optimized with many points
-							if (nGood > 30 && nGood < 50)
+							if (ngood > 30 && ngood < 50)
 							{
-								sFound.clear();
-								for (int ip = 0; ip < mCurrentFrame.N; ip++)
-									if (mCurrentFrame.mappoints[ip])
-										sFound.insert(mCurrentFrame.mappoints[ip]);
-								nadditional = matcher2.SearchByProjection(mCurrentFrame, vpCandidateKFs[i], sFound, 3, 64);
+								foundPoints.clear();
+								for (int ip = 0; ip < currFrame.N; ip++)
+									if (currFrame.mappoints[ip])
+										foundPoints.insert(currFrame.mappoints[ip]);
+								nadditional = matcher2.SearchByProjection(currFrame, candidateKFs[i], foundPoints, 3, 64);
 
 								// Final optimization
-								if (nGood + nadditional >= 50)
+								if (ngood + nadditional >= 50)
 								{
-									nGood = Optimizer::PoseOptimization(&mCurrentFrame);
+									ngood = Optimizer::PoseOptimization(&currFrame);
 
-									for (int io = 0; io < mCurrentFrame.N; io++)
-										if (mCurrentFrame.outlier[io])
-											mCurrentFrame.mappoints[io] = NULL;
+									for (int io = 0; io < currFrame.N; io++)
+										if (currFrame.outlier[io])
+											currFrame.mappoints[io] = nullptr;
 								}
 							}
 						}
@@ -793,34 +795,34 @@ public:
 
 
 					// If the pose is supported by enough inliers stop ransacs and continue
-					if (nGood >= 50)
+					if (ngood >= 50)
 					{
-						bMatch = true;
+						found = true;
 						break;
 					}
 				}
 			}
 		}
 
-		if (!bMatch)
+		if (!found)
 		{
 			return false;
 		}
 		else
 		{
-			mnLastRelocFrameId = mCurrentFrame.id;
+			lastRelocFrameId_ = currFrame.id;
 			return true;
 		}
 	}
 
 	int GetLastRelocFrameId() const
 	{
-		return mnLastRelocFrameId;
+		return lastRelocFrameId_;
 	}
 
 private:
 
-	int mnLastRelocFrameId;
+	int lastRelocFrameId_;
 };
 
 static CameraParams ReadCameraParams(const cv::FileStorage& fs)
