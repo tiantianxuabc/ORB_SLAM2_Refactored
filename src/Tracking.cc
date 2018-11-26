@@ -649,16 +649,16 @@ class Relocalizer
 {
 public:
 
-	Relocalizer() : lastRelocFrameId_(0) {}
+	Relocalizer(KeyFrameDatabase* keyFrameDB) : keyFrameDB_(keyFrameDB), lastRelocFrameId_(0) {}
 
-	bool Relocalize(Frame& currFrame, KeyFrameDatabase* keyFrameDB)
+	bool Relocalize(Frame& currFrame)
 	{
 		// Compute Bag of Words Vector
 		currFrame.ComputeBoW();
 
 		// Relocalization is performed when tracking is lost
 		// Track Lost: Query KeyFrame Database for keyframe candidates for relocalisation
-		std::vector<KeyFrame*> candidateKFs = keyFrameDB->DetectRelocalizationCandidates(&currFrame);
+		std::vector<KeyFrame*> candidateKFs = keyFrameDB_->DetectRelocalizationCandidates(&currFrame);
 
 		if (candidateKFs.empty())
 			return false;
@@ -822,6 +822,7 @@ public:
 
 private:
 
+	KeyFrameDatabase* keyFrameDB_;
 	int lastRelocFrameId_;
 };
 
@@ -918,7 +919,7 @@ public:
 		// you explicitly activate the "only tracking" mode.
 
 		if (state != Tracking::STATE_OK)
-			return relocalizer_.Relocalize(currFrame, keyFrameDB_);
+			return relocalizer_.Relocalize(currFrame);
 
 		const int minInliers = 10;
 
@@ -951,7 +952,7 @@ public:
 		// Localization Mode: Local Mapping is deactivated
 
 		if (state != Tracking::STATE_OK)
-			return relocalizer_.Relocalize(currFrame, keyFrameDB_);
+			return relocalizer_.Relocalize(currFrame);
 
 		const int minInliers = 21;
 		const bool createPoints = sensor_ != System::MONOCULAR && lastFrame.id != lastKeyFrameId;
@@ -998,7 +999,7 @@ public:
 				vbOutMM = currFrame.outlier;
 				TcwMM = currFrame.pose.Tcw.clone();
 			}
-			bOKReloc = relocalizer_.Relocalize(currFrame, keyFrameDB_);
+			bOKReloc = relocalizer_.Relocalize(currFrame);
 
 			if (bOKMM && !bOKReloc)
 			{
@@ -1083,7 +1084,7 @@ public:
 		int sensor, const Parameters& param)
 		: state_(STATE_NO_IMAGES), sensor_(sensor), localization_(false), keyFrameDB_(keyFrameDB),
 		initializer_(nullptr), tracking_(tracking), system_(system), map_(map), localMap_(map),
-		newKeyFrameCondition_(map, localMap_, param, sensor),
+		newKeyFrameCondition_(map, localMap_, param, sensor), relocalizer_(keyFrameDB),
 		trackerIni_(map, keyFrameDB, localMap_, relocalizer_, trajectory_, sensor, param.thDepth), param_(param)
 	{
 	}
