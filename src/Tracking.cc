@@ -906,9 +906,9 @@ class InitialTracker
 
 public:
 
-	InitialTracker(Map* map, KeyFrameDatabase* keyFrameDB, LocalMap& localMap, Relocalizer& relocalizer,
+	InitialTracker(Map* map, LocalMap& localMap, Relocalizer& relocalizer,
 		const Trajectory& trajectory, int sensor, float thDepth)
-		: sensor_(sensor), fewMatches_(false), keyFrameDB_(keyFrameDB), localMap_(localMap), map_(map),
+		: sensor_(sensor), fewMatches_(false), localMap_(localMap), map_(map),
 		relocalizer_(relocalizer), trajectory_(trajectory), thDepth_(thDepth)
 	{
 	}
@@ -1052,9 +1052,6 @@ private:
 	// "zero-drift" localization to the map.
 	bool fewMatches_;
 
-	//BoW
-	KeyFrameDatabase* keyFrameDB_;
-
 	//Local Map
 	LocalMap& localMap_;
 
@@ -1085,7 +1082,7 @@ public:
 		: state_(STATE_NO_IMAGES), sensor_(sensor), localization_(false), keyFrameDB_(keyFrameDB),
 		initializer_(nullptr), tracking_(tracking), system_(system), map_(map), localMap_(map),
 		newKeyFrameCondition_(map, localMap_, param, sensor), relocalizer_(keyFrameDB),
-		trackerIni_(map, keyFrameDB, localMap_, relocalizer_, trajectory_, sensor, param.thDepth), param_(param)
+		trackerIni_(map, localMap_, relocalizer_, trajectory_, sensor, param.thDepth), param_(param)
 	{
 	}
 
