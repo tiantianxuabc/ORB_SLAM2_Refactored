@@ -171,8 +171,7 @@ public:
 		//Load ORB Vocabulary
 		std::cout << std::endl << "Loading ORB Vocabulary. This could take a while..." << std::endl;
 
-		vocabulary_ = std::make_shared<ORBVocabulary>();
-		if (!vocabulary_->loadFromTextFile(vocabularyFile))
+		if (!vocabulary_.loadFromTextFile(vocabularyFile))
 		{
 			cerr << "Wrong path to vocabulary. " << std::endl;
 			cerr << "Falied to open at: " << vocabularyFile << std::endl;
@@ -181,27 +180,24 @@ public:
 		std::cout << "Vocabulary loaded!" << std::endl << std::endl;
 
 		//Create KeyFrame Database
-		keyFrameDB_ = std::make_shared<KeyFrameDatabase>(*vocabulary_);
-
-		//Create the Map
-		map_ = std::make_shared<Map>();
+		keyFrameDB_ = std::make_shared<KeyFrameDatabase>(vocabulary_);
 
 		//Initialize the Tracking thread
 		//(it will live in the main thread of execution, the one that called this constructor)
-		tracker_ = Tracking::Create(this, vocabulary_.get(), map_.get(), keyFrameDB_.get(), settingsFile, sensor_);
+		tracker_ = Tracking::Create(this, &vocabulary_, &map_, keyFrameDB_.get(), settingsFile, sensor_);
 
 		//Initialize the Local Mapping thread and launch
-		localMapper_ = LocalMapping::Create(map_.get(), sensor_ == MONOCULAR);
+		localMapper_ = LocalMapping::Create(&map_, sensor_ == MONOCULAR);
 		threads_[THREAD_LOCAL_MAPPING] = thread(&ORB_SLAM2::LocalMapping::Run, localMapper_);
 
 		//Initialize the Loop Closing thread and launch
-		loopCloser_ = LoopClosing::Create(map_.get(), keyFrameDB_.get(), vocabulary_.get(), sensor_ != MONOCULAR);
+		loopCloser_ = LoopClosing::Create(&map_, keyFrameDB_.get(), &vocabulary_, sensor_ != MONOCULAR);
 		threads_[THREAD_LOOP_CLOSING] = thread(&ORB_SLAM2::LoopClosing::Run, loopCloser_);
 
 		//Initialize the Viewer thread and launch
 		if (useViewer)
 		{
-			viewer_ = std::make_shared<Viewer>(this, map_.get(), settingsFile);
+			viewer_ = std::make_shared<Viewer>(this, &map_, settingsFile);
 			threads_[THREAD_VIEWER] = thread(&Viewer::Run, viewer_.get());
 			tracker_->SetViewer(viewer_.get());
 		}
@@ -313,7 +309,7 @@ public:
 	bool MapChanged() const override
 	{
 		static int n = 0;
-		const int curn = map_->GetLastBigChangeIdx();
+		const int curn = map_.GetLastBigChangeIdx();
 		if (n < curn)
 		{
 			n = curn;
@@ -366,7 +362,7 @@ public:
 			return;
 		}
 
-		std::vector<KeyFrame*> keyframes = map_->GetAllKeyFrames();
+		std::vector<KeyFrame*> keyframes = map_.GetAllKeyFrames();
 		std::sort(std::begin(keyframes), std::end(keyframes), KeyFrame::lId);
 
 		// Transform all keyframes so that the first keyframe is at the origin.
@@ -422,7 +418,7 @@ public:
 	{
 		std::cout << std::endl << "Saving keyframe trajectory to " << filename << " ..." << std::endl;
 
-		std::vector<KeyFrame*> keyframes = map_->GetAllKeyFrames();
+		std::vector<KeyFrame*> keyframes = map_.GetAllKeyFrames();
 		std::sort(std::begin(keyframes), std::end(keyframes), KeyFrame::lId);
 
 		// Transform all keyframes so that the first keyframe is at the origin.
@@ -464,7 +460,7 @@ public:
 			return;
 		}
 
-		std::vector<KeyFrame*> keyframes = map_->GetAllKeyFrames();
+		std::vector<KeyFrame*> keyframes = map_.GetAllKeyFrames();
 		std::sort(std::begin(keyframes), std::end(keyframes), KeyFrame::lId);
 
 		// Transform all keyframes so that the first keyframe is at the origin.
@@ -538,13 +534,13 @@ private:
 	Sensor sensor_;
 
 	// ORB vocabulary used for place recognition and feature matching.
-	std::shared_ptr<ORBVocabulary> vocabulary_;
+	ORBVocabulary vocabulary_;
 
 	// KeyFrame database for place recognition (relocalization and loop detection).
 	std::shared_ptr<KeyFrameDatabase> keyFrameDB_;
 
 	// Map structure that stores the pointers to all KeyFrames and MapPoints.
-	std::shared_ptr<Map> map_;
+	Map map_;
 
 	// Tracker. It receives a frame and computes the associated camera pose.
 	// It also decides when to insert a new keyframe, create some new MapPoints and
