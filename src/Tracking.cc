@@ -815,7 +815,7 @@ public:
 		}
 	}
 
-	int GetLastRelocFrameId() const
+	frameid_t GetLastRelocFrameId() const
 	{
 		return lastRelocFrameId_;
 	}
@@ -823,7 +823,7 @@ public:
 private:
 
 	KeyFrameDatabase* keyFrameDB_;
-	int lastRelocFrameId_;
+	frameid_t lastRelocFrameId_;
 };
 
 static CameraParams ReadCameraParams(const cv::FileStorage& fs)
@@ -933,7 +933,7 @@ public:
 		}
 
 		bool success = false;
-		const bool withMotionModel = !velocity.empty() && (int)currFrame.id >= relocalizer_.GetLastRelocFrameId() + 2;
+		const bool withMotionModel = !velocity.empty() && currFrame.PassedFrom(relocalizer_.GetLastRelocFrameId()) >= 2;
 		if (withMotionModel)
 		{
 			UpdateLastFramePose(lastFrame, trajectory_.back());
