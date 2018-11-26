@@ -320,7 +320,7 @@ public:
 		if (localMapper->isStopped() || localMapper->stopRequested())
 			return false;
 
-		const int nkeyframes = map_->KeyFramesInMap();
+		const size_t nkeyframes = map_->KeyFramesInMap();
 
 		// Do not insert keyframes if not enough frames have passed from last relocalisation
 		if (currFrame.PassedFrom(lastRelocFrameId) < param_.maxFrames && nkeyframes > param_.maxFrames)
