@@ -901,19 +901,19 @@ static void PrintSettings(const CameraParams& camera, const cv::Mat1f& distCoeff
 		cout << endl << "Depth Threshold (Close/Far Points): " << thDepth << endl;
 }
 
-class InitialTracker
+class InitialPoseEstimator
 {
 
 public:
 
-	InitialTracker(Map* map, LocalMap& localMap, Relocalizer& relocalizer,
+	InitialPoseEstimator(Map* map, LocalMap& localMap, Relocalizer& relocalizer,
 		const Trajectory& trajectory, int sensor, float thDepth)
 		: sensor_(sensor), fewMatches_(false), localMap_(localMap), map_(map),
 		relocalizer_(relocalizer), trajectory_(trajectory), thDepth_(thDepth)
 	{
 	}
 
-	bool TrackNormal(Frame& currFrame, Frame& lastFrame, const cv::Mat& velocity, int state)
+	bool Estimate(Frame& currFrame, Frame& lastFrame, const cv::Mat& velocity, int state)
 	{
 		// Local Mapping is activated. This is the normal behaviour, unless
 		// you explicitly activate the "only tracking" mode.
@@ -947,7 +947,7 @@ public:
 		return success;
 	}
 
-	bool TrackLocalization(Frame& currFrame, Frame& lastFrame, const cv::Mat& velocity, int state, int lastKeyFrameId)
+	bool EstimateLocalization(Frame& currFrame, Frame& lastFrame, const cv::Mat& velocity, int state, int lastKeyFrameId)
 	{
 		// Localization Mode: Local Mapping is deactivated
 
@@ -1065,7 +1065,7 @@ private:
 	// Basically we store the reference keyframe for each frame and its relative transformation
 	const Trajectory& trajectory_;
 
-	list<MapPoint*> tempPoints_;
+	std::list<MapPoint*> tempPoints_;
 
 	float thDepth_;
 };
@@ -1082,7 +1082,7 @@ public:
 		: state_(STATE_NO_IMAGES), sensor_(sensor), localization_(false), keyFrameDB_(keyFrameDB),
 		initializer_(nullptr), tracking_(tracking), system_(system), map_(map), localMap_(map),
 		newKeyFrameCondition_(map, localMap_, param, sensor), relocalizer_(keyFrameDB),
-		trackerIni_(map, localMap_, relocalizer_, trajectory_, sensor, param.thDepth), param_(param)
+		initPose_(map, localMap_, relocalizer_, trajectory_, sensor, param.thDepth), param_(param)
 	{
 	}
 
@@ -1361,9 +1361,9 @@ public:
 
 		// Initial camera pose estimation using motion model or relocalization (if tracking is lost)
 		if (!localization_)
-			success = trackerIni_.TrackNormal(currFrame, lastFrame_, velocity_, state_);
+			success = initPose_.Estimate(currFrame, lastFrame_, velocity_, state_);
 		else
-			success = trackerIni_.TrackLocalization(currFrame, lastFrame_, velocity_, state_, lastKeyFrame_->frameId);
+			success = initPose_.EstimateLocalization(currFrame, lastFrame_, velocity_, state_, lastKeyFrame_->frameId);
 
 		currFrame.referenceKF = localMap_.referenceKF;
 
@@ -1372,7 +1372,7 @@ public:
 		// mbVO true means that there are few matches to MapPoints in the map. We cannot retrieve
 		// a local map and therefore we do not perform TrackLocalMap(). Once the system relocalizes
 		// the camera we will use the local map again.
-		if (success && (!localization_ || (localization_ && !trackerIni_.FewMatches())))
+		if (success && (!localization_ || (localization_ && !initPose_.FewMatches())))
 		{
 			const int lastRelocFrameId = relocalizer_.GetLastRelocFrameId();
 			// If the camera has been relocalised recently, perform a coarser search
@@ -1422,7 +1422,7 @@ public:
 			}
 
 			// Delete temporal MapPoints
-			trackerIni_.DeleteTemporalMapPoints();
+			initPose_.DeleteTemporalMapPoints();
 
 			// Check if we need to insert a new keyframe
 			if (!localization_ && newKeyFrameCondition_.Satisfy(currFrame, localMapper_, matchesInliers_,
@@ -1618,7 +1618,7 @@ private:
 	//Motion Model
 	cv::Mat velocity_;
 
-	InitialTracker trackerIni_;
+	InitialPoseEstimator initPose_;
 
 	NewKeyFrameCondition newKeyFrameCondition_;
 };
