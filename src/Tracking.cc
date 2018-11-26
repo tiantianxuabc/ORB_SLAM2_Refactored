@@ -906,8 +906,8 @@ class InitialPoseEstimator
 
 public:
 
-	InitialPoseEstimator(Map* map, LocalMap& localMap, Relocalizer& relocalizer,
-		const Trajectory& trajectory, int sensor, float thDepth)
+	InitialPoseEstimator(Map* map, LocalMap& localMap, Relocalizer& relocalizer, const Trajectory& trajectory,
+		int sensor, float thDepth)
 		: sensor_(sensor), fewMatches_(false), localMap_(localMap), map_(map),
 		relocalizer_(relocalizer), trajectory_(trajectory), thDepth_(thDepth)
 	{
@@ -977,47 +977,47 @@ public:
 			// If relocalization is sucessfull we choose that solution, otherwise we retain
 			// the "visual odometry" solution.
 
-			bool bOKMM = false;
-			bool bOKReloc = false;
-			vector<MapPoint*> vpMPsMM;
-			vector<bool> vbOutMM;
-			cv::Mat TcwMM;
+			// compute camera pose from motion model
+			bool successMM = false;
+			std::vector<MapPoint*> mappointsMM;
+			std::vector<bool> outlierMM;
+			cv::Mat poseMM;
 			if (!velocity.empty())
 			{
 				UpdateLastFramePose(lastFrame, trajectory_.back());
 				if (createPoints)
 					CreateMapPointsVO(lastFrame, tempPoints_, map_, thDepth_);
 
-				bOKMM = TrackWithMotionModel(currFrame, lastFrame, velocity, minInliers, sensor_, &fewMatches_);
-				vpMPsMM = currFrame.mappoints;
-				vbOutMM = currFrame.outlier;
-				TcwMM = currFrame.pose.Tcw.clone();
+				successMM = TrackWithMotionModel(currFrame, lastFrame, velocity, minInliers, sensor_, &fewMatches_);
+				mappointsMM = currFrame.mappoints;
+				outlierMM = currFrame.outlier;
+				poseMM = currFrame.pose.Tcw.clone();
 			}
-			bOKReloc = relocalizer_.Relocalize(currFrame);
 
-			if (bOKMM && !bOKReloc)
+			// compute camera pose from relocalization
+			const bool successReloc = relocalizer_.Relocalize(currFrame);
+
+			if (successReloc)
 			{
-				currFrame.SetPose(TcwMM);
-				currFrame.mappoints = vpMPsMM;
-				currFrame.outlier = vbOutMM;
+				// If relocalization is sucessfull we choose that solution
+				fewMatches_ = false;
+			}
+			else if (successMM)
+			{
+				// otherwise we retain the "visual odometry" solution.
+				currFrame.SetPose(poseMM);
+				currFrame.mappoints = mappointsMM;
+				currFrame.outlier = outlierMM;
 
 				if (fewMatches_)
 				{
 					for (int i = 0; i < currFrame.N; i++)
-					{
 						if (currFrame.mappoints[i] && !currFrame.outlier[i])
-						{
 							currFrame.mappoints[i]->IncreaseFound();
-						}
-					}
 				}
 			}
-			else if (bOKReloc)
-			{
-				fewMatches_ = false;
-			}
 
-			success = bOKReloc || bOKMM;
+			success = successReloc || successMM;
 		}
 
 		return success;
