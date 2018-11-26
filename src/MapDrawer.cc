@@ -23,6 +23,7 @@
 #include "Map.h"
 #include "MapPoint.h"
 #include "KeyFrame.h"
+#include "CameraPose.h"
 
 namespace ORB_SLAM2
 {
@@ -226,8 +227,8 @@ void MapDrawer::GetCurrentOpenGLCameraMatrix(pangolin::OpenGlMatrix& M) const
 		cv::Mat1f twc(3, 1);
 		{
 			unique_lock<mutex> lock(mutexCamera_);
-			Rwc = CameraPose::GetR(cameraPose_).t();
-			twc = -Rwc * CameraPose::Gett(cameraPose_);
+			Rwc = GetR(cameraPose_).t();
+			twc = -Rwc * Gett(cameraPose_);
 		}
 
 		M.m[0] = Rwc(0, 0);

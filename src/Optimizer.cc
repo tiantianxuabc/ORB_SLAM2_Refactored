@@ -131,6 +131,36 @@ static void SetXw(EDGE* e, const cv::Mat1f& Xw)
 	e->Xw[2] = Xw(2);
 }
 
+template <class R2, class R1>
+static R2 ConvertRotation(const R1& src)
+{
+	R2 dst;
+	for (int i = 0; i < 3; i++) for (int j = 0; j < 3; j++) dst(i, j) = static_cast<typename R2::value_type>(src(i, j));
+	return dst;
+}
+
+template <class T2, class T1>
+static T2 ConvertTranslation(const T1& src)
+{
+	T2 dst;
+	for (int i = 0; i < 3; i++) dst(i) = static_cast<typename T2::value_type>(src(i));
+	return dst;
+}
+
+static CameraPose FromSE3Quat(const g2o::SE3Quat& quat)
+{
+	const auto R = ConvertRotation<CameraPose::Mat33>(quat.rotation().matrix());
+	const auto t = ConvertTranslation<CameraPose::Mat31>(quat.translation());
+	return CameraPose(R, t);
+}
+
+static g2o::SE3Quat ToSE3Quat(const CameraPose& pose)
+{
+	const auto R = ConvertRotation<Eigen::Matrix3d>(pose.R());
+	const auto t = ConvertTranslation<Eigen::Vector3d>(pose.t());
+	return g2o::SE3Quat(R, t);
+}
+
 void Optimizer::GlobalBundleAdjustemnt(Map* map, int niterations, bool* stopFlag, frameid_t loopKFId, bool robust)
 {
 	std::vector<KeyFrame*> keyframes = map->GetAllKeyFrames();
@@ -287,7 +317,7 @@ int Optimizer::PoseOptimization(Frame* frame)
 	CreateOptimizer<g2o::LinearSolverDense, g2o::BlockSolver_6_3>(optimizer);
 
 	// Set Frame vertex
-	auto vertex = CreateVertexSE3(Converter::toSE3Quat(frame->pose.Tcw), 0, false);
+	auto vertex = CreateVertexSE3(ToSE3Quat(frame->pose), 0, false);
 	optimizer.addVertex(vertex);
 
 	// Set MapPoint vertices
@@ -364,7 +394,7 @@ int Optimizer::PoseOptimization(Frame* frame)
 	int noutliers = 0;
 	for (int k = 0; k < 4; k++)
 	{
-		vertex->setEstimate(Converter::toSE3Quat(frame->pose.Tcw));
+		vertex->setEstimate(ToSE3Quat(frame->pose));
 		optimizer.initializeOptimization(0);
 		optimizer.optimize(iterations);
 
@@ -397,7 +427,7 @@ int Optimizer::PoseOptimization(Frame* frame)
 	}
 
 	// Recover optimized pose and return number of inliers
-	frame->SetPose(Converter::toCvMat(vertex->estimate()));
+	frame->SetPose(FromSE3Quat(vertex->estimate()));
 
 	return nedges - noutliers;
 }

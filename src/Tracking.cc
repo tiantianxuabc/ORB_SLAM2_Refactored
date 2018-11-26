@@ -56,7 +56,7 @@ void GlobalBundleAdjustemnt(Map* map, int niterations, bool* stopFlag = nullptr,
 TrackPoint::TrackPoint(const Frame& frame, bool lost)
 	: referenceKF(frame.referenceKF), timestamp(frame.timestamp), lost(lost)
 {
-	Tcr = frame.pose.Tcw * frame.referenceKF->GetPoseInverse();
+	Tcr = frame.pose * CameraPose(frame.referenceKF->GetPoseInverse());
 }
 
 struct TrackerParameters
@@ -236,8 +236,7 @@ static void UpdateLastFramePose(Frame& lastFrame, const TrackPoint& lastTrackPoi
 {
 	// Update pose according to reference keyframe
 	KeyFrame* referenceKF = lastFrame.referenceKF;
-	cv::Mat Tlr = lastTrackPoint.Tcr;
-	lastFrame.SetPose(Tlr * referenceKF->GetPose());
+	lastFrame.SetPose(lastTrackPoint.Tcr * CameraPose(referenceKF->GetPose()));
 }
 
 bool TrackWithMotionModel(Frame& currFrame, Frame& lastFrame, const cv::Mat& velocity,
@@ -245,7 +244,7 @@ bool TrackWithMotionModel(Frame& currFrame, Frame& lastFrame, const cv::Mat& vel
 {
 	ORBmatcher matcher(0.9f, true);
 
-	currFrame.SetPose(velocity * lastFrame.pose.Tcw);
+	currFrame.SetPose(CameraPose(velocity) * lastFrame.pose);
 
 	// Project points seen in previous frame
 	const float threshold = sensor == System::STEREO ? 7.f : 15.f;
@@ -294,7 +293,7 @@ static bool TrackReferenceKeyFrame(Frame& currFrame, KeyFrame* referenceKF, Fram
 		return false;
 
 	currFrame.mappoints = mappoints;
-	currFrame.SetPose(lastFrame.pose.Tcw);
+	currFrame.SetPose(lastFrame.pose);
 
 	Optimizer::PoseOptimization(&currFrame);
 
@@ -416,7 +415,9 @@ static bool IsInFrustum(const Frame& frame, MapPoint* mappoint, float minViewing
 	cv::Mat Xw = mappoint->GetWorldPos();
 
 	// 3D in camera coordinates
-	const cv::Mat Xc = pose.Rcw * Xw + pose.tcw;
+	const cv::Mat Rcw(pose.R());
+	const cv::Mat tcw(pose.t());
+	const cv::Mat Xc = Rcw * Xw + tcw;
 	const float PcX = Xc.at<float>(0);
 	const float PcY = Xc.at<float>(1);
 	const float PcZ = Xc.at<float>(2);
@@ -436,7 +437,7 @@ static bool IsInFrustum(const Frame& frame, MapPoint* mappoint, float minViewing
 	// Check distance is in the scale invariance region of the MapPoint
 	const float maxDistance = mappoint->GetMaxDistanceInvariance();
 	const float minDistance = mappoint->GetMinDistanceInvariance();
-	const cv::Mat PO = Xw - pose.Ow;
+	const cv::Mat PO = Xw - cv::Mat(pose.Invt());
 	const float dist = static_cast<float>(cv::norm(PO));
 
 	if (dist < minDistance || dist > maxDistance)
@@ -543,8 +544,6 @@ static int TrackLocalMap(LocalMap& localMap, Frame& currFrame, float th, bool lo
 
 void CreateMapPoints(Frame& currFrame, KeyFrame* keyframe, Map* map, float thDepth)
 {
-	currFrame.pose.Update();
-
 	// We sort points by the measured depth by the stereo/RGBD sensor.
 	// We create all those MapPoints whose depth < param_.thDepth.
 	// If there are less than 100 close points we create the 100 closest.
@@ -735,7 +734,7 @@ public:
 				// If a Camera Pose is computed, optimize
 				if (!Tcw.empty())
 				{
-					Tcw.copyTo(currFrame.pose.Tcw);
+					currFrame.SetPose(CameraPose(Tcw));
 
 					std::set<MapPoint*> foundPoints;
 
@@ -981,7 +980,7 @@ public:
 			bool successMM = false;
 			std::vector<MapPoint*> mappointsMM;
 			std::vector<bool> outlierMM;
-			cv::Mat poseMM;
+			CameraPose poseMM;
 			if (!velocity.empty())
 			{
 				UpdateLastFramePose(lastFrame, trajectory_.back());
@@ -991,7 +990,7 @@ public:
 				successMM = TrackWithMotionModel(currFrame, lastFrame, velocity, minInliers, sensor_, &fewMatches_);
 				mappointsMM = currFrame.mappoints;
 				outlierMM = currFrame.outlier;
-				poseMM = currFrame.pose.Tcw.clone();
+				poseMM = currFrame.pose;
 			}
 
 			// compute camera pose from relocalization
@@ -1087,7 +1086,7 @@ public:
 			return;
 
 		// Set Frame pose to the origin
-		currFrame.SetPose(cv::Mat::eye(4, 4, CV_32F));
+		currFrame.SetPose(CameraPose::Origin());
 
 		// Create KeyFrame
 		KeyFrame* keyframe = new KeyFrame(currFrame, map_, keyFrameDB_);
@@ -1132,7 +1131,7 @@ public:
 		map_->keyFrameOrigins.push_back(keyframe);
 
 		if (viewer_)
-			viewer_->SetCurrentCameraPose(currFrame.pose.Tcw);
+			viewer_->SetCurrentCameraPose(currFrame.pose);
 
 		state_ = STATE_OK;
 	}
@@ -1200,11 +1199,11 @@ public:
 				}
 
 				// Set Frame Poses
-				initFrame_.SetPose(cv::Mat::eye(4, 4, CV_32F));
+				initFrame_.SetPose(CameraPose::Origin());
 				cv::Mat Tcw = cv::Mat::eye(4, 4, CV_32F);
 				Rcw.copyTo(Tcw.rowRange(0, 3).colRange(0, 3));
 				tcw.copyTo(Tcw.rowRange(0, 3).col(3));
-				currFrame.SetPose(Tcw);
+				currFrame.SetPose(cv::Mat1f(Tcw));
 
 				CreateInitialMapMonocular(currFrame);
 			}
@@ -1291,7 +1290,7 @@ public:
 		localMapper_->InsertKeyFrame(pKFini);
 		localMapper_->InsertKeyFrame(pKFcur);
 
-		currFrame.SetPose(pKFcur->GetPose());
+		currFrame.SetPose(cv::Mat1f(pKFcur->GetPose()));
 		lastKeyFrame_ = pKFcur;
 		CV_Assert(lastKeyFrame_->frameId == currFrame.id);
 
@@ -1399,18 +1398,10 @@ public:
 		if (success)
 		{
 			// Update motion model
-			if (!lastFrame_.pose.Tcw.empty())
-			{
-				cv::Mat LastTwc = cv::Mat::eye(4, 4, CV_32F);
-				lastFrame_.pose.GetRotationInverse().copyTo(LastTwc.rowRange(0, 3).colRange(0, 3));
-				lastFrame_.GetCameraCenter().copyTo(LastTwc.rowRange(0, 3).col(3));
-				velocity_ = currFrame.pose.Tcw * LastTwc;
-			}
-			else
-				velocity_ = cv::Mat();
-
+			velocity_ = !lastFrame_.pose.Empty() ? currFrame.pose * lastFrame_.pose.Inverse() : cv::Mat();
+			
 			if (viewer_)
-				viewer_->SetCurrentCameraPose(currFrame.pose.Tcw);
+				viewer_->SetCurrentCameraPose(currFrame.pose);
 
 			// Clean VO matches
 			for (int i = 0; i < currFrame.N; i++)
@@ -1475,7 +1466,7 @@ public:
 		// Store frame pose information to retrieve the complete camera trajectory afterwards.
 		CV_Assert(currFrame.referenceKF == localMap_.referenceKF);
 		const bool lost = state_ == STATE_LOST;
-		if (!currFrame.pose.Tcw.empty())
+		if (!currFrame.pose.Empty())
 		{
 			trajectory_.push_back(TrackPoint(currFrame, lost));
 		}
@@ -1689,7 +1680,7 @@ public:
 
 		tracker_->Update(currFrame_);
 
-		return currFrame_.pose.Tcw.clone();
+		return currFrame_.pose;
 	}
 
 	cv::Mat GrabImageRGBD(const cv::Mat& image, const cv::Mat& depth, double timestamp) override
@@ -1702,7 +1693,7 @@ public:
 
 		tracker_->Update(currFrame_);
 
-		return currFrame_.pose.Tcw.clone();
+		return currFrame_.pose;
 	}
 
 	cv::Mat GrabImageMonocular(const cv::Mat& image, double timestamp) override
@@ -1718,7 +1709,7 @@ public:
 
 		tracker_->Update(currFrame_);
 
-		return currFrame_.pose.Tcw.clone();
+		return currFrame_.pose;
 	}
 
 	void SetLocalMapper(const std::shared_ptr<LocalMapping>& localMapper) override

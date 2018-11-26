@@ -33,9 +33,6 @@
 namespace ORB_SLAM2
 {
 
-auto GetR = CameraPose::GetR;
-auto Gett = CameraPose::Gett;
-
 frameid_t KeyFrame::nextId = 0;
 
 using WeightAndKeyFrame = std::pair<int, KeyFrame*>;
@@ -64,7 +61,7 @@ KeyFrame::KeyFrame(const Frame& frame, Map* map, KeyFrameDatabase* keyframeDB) :
 	toBeErased_(false), bad_(false), halfBaseline_(frame.camera.baseline / 2), map_(map)
 {
 	id = nextId++;
-	SetPose(frame.pose.Tcw);
+	SetPose(frame.pose);
 }
 
 void KeyFrame::ComputeBoW()

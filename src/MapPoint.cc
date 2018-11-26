@@ -57,7 +57,7 @@ MapPoint::MapPoint(const cv::Mat& Xw, Map* map, Frame* frame, int idx) :
 	nfound_(1), bad_(false), replaced_(nullptr), map_(map)
 {
 	Xw.copyTo(Xw_);
-	cv::Mat Ow = frame->GetCameraCenter();
+	cv::Mat Ow = cv::Mat(frame->GetCameraCenter());
 	normal_ = Xw_ - Ow;
 	normal_ = normal_ / cv::norm(normal_);
 

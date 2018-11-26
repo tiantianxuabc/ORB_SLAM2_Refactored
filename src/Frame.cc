@@ -430,19 +430,6 @@ std::vector<size_t> FeaturesGrid::GetFeaturesInArea(float x, float y, float r, i
 	return indices;
 }
 
-void CameraPose::Update()
-{
-	Rcw = GetR(Tcw);
-	Rwc = Rcw.t();
-	tcw = Gett(Tcw);
-	Ow = -Rcw.t() * tcw;
-}
-
-cv::Mat CameraPose::GetRotationInverse() const
-{
-	return Rwc.clone();
-}
-
 Frame::Frame() {}
 
 //Copy Constructor
@@ -453,8 +440,8 @@ Frame::Frame(const Frame& frame)
 	descriptorsL(frame.descriptorsL.clone()), descriptorsR(frame.descriptorsR.clone()), mappoints(frame.mappoints),
 	outlier(frame.outlier), id(frame.id), referenceKF(frame.referenceKF), pyramid(frame.pyramid), grid(frame.grid)
 {
-	if (!frame.pose.Tcw.empty())
-		SetPose(frame.pose.Tcw);
+	if (!frame.pose.Empty())
+		SetPose(frame.pose);
 }
 
 
@@ -568,15 +555,14 @@ Frame::Frame(const cv::Mat& image, double timestamp, ORBextractor* extractor, OR
 	grid.AssignFeatures(keypointsUn, imageBounds, pyramid.nlevels);
 }
 
-void Frame::SetPose(cv::Mat Tcw)
+void Frame::SetPose(const CameraPose& pose)
 {
-	pose.Tcw = Tcw.clone();
-	pose.Update();
+	this->pose = pose;
 }
 
-cv::Mat Frame::GetCameraCenter() const
+Point3D Frame::GetCameraCenter() const
 {
-	return pose.Ow.clone();
+	return pose.Invt();
 }
 
 void Frame::ComputeBoW()
@@ -608,7 +594,7 @@ cv::Mat Frame::UnprojectStereo(int i) const
 	const float Yc = (v - camera.cy) * Zc * invfy;
 
 	cv::Mat x3Dc = (cv::Mat_<float>(3, 1) << Xc, Yc, Zc);
-	return pose.Rwc * x3Dc + pose.Ow;
+	return cv::Mat(pose.InvR()) * x3Dc + cv::Mat(pose.Invt());
 }
 
 int Frame::PassedFrom(frameid_t from) const

@@ -18,7 +18,6 @@
 * along with ORB-SLAM2. If not, see <http://www.gnu.org/licenses/>.
 */
 
-
 #ifndef CAMERAPARAMETERS_H
 #define CAMERAPARAMETERS_H
 

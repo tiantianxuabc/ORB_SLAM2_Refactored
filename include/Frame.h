@@ -30,6 +30,8 @@
 #include "FrameId.h"
 #include "ORBVocabulary.h"
 #include "CameraParameters.h"
+#include "CameraPose.h"
+#include "Point.h"
 
 namespace ORB_SLAM2
 {
@@ -58,26 +60,26 @@ struct ScalePyramidInfo
 	std::vector<float> invSigmaSq;
 };
 
-struct CameraPose
-{
-	static inline cv::Mat GetR(const cv::Mat& T) { return T(cv::Range(0, 3), cv::Range(0, 3)); }
-	static inline cv::Mat Gett(const cv::Mat& T) { return T(cv::Range(0, 3), cv::Range(3, 4)); }
-
-	// Computes rotation, translation and camera center matrices from the camera pose.
-	void Update();
-
-	// Returns inverse of rotation
-	cv::Mat GetRotationInverse() const;
-
-	// Camera pose.
-	cv::Mat Tcw;
-
-	// Rotation, translation and camera center
-	cv::Mat Rcw;
-	cv::Mat tcw;
-	cv::Mat Rwc;
-	cv::Mat Ow; //==mtwc
-};
+//struct CameraPose
+//{
+//	static inline cv::Mat GetR(const cv::Mat& T) { return T(cv::Range(0, 3), cv::Range(0, 3)); }
+//	static inline cv::Mat Gett(const cv::Mat& T) { return T(cv::Range(0, 3), cv::Range(3, 4)); }
+//
+//	// Computes rotation, translation and camera center matrices from the camera pose.
+//	void Update();
+//
+//	// Returns inverse of rotation
+//	cv::Mat GetRotationInverse() const;
+//
+//	// Camera pose.
+//	cv::Mat Tcw;
+//
+//	// Rotation, translation and camera center
+//	cv::Mat Rcw;
+//	cv::Mat tcw;
+//	cv::Mat Rwc;
+//	cv::Mat Ow; //==mtwc
+//};
 
 class FeaturesGrid
 {
@@ -125,10 +127,10 @@ public:
 	void ComputeBoW();
 
 	// Set the camera pose.
-	void SetPose(cv::Mat Tcw);
+	void SetPose(const CameraPose& pose);
 
 	// Returns the camera center.
-	cv::Mat GetCameraCenter() const;
+	Point3D GetCameraCenter() const;
 
 	std::vector<size_t> GetFeaturesInArea(float x, float y, float r, int minLevel = -1, int maxLevel = -1) const;
 

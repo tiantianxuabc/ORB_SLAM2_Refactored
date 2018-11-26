@@ -19,6 +19,7 @@
 */
 
 #include "ORBmatcher.h"
+#include "CameraPose.h"
 
 #include <Thirdparty/DBoW2/DBoW2/FeatureVector.h>
 
@@ -335,10 +336,10 @@ int ORBmatcher::SearchByProjection(const KeyFrame* keyframe, const cv::Mat& Scw,
 	const float cy = keyframe->camera.cy;
 
 	// Decompose Scw
-	const cv::Mat sRcw = CameraPose::GetR(Scw);
+	const cv::Mat sRcw = GetR(Scw);
 	const float scale = static_cast<float>(sqrt(sRcw.row(0).dot(sRcw.row(0))));
 	const cv::Mat Rcw = sRcw / scale;
-	const cv::Mat tcw = CameraPose::Gett(Scw) / scale;
+	const cv::Mat tcw = Gett(Scw) / scale;
 	const cv::Mat Ow = -Rcw.t() * tcw;
 
 	// Set of MapPoints already found in the KeyFrame
@@ -825,10 +826,10 @@ int ORBmatcher::Fuse(KeyFrame* keyframe, const cv::Mat& Scw, const std::vector<M
 	const float cy = keyframe->camera.cy;
 
 	// Decompose Scw
-	const cv::Mat sRcw = CameraPose::GetR(Scw);
+	const cv::Mat sRcw = GetR(Scw);
 	const float scale = static_cast<float>(sqrt(sRcw.row(0).dot(sRcw.row(0))));
 	const cv::Mat Rcw = sRcw / scale;
-	const cv::Mat tcw = CameraPose::Gett(Scw) / scale;
+	const cv::Mat tcw = Gett(Scw) / scale;
 	const cv::Mat Ow = -Rcw.t() * tcw;
 
 	// Set of MapPoints already found in the KeyFrame
@@ -1133,11 +1134,11 @@ int ORBmatcher::SearchByProjection(Frame& currFrame, const Frame& lastFrame, flo
 {
 	int nmatches = 0;
 
-	const cv::Mat Rcw = CameraPose::GetR(currFrame.pose.Tcw);
-	const cv::Mat tcw = CameraPose::Gett(currFrame.pose.Tcw);
+	const cv::Mat Rcw = cv::Mat(currFrame.pose.R());
+	const cv::Mat tcw = cv::Mat(currFrame.pose.t());
 
-	const cv::Mat Rlw = CameraPose::GetR(lastFrame.pose.Tcw);
-	const cv::Mat tlw = CameraPose::Gett(lastFrame.pose.Tcw);
+	const cv::Mat Rlw = cv::Mat(lastFrame.pose.R());
+	const cv::Mat tlw = cv::Mat(lastFrame.pose.t());
 
 	const cv::Mat twc = -Rcw.t() * tcw;
 	const cv::Mat tlc = Rlw * twc + tlw;
@@ -1233,8 +1234,8 @@ int ORBmatcher::SearchByProjection(Frame& frame, KeyFrame* keyframe, const std::
 {
 	int nmatches = 0;
 
-	const cv::Mat Rcw = CameraPose::GetR(frame.pose.Tcw);
-	const cv::Mat tcw = CameraPose::Gett(frame.pose.Tcw);
+	const cv::Mat Rcw = cv::Mat(frame.pose.R());
+	const cv::Mat tcw = cv::Mat(frame.pose.t());
 	const cv::Mat Ow = -Rcw.t() * tcw;
 
 	const float fx = frame.camera.fx;

@@ -30,6 +30,7 @@
 
 #include "KeyFrame.h"
 #include "MapPoint.h"
+#include "CameraPose.h"
 
 namespace ORB_SLAM2
 {
@@ -160,23 +161,23 @@ static void ComputeSim3(const cv::Mat& P1, const cv::Mat& P2, Sim3& S12, Sim3& S
 
 	// Step 8.1 T12
 	sR12 = S12.scale * S12.R;
-	sR12.copyTo(CameraPose::GetR(S12.T));
-	S12.t.copyTo(CameraPose::Gett(S12.T));
+	sR12.copyTo(GetR(S12.T));
+	S12.t.copyTo(Gett(S12.T));
 
 	// Step 8.2 T21
 	S21.R = S12.R.t();
 	S21.scale = 1.f / S12.scale;
 	sR21 = S21.scale * S21.R;
 	S21.t = -sR21 * S12.t;
-	sR21.copyTo(CameraPose::GetR(S21.T));
-	S21.t.copyTo(CameraPose::Gett(S21.T));
+	sR21.copyTo(GetR(S21.T));
+	S21.t.copyTo(Gett(S21.T));
 }
 
 static void Project(const std::vector<cv::Mat>& points3D, std::vector<cv::Mat>& points2D, const cv::Mat& Tcw,
 	const CameraParams& camera)
 {
-	cv::Mat Rcw = CameraPose::GetR(Tcw);
-	cv::Mat tcw = CameraPose::Gett(Tcw);
+	cv::Mat Rcw = GetR(Tcw);
+	cv::Mat tcw = Gett(Tcw);
 
 	const float fx = camera.fx;
 	const float fy = camera.fy;

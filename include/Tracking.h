@@ -42,7 +42,7 @@ class KeyFrame;
 
 struct TrackPoint
 {
-	cv::Mat Tcr;
+	CameraPose Tcr;
 	const KeyFrame* referenceKF;
 	double timestamp;
 	bool lost;
