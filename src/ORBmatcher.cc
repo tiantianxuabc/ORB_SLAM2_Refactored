@@ -338,9 +338,13 @@ int ORBmatcher::SearchByProjection(const KeyFrame* keyframe, const cv::Mat& Scw,
 	// Decompose Scw
 	const cv::Mat sRcw = GetR(Scw);
 	const float scale = static_cast<float>(sqrt(sRcw.row(0).dot(sRcw.row(0))));
-	const cv::Mat Rcw = sRcw / scale;
-	const cv::Mat tcw = Gett(Scw) / scale;
-	const cv::Mat Ow = -Rcw.t() * tcw;
+	const cv::Mat _Rcw = sRcw / scale;
+	const cv::Mat _tcw = Gett(Scw) / scale;
+	const cv::Mat _Ow = -_Rcw.t() * _tcw;
+
+	const CameraPose::Mat33 Rcw(_Rcw);
+	const CameraPose::Mat31 tcw(_tcw);
+	const Vec3D Ow(_Ow);
 
 	// Set of MapPoints already found in the KeyFrame
 	std::set<MapPoint*> alreadyFound(std::begin(matched), std::end(matched));
@@ -356,19 +360,19 @@ int ORBmatcher::SearchByProjection(const KeyFrame* keyframe, const cv::Mat& Scw,
 			continue;
 
 		// Get 3D Coords.
-		const cv::Mat Xw = mappoint->GetWorldPos();
+		const Point3D Xw = mappoint->GetWorldPos();
 
 		// Transform into Camera Coords.
-		const cv::Mat Xc = Rcw * Xw + tcw;
+		const Point3D Xc = Rcw * Xw + tcw;
 
 		// Depth must be positive
-		if (Xc.at<float>(2) < 0.f)
+		if (Xc(2) < 0.f)
 			continue;
 
 		// Project into Image
-		const float invZ = 1 / Xc.at<float>(2);
-		const float u = fx * Xc.at<float>(0) * invZ + cx;
-		const float v = fy * Xc.at<float>(1) * invZ + cy;
+		const float invZ = 1 / Xc(2);
+		const float u = fx * Xc(0) * invZ + cx;
+		const float v = fy * Xc(1) * invZ + cy;
 
 		// Point must be inside the image
 		if (!keyframe->IsInImage(u, v))
@@ -377,13 +381,13 @@ int ORBmatcher::SearchByProjection(const KeyFrame* keyframe, const cv::Mat& Scw,
 		// Depth must be inside the scale invariance region of the point
 		const float maxDistance = mappoint->GetMaxDistanceInvariance();
 		const float minDistance = mappoint->GetMinDistanceInvariance();
-		cv::Mat PO = Xw - Ow;
+		const Vec3D PO = Xw - Ow;
 		const float dist = static_cast<float>(cv::norm(PO));
 		if (dist < minDistance || dist > maxDistance)
 			continue;
 
 		// Viewing angle must be less than 60 deg
-		cv::Mat Pn = mappoint->GetNormal();
+		const Vec3D Pn = mappoint->GetNormal();
 		if (PO.dot(Pn) < 0.5 * dist)
 			continue;
 
@@ -587,13 +591,13 @@ int ORBmatcher::SearchForTriangulation(const KeyFrame* keyframe1, const KeyFrame
 	std::vector<std::pair<size_t, size_t>>& matchIds, bool onlyStereo)
 {
 	//Compute epipole in second image
-	const cv::Mat Cw = keyframe1->GetCameraCenter();
-	const cv::Mat R2w = cv::Mat(keyframe2->GetPose().R());
-	const cv::Mat t2w = cv::Mat(keyframe2->GetPose().t());
-	const cv::Mat C2 = R2w * Cw + t2w;
-	const float invZ = 1.f / C2.at<float>(2);
-	const float epx = keyframe2->camera.fx * C2.at<float>(0) * invZ + keyframe2->camera.cx;
-	const float epy = keyframe2->camera.fy * C2.at<float>(1) * invZ + keyframe2->camera.cy;
+	const Point3D Cw = keyframe1->GetCameraCenter();
+	const auto R2w = keyframe2->GetPose().R();
+	const auto t2w = keyframe2->GetPose().t();
+	const Point3D C2 = R2w * Cw + t2w;
+	const float invZ = 1.f / C2(2);
+	const float epx = keyframe2->camera.fx * C2(0) * invZ + keyframe2->camera.cx;
+	const float epy = keyframe2->camera.fy * C2(1) * invZ + keyframe2->camera.cy;
 
 	// Find matches between not tracked keypoints
 	// Matching speed-up by ORB Vocabulary
@@ -691,8 +695,8 @@ int ORBmatcher::SearchForTriangulation(const KeyFrame* keyframe1, const KeyFrame
 
 int ORBmatcher::Fuse(KeyFrame* keyframe, const std::vector<MapPoint*>& mappoints, float th)
 {
-	cv::Mat Rcw = cv::Mat(keyframe->GetPose().R());
-	cv::Mat tcw = cv::Mat(keyframe->GetPose().t());
+	const auto Rcw = keyframe->GetPose().R();
+	const auto tcw = keyframe->GetPose().t();
 
 	const float fx = keyframe->camera.fx;
 	const float fy = keyframe->camera.fy;
@@ -700,7 +704,7 @@ int ORBmatcher::Fuse(KeyFrame* keyframe, const std::vector<MapPoint*>& mappoints
 	const float cy = keyframe->camera.cy;
 	const float bf = keyframe->camera.bf;
 
-	const cv::Mat Ow = keyframe->GetCameraCenter();
+	const Vec3D Ow = keyframe->GetCameraCenter();
 	int nfused = 0;
 
 	for (MapPoint* mappoint : mappoints)
@@ -708,16 +712,16 @@ int ORBmatcher::Fuse(KeyFrame* keyframe, const std::vector<MapPoint*>& mappoints
 		if (!mappoint || mappoint->isBad() || mappoint->IsInKeyFrame(keyframe))
 			continue;
 
-		const cv::Mat Xw = mappoint->GetWorldPos();
-		const cv::Mat Xc = Rcw * Xw + tcw;
+		const Point3D Xw = mappoint->GetWorldPos();
+		const Point3D Xc = Rcw * Xw + tcw;
 
 		// Depth must be positive
-		if (Xc.at<float>(2) < 0.f)
+		if (Xc(2) < 0.f)
 			continue;
 
-		const float invZ = 1 / Xc.at<float>(2);
-		const float u = fx * Xc.at<float>(0) * invZ + cx;
-		const float v = fy * Xc.at<float>(1) * invZ + cy;
+		const float invZ = 1 / Xc(2);
+		const float u = fx * Xc(0) * invZ + cx;
+		const float v = fy * Xc(1) * invZ + cy;
 
 		// Point must be inside the image
 		if (!keyframe->IsInImage(u, v))
@@ -727,7 +731,7 @@ int ORBmatcher::Fuse(KeyFrame* keyframe, const std::vector<MapPoint*>& mappoints
 
 		const float maxDistance = mappoint->GetMaxDistanceInvariance();
 		const float minDistance = mappoint->GetMinDistanceInvariance();
-		const cv::Mat PO = Xw - Ow;
+		const Vec3D PO = Xw - Ow;
 		const float dist3D = static_cast<float>(cv::norm(PO));
 
 		// Depth must be inside the scale pyramid of the image
@@ -735,7 +739,7 @@ int ORBmatcher::Fuse(KeyFrame* keyframe, const std::vector<MapPoint*>& mappoints
 			continue;
 
 		// Viewing angle must be less than 60 deg
-		const cv::Mat Pn = mappoint->GetNormal();
+		const Vec3D Pn = mappoint->GetNormal();
 		if (PO.dot(Pn) < 0.5 * dist3D)
 			continue;
 
@@ -828,9 +832,13 @@ int ORBmatcher::Fuse(KeyFrame* keyframe, const cv::Mat& Scw, const std::vector<M
 	// Decompose Scw
 	const cv::Mat sRcw = GetR(Scw);
 	const float scale = static_cast<float>(sqrt(sRcw.row(0).dot(sRcw.row(0))));
-	const cv::Mat Rcw = sRcw / scale;
-	const cv::Mat tcw = Gett(Scw) / scale;
-	const cv::Mat Ow = -Rcw.t() * tcw;
+	const cv::Mat _Rcw = sRcw / scale;
+	const cv::Mat _tcw = Gett(Scw) / scale;
+	const cv::Mat _Ow = -_Rcw.t() * _tcw;
+
+	const CameraPose::Mat33 Rcw(_Rcw);
+	const CameraPose::Mat31 tcw(_tcw);
+	const Vec3D Ow(_Ow);
 
 	// Set of MapPoints already found in the KeyFrame
 	const std::set<MapPoint*> alreadyFound = keyframe->GetMapPoints();
@@ -847,19 +855,19 @@ int ORBmatcher::Fuse(KeyFrame* keyframe, const cv::Mat& Scw, const std::vector<M
 			continue;
 
 		// Get 3D Coords.
-		const cv::Mat Xw = mappoint->GetWorldPos();
+		const Point3D Xw = mappoint->GetWorldPos();
 
 		// Transform into Camera Coords.
-		const cv::Mat Xc = Rcw * Xw + tcw;
+		const Point3D Xc = Rcw * Xw + tcw;
 
 		// Depth must be positive
-		if (Xc.at<float>(2) < 0.f)
+		if (Xc(2) < 0.f)
 			continue;
 
 		// Project into Image
-		const float invZ = 1.f / Xc.at<float>(2);
-		const float u = fx * Xc.at<float>(0) * invZ + cx;
-		const float v = fy * Xc.at<float>(1) * invZ + cy;
+		const float invZ = 1.f / Xc(2);
+		const float u = fx * Xc(0) * invZ + cx;
+		const float v = fy * Xc(1) * invZ + cy;
 
 		// Point must be inside the image
 		if (!keyframe->IsInImage(u, v))
@@ -868,14 +876,14 @@ int ORBmatcher::Fuse(KeyFrame* keyframe, const cv::Mat& Scw, const std::vector<M
 		// Depth must be inside the scale pyramid of the image
 		const float maxDistance = mappoint->GetMaxDistanceInvariance();
 		const float minDistance = mappoint->GetMinDistanceInvariance();
-		const cv::Mat PO = Xw - Ow;
+		const Vec3D PO = Xw - Ow;
 		const float dist3D = static_cast<float>(cv::norm(PO));
 
 		if (dist3D < minDistance || dist3D > maxDistance)
 			continue;
 
 		// Viewing angle must be less than 60 deg
-		const cv::Mat Pn = mappoint->GetNormal();
+		const Vec3D Pn = mappoint->GetNormal();
 		if (PO.dot(Pn) < 0.5 * dist3D)
 			continue;
 
@@ -932,7 +940,7 @@ int ORBmatcher::Fuse(KeyFrame* keyframe, const cv::Mat& Scw, const std::vector<M
 }
 
 int ORBmatcher::SearchBySim3(KeyFrame* keyframe1, KeyFrame* keyframe2, std::vector<MapPoint*>& matches12,
-	float s12, const cv::Mat &R12, const cv::Mat &t12, float th)
+	float s12, const cv::Mat &R12, const cv::Mat &_t12, float th)
 {
 	const float fx = keyframe1->camera.fx;
 	const float fy = keyframe1->camera.fy;
@@ -940,17 +948,22 @@ int ORBmatcher::SearchBySim3(KeyFrame* keyframe1, KeyFrame* keyframe2, std::vect
 	const float cy = keyframe1->camera.cy;
 
 	// Camera 1 from world
-	const cv::Mat R1w = cv::Mat(keyframe1->GetPose().R());
-	const cv::Mat t1w = cv::Mat(keyframe1->GetPose().t());
+	const auto R1w = keyframe1->GetPose().R();
+	const auto t1w = keyframe1->GetPose().t();
 
 	//Camera 2 from world
-	const cv::Mat R2w = cv::Mat(keyframe2->GetPose().R());
-	const cv::Mat t2w = cv::Mat(keyframe2->GetPose().t());
+	const auto R2w = keyframe2->GetPose().R();
+	const auto t2w = keyframe2->GetPose().t();
 
 	//Transformation between cameras
-	cv::Mat sR12 = s12 * R12;
-	cv::Mat sR21 = (1.0 / s12) * R12.t();
-	cv::Mat t21 = -sR21 * t12;
+	cv::Mat _sR12 = s12 * R12;
+	cv::Mat _sR21 = (1.0 / s12) * R12.t();
+	cv::Mat _t21 = -_sR21 * _t12;
+
+	const CameraPose::Mat33 sR12(_sR12);
+	const CameraPose::Mat33 sR21(_sR21);
+	const CameraPose::Mat31 t12(_t12);
+	const CameraPose::Mat31 t21(_t21);
 
 	const std::vector<MapPoint*> mappoints1 = keyframe1->GetMapPointMatches();
 	const std::vector<MapPoint*> mappoints2 = keyframe2->GetMapPointMatches();
@@ -983,17 +996,17 @@ int ORBmatcher::SearchBySim3(KeyFrame* keyframe1, KeyFrame* keyframe2, std::vect
 		if (!mappoint1 || alreadyMatched1[i1] || mappoint1->isBad())
 			continue;
 
-		const cv::Mat Xw1 = mappoint1->GetWorldPos();
-		const cv::Mat Xc1 = R1w * Xw1 + t1w;
-		const cv::Mat Xc2 = sR21 * Xc1 + t21;
+		const Point3D Xw1 = mappoint1->GetWorldPos();
+		const Point3D Xc1 = R1w * Xw1 + t1w;
+		const Point3D Xc2 = sR21 * Xc1 + t21;
 
 		// Depth must be positive
-		if (Xc2.at<float>(2) < 0.f)
+		if (Xc2(2) < 0.f)
 			continue;
 
-		const float invZ = 1.f / Xc2.at<float>(2);
-		const float u = fx * Xc2.at<float>(0) * invZ + cx;
-		const float v = fy * Xc2.at<float>(1) * invZ + cy;
+		const float invZ = 1.f / Xc2(2);
+		const float u = fx * Xc2(0) * invZ + cx;
+		const float v = fy * Xc2(1) * invZ + cy;
 
 		// Point must be inside the image
 		if (!keyframe2->IsInImage(u, v))
@@ -1051,17 +1064,17 @@ int ORBmatcher::SearchBySim3(KeyFrame* keyframe1, KeyFrame* keyframe2, std::vect
 		if (!mappoint2 || alreadyMatched2[i2] || mappoint2->isBad())
 			continue;
 
-		const cv::Mat Xw2 = mappoint2->GetWorldPos();
-		const cv::Mat Xc2 = R2w * Xw2 + t2w;
-		const cv::Mat Xc1 = sR12 * Xc2 + t12;
+		const Point3D Xw2 = mappoint2->GetWorldPos();
+		const Point3D Xc2 = R2w * Xw2 + t2w;
+		const Point3D Xc1 = sR12 * Xc2 + t12;
 
 		// Depth must be positive
-		if (Xc1.at<float>(2) < 0.f)
+		if (Xc1(2) < 0.f)
 			continue;
 
-		const float invZ = 1.f / Xc1.at<float>(2);
-		const float u = fx * Xc1.at<float>(0) * invZ + cx;
-		const float v = fy * Xc1.at<float>(1) * invZ + cy;
+		const float invZ = 1.f / Xc1(2);
+		const float u = fx * Xc1(0) * invZ + cx;
+		const float v = fy * Xc1(1) * invZ + cy;
 
 		// Point must be inside the image
 		if (!keyframe1->IsInImage(u, v))
@@ -1134,19 +1147,19 @@ int ORBmatcher::SearchByProjection(Frame& currFrame, const Frame& lastFrame, flo
 {
 	int nmatches = 0;
 
-	const cv::Mat Rcw = cv::Mat(currFrame.pose.R());
-	const cv::Mat tcw = cv::Mat(currFrame.pose.t());
+	const auto Rcw = currFrame.pose.R();
+	const auto tcw = currFrame.pose.t();
 
-	const cv::Mat Rlw = cv::Mat(lastFrame.pose.R());
-	const cv::Mat tlw = cv::Mat(lastFrame.pose.t());
+	const auto Rlw = lastFrame.pose.R();
+	const auto tlw = lastFrame.pose.t();
 
-	const cv::Mat twc = -Rcw.t() * tcw;
-	const cv::Mat tlc = Rlw * twc + tlw;
+	const auto twc = -Rcw.t() * tcw;
+	const auto tlc = Rlw * twc + tlw;
 
 	const CameraParams& camera = currFrame.camera;
 
-	const bool forward = tlc.at<float>(2) > camera.baseline && !monocular;
-	const bool backward = -tlc.at<float>(2) > camera.baseline && !monocular;
+	const bool forward = tlc(2) > camera.baseline && !monocular;
+	const bool backward = -tlc(2) > camera.baseline && !monocular;
 
 	std::vector<MatchIdx> matchIds;
 	matchIds.reserve(lastFrame.N);
@@ -1158,12 +1171,12 @@ int ORBmatcher::SearchByProjection(Frame& currFrame, const Frame& lastFrame, flo
 			continue;
 
 		// Project
-		cv::Mat x3Dw = mappoint1->GetWorldPos();
-		cv::Mat x3Dc = Rcw * x3Dw + tcw;
+		const Point3D x3Dw = mappoint1->GetWorldPos();
+		const Point3D x3Dc = Rcw * x3Dw + tcw;
 
-		const float xc = x3Dc.at<float>(0);
-		const float yc = x3Dc.at<float>(1);
-		const float invZc = 1.f / x3Dc.at<float>(2);
+		const float xc = x3Dc(0);
+		const float yc = x3Dc(1);
+		const float invZc = 1.f / x3Dc(2);
 
 		if (invZc < 0)
 			continue;
@@ -1234,9 +1247,9 @@ int ORBmatcher::SearchByProjection(Frame& frame, KeyFrame* keyframe, const std::
 {
 	int nmatches = 0;
 
-	const cv::Mat Rcw = cv::Mat(frame.pose.R());
-	const cv::Mat tcw = cv::Mat(frame.pose.t());
-	const cv::Mat Ow = -Rcw.t() * tcw;
+	const auto Rcw = frame.pose.R();
+	const auto tcw = frame.pose.t();
+	const auto Ow = -Rcw.t() * tcw;
 
 	const float fx = frame.camera.fx;
 	const float fy = frame.camera.fy;
@@ -1261,18 +1274,18 @@ int ORBmatcher::SearchByProjection(Frame& frame, KeyFrame* keyframe, const std::
 			continue;
 
 		//Project
-		const cv::Mat Xw = mappoint->GetWorldPos();
-		const cv::Mat Xc = Rcw * Xw + tcw;
+		const Point3D Xw = mappoint->GetWorldPos();
+		const Point3D Xc = Rcw * Xw + tcw;
 
-		const float invZc = 1.f / Xc.at<float>(2);
-		const float u = fx * Xc.at<float>(0) * invZc + cx;
-		const float v = fy * Xc.at<float>(1) * invZc + cy;
+		const float invZc = 1.f / Xc(2);
+		const float u = fx * Xc(0) * invZc + cx;
+		const float v = fy * Xc(1) * invZc + cy;
 
 		if (!frame.imageBounds.Contains(u, v))
 			continue;
 
 		// Compute predicted scale level
-		const cv::Mat PO = Xw - Ow;
+		const Vec3D PO = Xw - Ow;
 		const float dist3D = static_cast<float>(cv::norm(PO));
 
 		const float maxDistance = mappoint->GetMaxDistanceInvariance();

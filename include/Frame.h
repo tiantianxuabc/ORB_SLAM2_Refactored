@@ -135,7 +135,7 @@ public:
 	std::vector<size_t> GetFeaturesInArea(float x, float y, float r, int minLevel = -1, int maxLevel = -1) const;
 
 	// Backprojects a keypoint (if stereo/depth info available) into 3D world coordinates.
-	cv::Mat UnprojectStereo(int i) const;
+	Point3D UnprojectStereo(int i) const;
 
 	int PassedFrom(frameid_t from) const;
 

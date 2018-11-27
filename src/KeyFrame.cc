@@ -89,10 +89,10 @@ CameraPose KeyFrame::GetPose() const
 	return pose_;
 }
 
-cv::Mat KeyFrame::GetCameraCenter() const
+Point3D KeyFrame::GetCameraCenter() const
 {
 	LOCK_MUTEX_POSE();
-	return cv::Mat(pose_.Invt());
+	return pose_.Invt();
 }
 
 //cv::Mat KeyFrame::GetPoseInverse() const
@@ -528,7 +528,7 @@ bool KeyFrame::IsInImage(float x, float y) const
 	return imageBounds.Contains(x, y);
 }
 
-cv::Mat KeyFrame::UnprojectStereo(int i) const
+Point3D KeyFrame::UnprojectStereo(int i) const
 {
 	const float Zc = depth[i];
 	if (Zc <= 0.f)
@@ -543,35 +543,38 @@ cv::Mat KeyFrame::UnprojectStereo(int i) const
 	const float Xc = (u - camera.cx) * Zc * invfx;
 	const float Yc = (v - camera.cy) * Zc * invfy;
 
-	cv::Mat x3Dc = (cv::Mat_<float>(3, 1) << Xc, Yc, Zc);
+	Point3D x3Dc(Xc, Yc, Zc);
 
 	LOCK_MUTEX_POSE();
-	return cv::Mat(pose_.InvR()) * x3Dc + cv::Mat(pose_.Invt());
+	return pose_.InvR() * x3Dc + pose_.Invt();
 }
 
 float KeyFrame::ComputeSceneMedianDepth(int q) const
 {
 	std::vector<MapPoint*> mappoints;
-	cv::Mat Tcw_;
+	CameraPose Tcw_;
 	{
 		LOCK_MUTEX_FEATURES();
 		LOCK_MUTEX_POSE();
 		mappoints = mappoints_;
-		Tcw_ = pose_.Mat();
+		Tcw_ = pose_;
 	}
 
 	std::vector<float> depths;
 	depths.reserve(N);
 
-	cv::Mat Rcw2 = Tcw_.row(2).colRange(0, 3);
-	Rcw2 = Rcw2.t();
+	// cv::Mat Rcw2 = Tcw_.row(2).colRange(0, 3);
+	// Rcw2 = Rcw2.t();
+	// const float zcw = Tcw_.at<float>(2, 3);
 
-	const float zcw = Tcw_.at<float>(2, 3);
+	const auto Rcw2 = Tcw_.R().row(2).t();
+	const float zcw = Tcw_.t()(2);
+
 	for (MapPoint* mappoint : mappoints)
 	{
 		if (mappoint)
 		{
-			const cv::Mat x3Dw = mappoint->GetWorldPos();
+			const Point3D x3Dw = mappoint->GetWorldPos();
 			const float Z = Rcw2.dot(x3Dw) + zcw;
 			depths.push_back(Z);
 		}

@@ -30,6 +30,12 @@ using Point2D = cv::Point2f;
 using Point3D = cv::Matx31f;
 using Vec3D = cv::Matx31f;
 
+static Vec3D Normalized(const Vec3D& v)
+{
+	const double invn = 1. / cv::norm(v);
+	return invn * v;
+}
+
 } // namespace ORB_SLAM2
 
 #endif // !POINT_H

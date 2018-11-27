@@ -441,14 +441,14 @@ public:
 							continue;
 
 						// Map to non-corrected camera
-						cv::Mat Rcw = cv::Mat(referenceKF->TcwBefGBA.R());
-						cv::Mat tcw = cv::Mat(referenceKF->TcwBefGBA.t());
-						cv::Mat Xc = Rcw * mappoint->GetWorldPos() + tcw;
+						const auto Rcw = referenceKF->TcwBefGBA.R();
+						const auto tcw = referenceKF->TcwBefGBA.t();
+						const Point3D Xc = Rcw * mappoint->GetWorldPos() + tcw;
 
 						// Backproject using corrected camera
-						cv::Mat Twc = referenceKF->GetPose().Inverse().Mat();
-						cv::Mat Rwc = Twc.rowRange(0, 3).colRange(0, 3);
-						cv::Mat twc = Twc.rowRange(0, 3).col(3);
+						const auto Twc = referenceKF->GetPose().Inverse();
+						const auto Rwc = Twc.R();
+						const auto twc = Twc.t();
 
 						mappoint->SetWorldPos(Rwc * Xc + twc);
 					}
@@ -604,7 +604,7 @@ public:
 						continue;
 					
 					// Project with non-corrected pose and project back with corrected pose
-					cv::Mat P3Dw = mappiont->GetWorldPos();
+					cv::Mat P3Dw = cv::Mat(mappiont->GetWorldPos());
 					Eigen::Matrix<double, 3, 1> eigP3Dw = Converter::toVector3d(P3Dw);
 					Eigen::Matrix<double, 3, 1> eigCorrectedP3Dw = g2oCorrectedSwi.map(g2oSiw.map(eigP3Dw));
 

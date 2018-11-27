@@ -48,7 +48,7 @@ public:
 	// Pose functions
 	void SetPose(const CameraPose& pose);
 	CameraPose GetPose() const;
-	cv::Mat GetCameraCenter() const;
+	Point3D GetCameraCenter() const;
 
 	/*cv::Mat GetPoseInverse() const;
 	cv::Mat GetStereoCenter() const;
@@ -93,7 +93,7 @@ public:
 
 	// KeyPoint functions
 	std::vector<size_t> GetFeaturesInArea(float x, float y, float r) const;
-	cv::Mat UnprojectStereo(int i) const;
+	Point3D UnprojectStereo(int i) const;
 
 	// Image
 	bool IsInImage(float x, float y) const;

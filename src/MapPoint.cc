@@ -36,32 +36,33 @@ namespace ORB_SLAM2
 MapPoint::mappointid_t MapPoint::nextId = 0;
 std::mutex MapPoint::globalMutex_;
 
-MapPoint::MapPoint(const cv::Mat& Xw, KeyFrame* referenceKF, Map* map) :
+MapPoint::MapPoint(const Point3D& Xw, KeyFrame* referenceKF, Map* map) :
 	firstKFid(referenceKF->id), firstFrame(referenceKF->frameId), nobservations_(0), trackReferenceForFrame(0),
 	lastFrameSeen(0), BALocalForKF(0), fuseCandidateForKF(0), loopPointForKF(0), correctedByKF(0),
 	correctedReference(0), BAGlobalForKF(0), referenceKF_(referenceKF), nvisible_(1), nfound_(1), bad_(false),
 	replaced_(nullptr), minDistance_(0), maxDistance_(0), map_(map)
 {
-	Xw.copyTo(Xw_);
-	normal_ = cv::Mat::zeros(3, 1, CV_32F);
-
+	Xw_ = Xw;
+	normal_ = Vec3D::zeros();
+	
 	// MapPoints can be created from Tracking and Local Mapping. This mutex avoid conflicts with id.
 	LOCK_MUTEX_POINT_CREATION();
 	id = nextId++;
 }
 
-MapPoint::MapPoint(const cv::Mat& Xw, Map* map, Frame* frame, int idx) :
+MapPoint::MapPoint(const Point3D& Xw, Map* map, Frame* frame, int idx) :
 	firstKFid(-1), firstFrame(frame->id), nobservations_(0), trackReferenceForFrame(0), lastFrameSeen(0),
 	BALocalForKF(0), fuseCandidateForKF(0), loopPointForKF(0), correctedByKF(0),
 	correctedReference(0), BAGlobalForKF(0), referenceKF_(nullptr), nvisible_(1),
 	nfound_(1), bad_(false), replaced_(nullptr), map_(map)
 {
-	Xw.copyTo(Xw_);
-	cv::Mat Ow = cv::Mat(frame->GetCameraCenter());
-	normal_ = Xw_ - Ow;
-	normal_ = normal_ / cv::norm(normal_);
 
-	const float dist = static_cast<float>(cv::norm(Xw - Ow));
+	const auto Ow = frame->GetCameraCenter();
+	Xw_ = Xw;
+	normal_ = Normalized(Xw_ - Ow);
+	
+	const Vec3D PC = Xw - Ow;
+	const float dist = static_cast<float>(cv::norm(PC));
 	const int level = frame->keypointsUn[idx].octave;
 	const float scaleFactor = frame->pyramid.scaleFactors[level];
 	
@@ -75,23 +76,23 @@ MapPoint::MapPoint(const cv::Mat& Xw, Map* map, Frame* frame, int idx) :
 	id = nextId++;
 }
 
-void MapPoint::SetWorldPos(const cv::Mat& Xw)
+void MapPoint::SetWorldPos(const Point3D& Xw)
 {
 	LOCK_MUTEX_GLOBAL();
 	LOCK_MUTEX_POSITION();
-	Xw.copyTo(Xw_);
+	Xw_ = Xw;
 }
 
-cv::Mat MapPoint::GetWorldPos() const
+Point3D MapPoint::GetWorldPos() const
 {
 	LOCK_MUTEX_POSITION();
-	return Xw_.clone();
+	return Xw_;
 }
 
-cv::Mat MapPoint::GetNormal() const
+Vec3D MapPoint::GetNormal() const
 {
 	LOCK_MUTEX_POSITION();
-	return normal_.clone();
+	return normal_;
 }
 
 KeyFrame* MapPoint::GetReferenceKeyFrame() const
@@ -337,7 +338,7 @@ void MapPoint::UpdateNormalAndDepth()
 {
 	std::map<KeyFrame*, size_t> observations;
 	KeyFrame* referenceKF;
-	cv::Mat Xw;
+	Point3D Xw;
 	{
 		LOCK_MUTEX_FEATURES();
 		LOCK_MUTEX_POSITION();
@@ -345,23 +346,23 @@ void MapPoint::UpdateNormalAndDepth()
 			return;
 		observations = observations_;
 		referenceKF = referenceKF_;
-		Xw = Xw_.clone();
+		Xw = Xw_;
 	}
 
 	if (observations.empty())
 		return;
 
-	cv::Mat normal = cv::Mat::zeros(3, 1, CV_32F);
+	Vec3D normal = Vec3D::zeros();
 	int n = 0;
 	for (const auto& observation : observations)
 	{
 		KeyFrame* keyframe = observation.first;
-		cv::Mat normali = Xw_ - keyframe->GetCameraCenter();
-		normal = normal + normali / cv::norm(normali);
+		const auto Ow = keyframe->GetCameraCenter();
+		normal += Normalized(Xw - Ow);
 		n++;
 	}
 
-	cv::Mat PC = Xw - referenceKF->GetCameraCenter();
+	const Vec3D PC = Xw - referenceKF->GetCameraCenter();
 	const float dist = static_cast<float>(cv::norm(PC));
 	const int octave = referenceKF->keypointsUn[observations[referenceKF]].octave;
 	const float scaleFactor = referenceKF->pyramid.scaleFactors[octave];
@@ -370,7 +371,7 @@ void MapPoint::UpdateNormalAndDepth()
 		LOCK_MUTEX_POSITION();
 		maxDistance_ = scaleFactor * dist;
 		minDistance_ = maxDistance_ / referenceKF->pyramid.scaleFactors.back();
-		normal_ = normal / n;
+		normal_ = (1. / n) * normal;
 	}
 }
 

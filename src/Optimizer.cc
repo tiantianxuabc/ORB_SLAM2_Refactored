@@ -124,7 +124,7 @@ static void SetCalibration(EDGE* e, const CameraParams& camera, float bf)
 }
 
 template <class EDGE>
-static void SetXw(EDGE* e, const cv::Mat1f& Xw)
+static void SetXw(EDGE* e, const Point3D& Xw)
 {
 	e->Xw[0] = Xw(0);
 	e->Xw[1] = Xw(1);
@@ -159,6 +159,16 @@ static g2o::SE3Quat ToSE3Quat(const CameraPose& pose)
 	const auto R = ConvertRotation<Eigen::Matrix3d>(pose.R());
 	const auto t = ConvertTranslation<Eigen::Vector3d>(pose.t());
 	return g2o::SE3Quat(R, t);
+}
+
+static Eigen::Vector3d ToVector3d(const Point3D& v)
+{
+	return Eigen::Vector3d(v(0), v(1), v(2));
+}
+
+static Point3D FromVector3d(const Eigen::Vector3d& v)
+{
+	return Point3D(v(0), v(1), v(2));
 }
 
 void Optimizer::GlobalBundleAdjustemnt(Map* map, int niterations, bool* stopFlag, frameid_t loopKFId, bool robust)
@@ -199,7 +209,7 @@ void Optimizer::BundleAdjustment(const std::vector<KeyFrame*>& keyframes, const 
 			continue;
 
 		const int id = mappoint->id + maxKFId + 1;
-		auto vertex = CreateVertexSBA(Converter::toVector3d(mappoint->GetWorldPos()), id, false, true);
+		auto vertex = CreateVertexSBA(ToVector3d(mappoint->GetWorldPos()), id, false, true);
 		optimizer.addVertex(vertex);
 
 		int nedges = 0;
@@ -298,13 +308,12 @@ void Optimizer::BundleAdjustment(const std::vector<KeyFrame*>& keyframes, const 
 
 		if (loopKFId == 0)
 		{
-			mappoint->SetWorldPos(Converter::toCvMat(vertex->estimate()));
+			mappoint->SetWorldPos(FromVector3d(vertex->estimate()));
 			mappoint->UpdateNormalAndDepth();
 		}
 		else
 		{
-			mappoint->posGBA.create(3, 1, CV_32F);
-			Converter::toCvMat(vertex->estimate()).copyTo(mappoint->posGBA);
+			mappoint->posGBA = FromVector3d(vertex->estimate());
 			mappoint->BAGlobalForKF = loopKFId;
 		}
 	}
@@ -519,7 +528,7 @@ void Optimizer::LocalBundleAdjustment(KeyFrame* currKeyFrame, bool* stopFlag, Ma
 	for (MapPoint* mappoint : localMPs)
 	{
 		const int id = mappoint->id + maxKFId + 1;
-		auto vertex = CreateVertexSBA(Converter::toVector3d(mappoint->GetWorldPos()), id, false, true);
+		auto vertex = CreateVertexSBA(ToVector3d(mappoint->GetWorldPos()), id, false, true);
 		optimizer.addVertex(vertex);
 
 		//Set edges
@@ -720,7 +729,7 @@ void Optimizer::OptimizeEssentialGraph(Map* map, KeyFrame* loopKF, KeyFrame* cur
 		else
 		{
 			Eigen::Matrix3d Rcw = Converter::toMatrix3d(cv::Mat(keyframe->GetPose().R()));
-			Eigen::Vector3d tcw = Converter::toVector3d(cv::Mat(keyframe->GetPose().t()));
+			Eigen::Vector3d tcw = ToVector3d(cv::Mat(keyframe->GetPose().t()));
 			g2o::Sim3 Siw(Rcw, tcw, 1.0);
 			nonCorrectedScw[id] = Siw;
 			vertex->setEstimate(Siw);
@@ -882,8 +891,8 @@ void Optimizer::OptimizeEssentialGraph(Map* map, KeyFrame* loopKF, KeyFrame* cur
 		g2o::Sim3 Srw = nonCorrectedScw[id];
 		g2o::Sim3 correctedSwr = correctedSwc[id];
 
-		cv::Mat P3Dw = mappoint->GetWorldPos();
-		Eigen::Matrix<double, 3, 1> eigP3Dw = Converter::toVector3d(P3Dw);
+		const Point3D P3Dw = mappoint->GetWorldPos();
+		Eigen::Matrix<double, 3, 1> eigP3Dw = ToVector3d(P3Dw);
 		Eigen::Matrix<double, 3, 1> eigCorrectedP3Dw = correctedSwr.map(Srw.map(eigP3Dw));
 
 		cv::Mat cvCorrectedP3Dw = Converter::toCvMat(eigCorrectedP3Dw);
@@ -904,10 +913,10 @@ int Optimizer::OptimizeSim3(KeyFrame* keyframe1, KeyFrame* keyframe2, std::vecto
 	const CameraParams& camera2 = keyframe2->camera;
 
 	// Camera poses
-	const cv::Mat R1w = cv::Mat(keyframe1->GetPose().R());
-	const cv::Mat t1w = cv::Mat(keyframe1->GetPose().t());
-	const cv::Mat R2w = cv::Mat(keyframe2->GetPose().R());
-	const cv::Mat t2w = cv::Mat(keyframe2->GetPose().t());
+	const auto R1w = keyframe1->GetPose().R();
+	const auto t1w = keyframe1->GetPose().t();
+	const auto R2w = keyframe2->GetPose().R();
+	const auto t2w = keyframe2->GetPose().t();
 
 	// Set Sim3 vertex
 	g2o::VertexSim3Expmap * vertex = new g2o::VertexSim3Expmap();
@@ -955,13 +964,13 @@ int Optimizer::OptimizeSim3(KeyFrame* keyframe1, KeyFrame* keyframe2, std::vecto
 		const int id1 = 2 * i + 1;
 		const int id2 = 2 * (i + 1);
 
-		const cv::Mat Xw1 = mappoint1->GetWorldPos();
-		const cv::Mat Xc1 = R1w * Xw1 + t1w;
-		optimizer.addVertex(CreateVertexSBA(Converter::toVector3d(Xc1), id1, true));
+		const Point3D Xw1 = mappoint1->GetWorldPos();
+		const Point3D Xc1 = R1w * Xw1 + t1w;
+		optimizer.addVertex(CreateVertexSBA(ToVector3d(Xc1), id1, true));
 
-		const cv::Mat Xw2 = mappoint2->GetWorldPos();
-		const cv::Mat Xc2 = R2w * Xw2 + t2w;
-		optimizer.addVertex(CreateVertexSBA(Converter::toVector3d(Xc2), id2, true));
+		const Point3D Xw2 = mappoint2->GetWorldPos();
+		const Point3D Xc2 = R2w * Xw2 + t2w;
+		optimizer.addVertex(CreateVertexSBA(ToVector3d(Xc2), id2, true));
 
 		ncorrespondences++;
 

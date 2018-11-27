@@ -381,7 +381,7 @@ private:
 		}
 	}
 
-	static inline float CosAngle(const cv::Mat& v1, const cv::Mat& v2)
+	static inline float CosAngle(const Vec3D& v1, const Vec3D& v2)
 	{
 		return static_cast<float>(v1.dot(v2) / (cv::norm(v1) * cv::norm(v2)));
 	}
@@ -401,13 +401,15 @@ private:
 
 		ORBmatcher matcher(0.6f, false);
 
-		const cv::Mat Rcw1 = cv::Mat(keyframe1->GetPose().R());
-		const cv::Mat Rwc1 = Rcw1.t();
-		const cv::Mat tcw1 = cv::Mat(keyframe1->GetPose().t());
-		const cv::Mat Tcw1(3, 4, CV_32F);
+		const auto Rcw1 = keyframe1->GetPose().R();
+		const auto Rwc1 = Rcw1.t();
+		const auto tcw1 = keyframe1->GetPose().t();
+		const cv::Mat Tcw1 = CameraPose(Rcw1, tcw1).Mat();
+		const Point3D Ow1 = keyframe1->GetCameraCenter();
+
+		/*const cv::Mat Tcw1(3, 4, CV_32F);
 		Rcw1.copyTo(Tcw1.colRange(0, 3));
-		tcw1.copyTo(Tcw1.col(3));
-		const cv::Mat Ow1 = keyframe1->GetCameraCenter();
+		tcw1.copyTo(Tcw1.col(3));*/
 
 		const float fx1 = keyframe1->camera.fx;
 		const float fy1 = keyframe1->camera.fy;
@@ -427,7 +429,7 @@ private:
 			KeyFrame* keyframe2 = neighborKFs[i];
 
 			// Check first that baseline is not too short
-			const cv::Mat Ow2 = keyframe2->GetCameraCenter();
+			const Point3D Ow2 = keyframe2->GetCameraCenter();
 			const float baseline = static_cast<float>(cv::norm(Ow2 - Ow1));
 
 			if (!monocular_)
@@ -451,12 +453,14 @@ private:
 			std::vector<std::pair<size_t, size_t> > matchIndices;
 			matcher.SearchForTriangulation(keyframe1, keyframe2, F12, matchIndices, false);
 
-			const cv::Mat Rcw2 = cv::Mat(keyframe2->GetPose().R());
-			const cv::Mat Rwc2 = Rcw2.t();
-			const cv::Mat tcw2 = cv::Mat(keyframe2->GetPose().t());
-			const cv::Mat Tcw2(3, 4, CV_32F);
+			const auto Rcw2 = keyframe2->GetPose().R();
+			const auto Rwc2 = Rcw2.t();
+			const auto tcw2 = keyframe2->GetPose().t();
+			const cv::Mat Tcw2 = CameraPose(Rcw2, tcw2).Mat();
+
+			/*const cv::Mat Tcw2(3, 4, CV_32F);
 			Rcw2.copyTo(Tcw2.colRange(0, 3));
-			tcw2.copyTo(Tcw2.col(3));
+			tcw2.copyTo(Tcw2.col(3));*/
 
 			const float fx2 = keyframe2->camera.fx;
 			const float fy2 = keyframe2->camera.fy;
@@ -481,11 +485,11 @@ private:
 				const bool stereo2 = ur2 >= 0;
 
 				// Check parallax between rays
-				cv::Mat xn1 = (cv::Mat1f(3, 1) << (keypoint1.pt.x - cx1) * invfx1, (keypoint1.pt.y - cy1) * invfy1, 1.f);
-				cv::Mat xn2 = (cv::Mat1f(3, 1) << (keypoint2.pt.x - cx2) * invfx2, (keypoint2.pt.y - cy2) * invfy2, 1.f);
+				Vec3D xn1((keypoint1.pt.x - cx1) * invfx1, (keypoint1.pt.y - cy1) * invfy1, 1.f);
+				Vec3D xn2((keypoint2.pt.x - cx2) * invfx2, (keypoint2.pt.y - cy2) * invfy2, 1.f);
 
-				const cv::Mat ray1 = Rwc1 * xn1;
-				const cv::Mat ray2 = Rwc2 * xn2;
+				const Vec3D ray1 = Rwc1 * xn1;
+				const Vec3D ray2 = Rwc2 * xn2;
 				const float cosParallaxRays = CosAngle(ray1, ray2);
 
 				float cosParallaxStereo = cosParallaxRays + 1;
@@ -499,26 +503,27 @@ private:
 
 				cosParallaxStereo = min(cosParallaxStereo1, cosParallaxStereo2);
 
-				cv::Mat x3D;
+				Point3D x3D;
 				if (cosParallaxRays < cosParallaxStereo && cosParallaxRays>0 && (stereo1 || stereo2 || cosParallaxRays < 0.9998))
 				{
 					// Linear Triangulation Method
 					cv::Mat A(4, 4, CV_32F);
-					A.row(0) = xn1.at<float>(0)*Tcw1.row(2) - Tcw1.row(0);
-					A.row(1) = xn1.at<float>(1)*Tcw1.row(2) - Tcw1.row(1);
-					A.row(2) = xn2.at<float>(0)*Tcw2.row(2) - Tcw2.row(0);
-					A.row(3) = xn2.at<float>(1)*Tcw2.row(2) - Tcw2.row(1);
+					A.row(0) = xn1(0) * Tcw1.row(2) - Tcw1.row(0);
+					A.row(1) = xn1(1) * Tcw1.row(2) - Tcw1.row(1);
+					A.row(2) = xn2(0) * Tcw2.row(2) - Tcw2.row(0);
+					A.row(3) = xn2(1) * Tcw2.row(2) - Tcw2.row(1);
 
 					cv::Mat w, u, vt;
 					cv::SVD::compute(A, w, u, vt, cv::SVD::MODIFY_A | cv::SVD::FULL_UV);
 
-					x3D = vt.row(3).t();
+					cv::Mat1f v = vt.row(3).t();
 
-					if (x3D.at<float>(3) == 0)
+					if (v(3) == 0)
 						continue;
 
 					// Euclidean coordinates
-					x3D = x3D.rowRange(0, 3) / x3D.at<float>(3);
+					const double denom = 1. / v(3);
+					x3D = denom * Point3D(v(0), v(1), v(2));
 
 				}
 				else if (stereo1 && cosParallaxStereo1 < cosParallaxStereo2)
@@ -532,21 +537,21 @@ private:
 				else
 					continue; //No stereo and very low parallax
 
-				cv::Mat x3Dt = x3D.t();
+				const auto x3Dt = x3D.t();
 
 				//Check triangulation in front of cameras
-				const float z1 = static_cast<float>(Rcw1.row(2).dot(x3Dt) + tcw1.at<float>(2));
+				const float z1 = static_cast<float>(Rcw1.row(2).dot(x3Dt) + tcw1(2));
 				if (z1 <= 0)
 					continue;
 
-				const float z2 = static_cast<float>(Rcw2.row(2).dot(x3Dt) + tcw2.at<float>(2));
+				const float z2 = static_cast<float>(Rcw2.row(2).dot(x3Dt) + tcw2(2));
 				if (z2 <= 0)
 					continue;
 
 				//Check reprojection error in first keyframe
 				const float sigmaSquare1 = keyframe1->pyramid.sigmaSq[keypoint1.octave];
-				const float x1 = static_cast<float>(Rcw1.row(0).dot(x3Dt) + tcw1.at<float>(0));
-				const float y1 = static_cast<float>(Rcw1.row(1).dot(x3Dt) + tcw1.at<float>(1));
+				const float x1 = static_cast<float>(Rcw1.row(0).dot(x3Dt) + tcw1(0));
+				const float y1 = static_cast<float>(Rcw1.row(1).dot(x3Dt) + tcw1(1));
 				const float invz1 = 1.f / z1;
 
 				if (!stereo1)
@@ -572,8 +577,8 @@ private:
 
 				//Check reprojection error in second keyframe
 				const float sigmaSquare2 = keyframe2->pyramid.sigmaSq[keypoint2.octave];
-				const float x2 = static_cast<float>(Rcw2.row(0).dot(x3Dt) + tcw2.at<float>(0));
-				const float y2 = static_cast<float>(Rcw2.row(1).dot(x3Dt) + tcw2.at<float>(1));
+				const float x2 = static_cast<float>(Rcw2.row(0).dot(x3Dt) + tcw2(0));
+				const float y2 = static_cast<float>(Rcw2.row(1).dot(x3Dt) + tcw2(1));
 				const float invz2 = 1.f / z2;
 				if (!stereo2)
 				{
@@ -597,10 +602,10 @@ private:
 				}
 
 				//Check scale consistency
-				cv::Mat normal1 = x3D - Ow1;
+				const Vec3D normal1 = x3D - Ow1;
 				float dist1 = static_cast<float>(cv::norm(normal1));
 
-				cv::Mat normal2 = x3D - Ow2;
+				const Vec3D normal2 = x3D - Ow2;
 				float dist2 = static_cast<float>(cv::norm(normal2));
 
 				if (dist1 == 0 || dist2 == 0)

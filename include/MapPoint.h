@@ -27,6 +27,7 @@
 #include <opencv2/core/core.hpp>
 
 #include "FrameId.h"
+#include "Point.h"
 
 namespace ORB_SLAM2
 {
@@ -41,13 +42,13 @@ public:
 
 	using mappointid_t = long unsigned int;
 
-	MapPoint(const cv::Mat& Xw, KeyFrame* referenceKF, Map* map);
-	MapPoint(const cv::Mat& Xw, Map* map, Frame* frame, int idx);
+	MapPoint(const Point3D& Xw, KeyFrame* referenceKF, Map* map);
+	MapPoint(const Point3D& Xw, Map* map, Frame* frame, int idx);
 
-	void SetWorldPos(const cv::Mat& Xw);
-	cv::Mat GetWorldPos() const;
+	void SetWorldPos(const Point3D& Xw);
+	Point3D GetWorldPos() const;
 
-	cv::Mat GetNormal() const;
+	Vec3D GetNormal() const;
 	KeyFrame* GetReferenceKeyFrame() const;
 
 	std::map<KeyFrame*, size_t> GetObservations() const;
@@ -105,7 +106,7 @@ public:
 	frameid_t loopPointForKF;
 	frameid_t correctedByKF;
 	frameid_t correctedReference;
-	cv::Mat posGBA;
+	Point3D posGBA;
 	frameid_t BAGlobalForKF;
 
 	static std::mutex globalMutex_;
@@ -113,14 +114,14 @@ public:
 protected:
 
 	// Position in absolute coordinates
-	cv::Mat Xw_;
+	Point3D Xw_;
 
 	// Keyframes observing the point and associated index in keyframe
 	std::map<KeyFrame*, size_t> observations_;
 	int nobservations_;
 
 	// Mean viewing direction
-	cv::Mat normal_;
+	Vec3D normal_;
 
 	// Best descriptor to fast matching
 	cv::Mat descriptor_;

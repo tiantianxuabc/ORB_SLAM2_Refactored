@@ -410,17 +410,18 @@ static bool IsInFrustum(const Frame& frame, MapPoint* mappoint, float minViewing
 
 	const CameraParams& camera = frame.camera;
 	const CameraPose& pose = frame.pose;
+	const auto Ow = frame.GetCameraCenter();
 
 	// 3D in absolute coordinates
-	cv::Mat Xw = mappoint->GetWorldPos();
+	const Point3D Xw = mappoint->GetWorldPos();
 
 	// 3D in camera coordinates
-	const cv::Mat Rcw(pose.R());
-	const cv::Mat tcw(pose.t());
-	const cv::Mat Xc = Rcw * Xw + tcw;
-	const float PcX = Xc.at<float>(0);
-	const float PcY = Xc.at<float>(1);
-	const float PcZ = Xc.at<float>(2);
+	const auto Rcw = pose.R();
+	const auto tcw = pose.t();
+	const Point3D Xc = Rcw * Xw + tcw;
+	const float PcX = Xc(0);
+	const float PcY = Xc(1);
+	const float PcZ = Xc(2);
 
 	// Check positive depth
 	if (PcZ < 0.f)
@@ -437,14 +438,14 @@ static bool IsInFrustum(const Frame& frame, MapPoint* mappoint, float minViewing
 	// Check distance is in the scale invariance region of the MapPoint
 	const float maxDistance = mappoint->GetMaxDistanceInvariance();
 	const float minDistance = mappoint->GetMinDistanceInvariance();
-	const cv::Mat PO = Xw - cv::Mat(pose.Invt());
+	const Vec3D PO = Xw - Ow;
 	const float dist = static_cast<float>(cv::norm(PO));
 
 	if (dist < minDistance || dist > maxDistance)
 		return false;
 
 	// Check viewing angle
-	const cv::Mat Pn = mappoint->GetNormal();
+	const Vec3D Pn = mappoint->GetNormal();
 
 	const float viewCos = static_cast<float>(PO.dot(Pn) / dist);
 
@@ -582,7 +583,7 @@ void CreateMapPoints(Frame& currFrame, KeyFrame* keyframe, Map* map, float thDep
 
 		if (create)
 		{
-			const cv::Mat Xw = currFrame.UnprojectStereo(i);
+			const Point3D Xw = currFrame.UnprojectStereo(i);
 
 			MapPoint* newpoint = new MapPoint(Xw, keyframe, map);
 			newpoint->AddObservation(keyframe, i);
@@ -630,7 +631,7 @@ static void CreateMapPointsVO(Frame& lastFrame, list<MapPoint*>& tempPoints, Map
 		MapPoint* mappoint = lastFrame.mappoints[i];
 		if (!mappoint || mappoint->Observations() < 1)
 		{
-			const cv::Mat Xw = lastFrame.UnprojectStereo(i);
+			const Point3D Xw = lastFrame.UnprojectStereo(i);
 			MapPoint* newpoint = new MapPoint(Xw, map, &lastFrame, i);
 
 			lastFrame.mappoints[i] = newpoint;
@@ -1101,7 +1102,7 @@ public:
 			if (Z <= 0.f)
 				continue;
 
-			cv::Mat Xw = currFrame.UnprojectStereo(i);
+			const Point3D Xw = currFrame.UnprojectStereo(i);
 			MapPoint* mappoint = new MapPoint(Xw, keyframe, map_);
 			mappoint->AddObservation(keyframe, i);
 			mappoint->ComputeDistinctiveDescriptors();

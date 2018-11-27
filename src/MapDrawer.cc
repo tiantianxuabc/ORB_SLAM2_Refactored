@@ -58,8 +58,8 @@ void MapDrawer::DrawMapPoints() const
 	{
 		if (mappoint->isBad() || referenceMPs.count(mappoint))
 			continue;
-		const cv::Mat pos = mappoint->GetWorldPos();
-		glVertex3f(pos.at<float>(0), pos.at<float>(1), pos.at<float>(2));
+		const Point3D pos = mappoint->GetWorldPos();
+		glVertex3f(pos(0), pos(1), pos(2));
 	}
 	glEnd();
 
@@ -71,8 +71,8 @@ void MapDrawer::DrawMapPoints() const
 	{
 		if (mappoint->isBad())
 			continue;
-		const cv::Mat pos = mappoint->GetWorldPos();
-		glVertex3f(pos.at<float>(0), pos.at<float>(1), pos.at<float>(2));
+		const Point3D pos = mappoint->GetWorldPos();
+		glVertex3f(pos(0), pos(1), pos(2));
 	}
 
 	glEnd();
@@ -135,24 +135,24 @@ void MapDrawer::DrawKeyFrames(bool drawKF, bool drawGraph) const
 		for (KeyFrame* keyframe : keyframes)
 		{
 			// Covisibility Graph
-			cv::Mat Ow = keyframe->GetCameraCenter();
+			const Point3D Ow = keyframe->GetCameraCenter();
 			for (KeyFrame* covisibleKF : keyframe->GetCovisiblesByWeight(100))
 			{
 				if (covisibleKF->id < keyframe->id)
 					continue;
 
-				cv::Mat Ow2 = covisibleKF->GetCameraCenter();
-				glVertex3f(Ow.at<float>(0), Ow.at<float>(1), Ow.at<float>(2));
-				glVertex3f(Ow2.at<float>(0), Ow2.at<float>(1), Ow2.at<float>(2));
+				const Point3D Ow2 = covisibleKF->GetCameraCenter();
+				glVertex3f(Ow(0), Ow(1), Ow(2));
+				glVertex3f(Ow2(0), Ow2(1), Ow2(2));
 			}
 
 			// Spanning tree
 			KeyFrame* parentKF = keyframe->GetParent();
 			if (parentKF)
 			{
-				cv::Mat Owp = parentKF->GetCameraCenter();
-				glVertex3f(Ow.at<float>(0), Ow.at<float>(1), Ow.at<float>(2));
-				glVertex3f(Owp.at<float>(0), Owp.at<float>(1), Owp.at<float>(2));
+				const Point3D Owp = parentKF->GetCameraCenter();
+				glVertex3f(Ow(0), Ow(1), Ow(2));
+				glVertex3f(Owp(0), Owp(1), Owp(2));
 			}
 
 			// Loops
@@ -161,9 +161,9 @@ void MapDrawer::DrawKeyFrames(bool drawKF, bool drawGraph) const
 				if (loopKF->id < keyframe->id)
 					continue;
 
-				cv::Mat Owl = loopKF->GetCameraCenter();
-				glVertex3f(Ow.at<float>(0), Ow.at<float>(1), Ow.at<float>(2));
-				glVertex3f(Owl.at<float>(0), Owl.at<float>(1), Owl.at<float>(2));
+				const Point3D Owl = loopKF->GetCameraCenter();
+				glVertex3f(Ow(0), Ow(1), Ow(2));
+				glVertex3f(Owl(0), Owl(1), Owl(2));
 			}
 		}
 

@@ -173,11 +173,11 @@ static void ComputeSim3(const cv::Mat& P1, const cv::Mat& P2, Sim3& S12, Sim3& S
 	S21.t.copyTo(Gett(S21.T));
 }
 
-static void Project(const std::vector<cv::Mat>& points3D, std::vector<cv::Mat>& points2D, const cv::Mat& Tcw,
+static void Project(const std::vector<Point3D>& points3D, std::vector<Point2D>& points2D, const cv::Mat& Tcw,
 	const CameraParams& camera)
 {
-	cv::Mat Rcw = GetR(Tcw);
-	cv::Mat tcw = Gett(Tcw);
+	const CameraPose::Mat33 Rcw = GetR(Tcw);
+	const CameraPose::Mat31 tcw = Gett(Tcw);
 
 	const float fx = camera.fx;
 	const float fy = camera.fy;
@@ -189,15 +189,15 @@ static void Project(const std::vector<cv::Mat>& points3D, std::vector<cv::Mat>& 
 
 	for (size_t i = 0; i < points3D.size(); i++)
 	{
-		const cv::Mat P3Dc = Rcw * points3D[i] + tcw;
-		const float invZ = 1.f / (P3Dc.at<float>(2));
-		const float u = P3Dc.at<float>(0) * invZ;
-		const float v = P3Dc.at<float>(1) * invZ;
-		points2D.push_back((cv::Mat_<float>(2, 1) << fx * u + cx, fy * v + cy));
+		const Point3D P3Dc = Rcw * points3D[i] + tcw;
+		const float invZ = 1.f / (P3Dc(2));
+		const float u = P3Dc(0) * invZ;
+		const float v = P3Dc(1) * invZ;
+		points2D.push_back(Point2D(fx * u + cx, fy * v + cy));
 	}
 }
 
-static void FromCameraToImage(const std::vector<cv::Mat>& points3D, std::vector<cv::Mat>& points2D,
+static void FromCameraToImage(const std::vector<Point3D>& points3D, std::vector<Point2D>& points2D,
 	const CameraParams& camera)
 {
 	const float fx = camera.fx;
@@ -210,10 +210,10 @@ static void FromCameraToImage(const std::vector<cv::Mat>& points3D, std::vector<
 
 	for (size_t i = 0; i < points3D.size(); i++)
 	{
-		const float invZ = 1 / (points3D[i].at<float>(2));
-		const float u = points3D[i].at<float>(0) * invZ;
-		const float v = points3D[i].at<float>(1) * invZ;
-		points2D.push_back((cv::Mat_<float>(2, 1) << fx * u + cx, fy * v + cy));
+		const float invZ = 1 / (points3D[i](2));
+		const float u = points3D[i](0) * invZ;
+		const float v = points3D[i](1) * invZ;
+		points2D.push_back(Point2D(fx * u + cx, fy * v + cy));
 	}
 }
 
@@ -228,10 +228,10 @@ Sim3Solver::Sim3Solver(const KeyFrame* keyframe1, const KeyFrame* keyframe2, con
 	Xc1_.reserve(nkeypoints1_);
 	Xc2_.reserve(nkeypoints1_);
 
-	const cv::Mat Rcw1 = cv::Mat(keyframe1->GetPose().R());
-	const cv::Mat tcw1 = cv::Mat(keyframe1->GetPose().t());
-	const cv::Mat Rcw2 = cv::Mat(keyframe2->GetPose().R());
-	const cv::Mat tcw2 = cv::Mat(keyframe2->GetPose().t());
+	const auto Rcw1 = keyframe1->GetPose().R();
+	const auto tcw1 = keyframe1->GetPose().t();
+	const auto Rcw2 = keyframe2->GetPose().R();
+	const auto tcw2 = keyframe2->GetPose().t();
 
 	allIndices_.reserve(nkeypoints1_);
 
@@ -259,8 +259,8 @@ Sim3Solver::Sim3Solver(const KeyFrame* keyframe1, const KeyFrame* keyframe2, con
 		maxErrorSq1_.push_back(9.21 * sigmaSq1);
 		maxErrorSq2_.push_back(9.21 * sigmaSq2);
 
-		const cv::Mat X3D1w = mappoint1->GetWorldPos();
-		const cv::Mat X3D2w = mappoint2->GetWorldPos();
+		const Point3D X3D1w = mappoint1->GetWorldPos();
+		const Point3D X3D2w = mappoint2->GetWorldPos();
 		Xc1_.push_back(Rcw1 * X3D1w + tcw1);
 		Xc2_.push_back(Rcw2 * X3D2w + tcw2);
 
@@ -321,13 +321,15 @@ bool Sim3Solver::iterate(int maxk, Sim3& sim3, std::vector<bool>& isInlier)
 		availableIndices = allIndices_;
 
 		// Get min set of points
-		for (int i = 0; i < 3; ++i)
+		for (int c = 0; c < 3; ++c)
 		{
 			const int randi = DUtils::Random::RandomInt(0, static_cast<int>(availableIndices.size() - 1));
 			const size_t idx = availableIndices[randi];
 
-			Xc1_[idx].copyTo(P1.col(i));
-			Xc2_[idx].copyTo(P2.col(i));
+			const cv::Mat Xc1(Xc1_[idx]);
+			const cv::Mat Xc2(Xc2_[idx]);
+			Xc1.copyTo(P1.col(c));
+			Xc2.copyTo(P2.col(c));
 
 			availableIndices[randi] = availableIndices.back();
 			availableIndices.pop_back();
@@ -337,15 +339,15 @@ bool Sim3Solver::iterate(int maxk, Sim3& sim3, std::vector<bool>& isInlier)
 		ComputeSim3(P1, P2, S12, S21, fixScale_);
 
 		//CheckInliers();
-		std::vector<cv::Mat> proj1, proj2;
+		std::vector<Point2D> proj1, proj2;
 		Project(Xc2_, proj1, S12.T, camera1_);
 		Project(Xc1_, proj2, S21.T, camera2_);
 
 		int ninliers = 0;
 		for (size_t i = 0; i < points1_.size(); i++)
 		{
-			cv::Mat diff1 = points1_[i] - proj1[i];
-			cv::Mat diff2 = points2_[i] - proj2[i];
+			const auto diff1 = points1_[i] - proj1[i];
+			const auto diff2 = points2_[i] - proj2[i];
 
 			const double errorSq1 = diff1.dot(diff1);
 			const double errorSq2 = diff2.dot(diff2);

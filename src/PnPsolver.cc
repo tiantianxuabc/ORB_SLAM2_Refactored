@@ -89,8 +89,8 @@ PnPsolver::PnPsolver(const Frame &F, const vector<MapPoint*> &vpMapPointMatches)
                 mvP2D.push_back(kp.pt);
                 mvSigma2.push_back(F.pyramid.sigmaSq[kp.octave]);
 
-                cv::Mat Pos = pMP->GetWorldPos();
-                mvP3Dw.push_back(cv::Point3f(Pos.at<float>(0),Pos.at<float>(1), Pos.at<float>(2)));
+                Point3D Pos = pMP->GetWorldPos();
+                mvP3Dw.push_back(cv::Point3f(Pos(0),Pos(1), Pos(2)));
 
                 mvKeyPointIndices.push_back(i);
                 mvAllIndices.push_back(idx);               

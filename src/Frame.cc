@@ -578,7 +578,7 @@ std::vector<size_t> Frame::GetFeaturesInArea(float x, float y, float r, int minL
 	return grid.GetFeaturesInArea(x, y, r, minLevel, maxLevel);
 }
 
-cv::Mat Frame::UnprojectStereo(int i) const
+Point3D Frame::UnprojectStereo(int i) const
 {
 	const float Zc = depth[i];
 	if (Zc <= 0.f)
@@ -593,8 +593,8 @@ cv::Mat Frame::UnprojectStereo(int i) const
 	const float Xc = (u - camera.cx) * Zc * invfx;
 	const float Yc = (v - camera.cy) * Zc * invfy;
 
-	cv::Mat x3Dc = (cv::Mat_<float>(3, 1) << Xc, Yc, Zc);
-	return cv::Mat(pose.InvR()) * x3Dc + cv::Mat(pose.Invt());
+	const Point3D x3Dc(Xc, Yc, Zc);
+	return pose.InvR() * x3Dc + pose.Invt();
 }
 
 int Frame::PassedFrom(frameid_t from) const

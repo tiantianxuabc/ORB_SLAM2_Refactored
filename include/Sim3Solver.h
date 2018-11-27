@@ -27,6 +27,7 @@
 #include <opencv2/opencv.hpp>
 
 #include "CameraParameters.h"
+#include "Point.h"
 
 namespace ORB_SLAM2
 {
@@ -53,8 +54,8 @@ public:
 	
 private:
 
-	std::vector<cv::Mat> Xc1_;
-	std::vector<cv::Mat> Xc2_;
+	std::vector<Point3D> Xc1_;
+	std::vector<Point3D> Xc2_;
 	std::vector<size_t> indices1_;
 	std::vector<double> maxErrorSq1_;
 	std::vector<double> maxErrorSq2_;
@@ -76,8 +77,8 @@ private:
 	std::vector<size_t> allIndices_;
 
 	// Projections
-	std::vector<cv::Mat> points1_;
-	std::vector<cv::Mat> points2_;
+	std::vector<Point2D> points1_;
+	std::vector<Point2D> points2_;
 
 	// RANSAC probability
 	double probability_;
