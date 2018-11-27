@@ -71,7 +71,7 @@ public:
 		// If enough matches are found, we setup a Sim3Solver
 		ORBmatcher matcher(0.75f, true);
 
-		std::vector<Sim3Solver*> solvers(ninitialCandidates);
+		std::vector<std::shared_ptr<Sim3Solver>> solvers(ninitialCandidates);
 		std::vector<std::vector<MapPoint*>> vmatches(ninitialCandidates);
 		std::vector<bool> discarded(ninitialCandidates);
 		int ncandidates = 0; //candidates with enough matches
@@ -97,7 +97,7 @@ public:
 			}
 			else
 			{
-				Sim3Solver* solver = new Sim3Solver(currentKF, candidateKF, vmatches[i], fixScale);
+				auto solver = std::make_shared<Sim3Solver>(currentKF, candidateKF, vmatches[i], fixScale);
 				solver->SetRansacParameters(0.99, 20, 300);
 				solvers[i] = solver;
 			}
@@ -118,7 +118,7 @@ public:
 
 				// Perform 5 Ransac Iterations
 				std::vector<bool> isInlier;
-				Sim3Solver* solver = solvers[i];
+				auto solver = solvers[i];
 				Sim3Solver::Sim3 sim3;
 				const bool found = solver->iterate(5, sim3, isInlier);
 				
