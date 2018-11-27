@@ -276,12 +276,11 @@ void Optimizer::BundleAdjustment(const std::vector<KeyFrame*>& keyframes, const 
 		g2o::VertexSE3Expmap* vertex = static_cast<g2o::VertexSE3Expmap*>(optimizer.vertex(id));
 		if (loopKFId == 0)
 		{
-			keyframe->SetPose(Converter::toCvMat(vertex->estimate()));
+			keyframe->SetPose(FromSE3Quat(vertex->estimate()));
 		}
 		else
 		{
-			keyframe->TcwGBA.create(4, 4, CV_32F);
-			Converter::toCvMat(vertex->estimate()).copyTo(keyframe->TcwGBA);
+			keyframe->TcwGBA = FromSE3Quat(vertex->estimate());
 			keyframe->BAGlobalForKF = loopKFId;
 		}
 	}
@@ -664,7 +663,7 @@ void Optimizer::LocalBundleAdjustment(KeyFrame* currKeyFrame, bool* stopFlag, Ma
 	{
 		const int id = localKF->id;
 		g2o::VertexSE3Expmap* vertex = static_cast<g2o::VertexSE3Expmap*>(optimizer.vertex(id));
-		localKF->SetPose(Converter::toCvMat(vertex->estimate()));
+		localKF->SetPose(FromSE3Quat(vertex->estimate()));
 	}
 
 	//Points
@@ -720,8 +719,8 @@ void Optimizer::OptimizeEssentialGraph(Map* map, KeyFrame* loopKF, KeyFrame* cur
 		}
 		else
 		{
-			Eigen::Matrix3d Rcw = Converter::toMatrix3d(keyframe->GetRotation());
-			Eigen::Vector3d tcw = Converter::toVector3d(keyframe->GetTranslation());
+			Eigen::Matrix3d Rcw = Converter::toMatrix3d(cv::Mat(keyframe->GetPose().R()));
+			Eigen::Vector3d tcw = Converter::toVector3d(cv::Mat(keyframe->GetPose().t()));
 			g2o::Sim3 Siw(Rcw, tcw, 1.0);
 			nonCorrectedScw[id] = Siw;
 			vertex->setEstimate(Siw);
@@ -868,7 +867,7 @@ void Optimizer::OptimizeEssentialGraph(Map* map, KeyFrame* loopKF, KeyFrame* cur
 
 		cv::Mat Tiw = Converter::toCvSE3(eigR, eigt);
 
-		keyframe->SetPose(Tiw);
+		keyframe->SetPose(CameraPose(Tiw));
 	}
 
 	// Correct points. Transform to "non-optimized" reference keyframe pose and transform back with optimized pose
@@ -905,10 +904,10 @@ int Optimizer::OptimizeSim3(KeyFrame* keyframe1, KeyFrame* keyframe2, std::vecto
 	const CameraParams& camera2 = keyframe2->camera;
 
 	// Camera poses
-	const cv::Mat R1w = keyframe1->GetRotation();
-	const cv::Mat t1w = keyframe1->GetTranslation();
-	const cv::Mat R2w = keyframe2->GetRotation();
-	const cv::Mat t2w = keyframe2->GetTranslation();
+	const cv::Mat R1w = cv::Mat(keyframe1->GetPose().R());
+	const cv::Mat t1w = cv::Mat(keyframe1->GetPose().t());
+	const cv::Mat R2w = cv::Mat(keyframe2->GetPose().R());
+	const cv::Mat t2w = cv::Mat(keyframe2->GetPose().t());
 
 	// Set Sim3 vertex
 	g2o::VertexSim3Expmap * vertex = new g2o::VertexSim3Expmap();

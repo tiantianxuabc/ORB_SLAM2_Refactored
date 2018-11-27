@@ -30,6 +30,7 @@
 #include "Frame.h"
 #include "ORBVocabulary.h"
 #include "CameraParameters.h"
+#include "CameraPose.h"
 
 namespace ORB_SLAM2
 {
@@ -45,13 +46,14 @@ public:
 	KeyFrame(const Frame& frame, Map* map, KeyFrameDatabase* keyframeDB);
 
 	// Pose functions
-	void SetPose(const cv::Mat &Tcw);
-	cv::Mat GetPose() const;
-	cv::Mat GetPoseInverse() const;
+	void SetPose(const CameraPose& pose);
+	CameraPose GetPose() const;
 	cv::Mat GetCameraCenter() const;
+
+	/*cv::Mat GetPoseInverse() const;
 	cv::Mat GetStereoCenter() const;
 	cv::Mat GetRotation() const;
-	cv::Mat GetTranslation() const;
+	cv::Mat GetTranslation() const;*/
 
 	// Bag of Words Representation
 	void ComputeBoW();
@@ -141,8 +143,8 @@ public:
 	float relocScore;
 
 	// Variables used by loop closing
-	cv::Mat TcwGBA;
-	cv::Mat TcwBefGBA;
+	CameraPose TcwGBA;
+	CameraPose TcwBefGBA;
 	frameid_t BAGlobalForKF;
 
 	// Calibration parameters
@@ -165,7 +167,7 @@ public:
 	DBoW2::FeatureVector featureVector;
 
 	// Pose relative to parent (this is computed when bad flag is activated)
-	cv::Mat Tcp;
+	CameraPose Tcp;
 
 	// Scale
 	ScalePyramidInfo pyramid;
@@ -177,9 +179,10 @@ public:
 protected:
 
 	// SE3 Pose and camera center
-	cv::Mat Tcw;
+	CameraPose pose_;
+	/*cv::Mat Tcw;
 	cv::Mat Twc;
-	cv::Mat Ow;
+	cv::Mat Ow;*/
 
 	cv::Mat Cw; // Stereo middel point. Only for visualization
 

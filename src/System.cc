@@ -367,7 +367,7 @@ public:
 
 		// Transform all keyframes so that the first keyframe is at the origin.
 		// After a loop closure the first keyframe might not be at the origin.
-		const cv::Mat Two = keyframes.front()->GetPoseInverse();
+		const CameraPose Two = keyframes.front()->GetPose().Inverse();
 
 		std::ofstream ofs(filename);
 		ofs << std::fixed;
@@ -385,7 +385,7 @@ public:
 
 			KeyFrame* keyframe = (KeyFrame*)track.referenceKF;
 
-			cv::Mat Trw = cv::Mat::eye(4, 4, CV_32F);
+			CameraPose Trw = CameraPose::Origin();
 
 			// If the reference keyframe was culled, traverse the spanning tree to get a suitable keyframe.
 			while (keyframe->isBad())
@@ -396,11 +396,12 @@ public:
 
 			Trw = Trw * keyframe->GetPose() * Two;
 
-			const cv::Mat1f Tcw = track.Tcr * Trw;
-			const cv::Mat1f Rwc = Tcw.rowRange(0, 3).colRange(0, 3).t();
-			const cv::Mat1f twc = -Rwc * Tcw.rowRange(0, 3).col(3);
+			const CameraPose Tcw = track.Tcr * Trw;
+			const CameraPose Twc = Tcw.Inverse();
+			const auto Rwc = Twc.R();
+			const auto twc = Twc.t();
 
-			std::vector<float> q = Converter::toQuaternion(Rwc);
+			std::vector<float> q = Converter::toQuaternion(cv::Mat(Rwc));
 
 			ofs << std::setprecision(6) << track.timestamp << " ";
 			ofs << std::setprecision(9) << twc(0) << " " << twc(1) << " " << twc(2) << " ";
@@ -435,7 +436,7 @@ public:
 			if (keyframe->isBad())
 				continue;
 
-			const cv::Mat1f R = keyframe->GetRotation().t();
+			const cv::Mat1f R(keyframe->GetPose().InvR());
 			std::vector<float> q = Converter::toQuaternion(R);
 			const cv::Mat1f t = keyframe->GetCameraCenter();
 			ofs << std::setprecision(6) << keyframe->timestamp << " ";
@@ -465,7 +466,7 @@ public:
 
 		// Transform all keyframes so that the first keyframe is at the origin.
 		// After a loop closure the first keyframe might not be at the origin.
-		const cv::Mat Two = keyframes.front()->GetPoseInverse();
+		const CameraPose Two = keyframes.front()->GetPose().Inverse();
 
 		std::ofstream ofs(filename);
 		ofs << std::fixed;
@@ -478,9 +479,9 @@ public:
 		// which is true when tracking failed.
 		for (const auto& track : tracker_->GetTrajectory())
 		{
-			ORB_SLAM2::KeyFrame* keyframe = (KeyFrame*)track.referenceKF;
+			KeyFrame* keyframe = (KeyFrame*)track.referenceKF;
 
-			cv::Mat Trw = cv::Mat::eye(4, 4, CV_32F);
+			CameraPose Trw = CameraPose::Origin();
 
 			while (keyframe->isBad())
 			{
@@ -491,9 +492,10 @@ public:
 
 			Trw = Trw * keyframe->GetPose() * Two;
 
-			const cv::Mat1f Tcw = track.Tcr * Trw;
-			const cv::Mat1f Rwc = Tcw.rowRange(0, 3).colRange(0, 3).t();
-			const cv::Mat1f twc = -Rwc * Tcw.rowRange(0, 3).col(3);
+			const CameraPose Tcw = track.Tcr * Trw;
+			const CameraPose Twc = Tcw.Inverse();
+			const auto Rwc = Twc.R();
+			const auto twc = Twc.t();
 
 			ofs << std::setprecision(9) <<
 				Rwc(0, 0) << " " << Rwc(0, 1) << " " << Rwc(0, 2) << " " << twc(0) << " " <<

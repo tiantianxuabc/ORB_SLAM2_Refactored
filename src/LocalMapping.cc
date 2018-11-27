@@ -53,22 +53,34 @@ static cv::Mat SkewSymmetricMatrix(const cv::Mat1f& v)
 		-v(1),  v(0),    0);
 }
 
+static inline cv::Matx33f SkewSymmetricMatrix(const Vec3D& v)
+{
+	const float x = v(0);
+	const float y = v(1);
+	const float z = v(2);
+
+	return cv::Matx33f(
+		0, -z, y,
+		z, 0, -x,
+		-y, x, 0);
+}
+
 static cv::Mat ComputeF12(KeyFrame* keyframe1, KeyFrame* keyframe2)
 {
-	const cv::Mat R1w = keyframe1->GetRotation();
-	const cv::Mat t1w = keyframe1->GetTranslation();
-	const cv::Mat R2w = keyframe2->GetRotation();
-	const cv::Mat t2w = keyframe2->GetTranslation();
+	const auto R1w = keyframe1->GetPose().R();
+	const auto t1w = keyframe1->GetPose().t();
+	const auto R2w = keyframe2->GetPose().R();
+	const auto t2w = keyframe2->GetPose().t();
 
-	const cv::Mat R12 = R1w * R2w.t();
-	const cv::Mat t12 = -R1w * R2w.t() * t2w + t1w;
+	const auto R12 = R1w * R2w.t();
+	const auto t12 = -R1w * R2w.t() * t2w + t1w;
 
-	const cv::Mat t12x = SkewSymmetricMatrix(t12);
+	const auto t12x = SkewSymmetricMatrix(t12);
 
-	const cv::Mat& K1 = keyframe1->camera.Mat();
-	const cv::Mat& K2 = keyframe2->camera.Mat();
+	const auto K1 = cv::Matx33f(keyframe1->camera.Mat());
+	const auto K2 = cv::Matx33f(keyframe2->camera.Mat());
 
-	return K1.t().inv() * t12x * R12 * K2.inv();
+	return cv::Mat(K1.t().inv() * t12x * R12 * K2.inv());
 }
 
 class LocalMappingImpl : public LocalMapping
@@ -389,9 +401,9 @@ private:
 
 		ORBmatcher matcher(0.6f, false);
 
-		const cv::Mat Rcw1 = keyframe1->GetRotation();
+		const cv::Mat Rcw1 = cv::Mat(keyframe1->GetPose().R());
 		const cv::Mat Rwc1 = Rcw1.t();
-		const cv::Mat tcw1 = keyframe1->GetTranslation();
+		const cv::Mat tcw1 = cv::Mat(keyframe1->GetPose().t());
 		const cv::Mat Tcw1(3, 4, CV_32F);
 		Rcw1.copyTo(Tcw1.colRange(0, 3));
 		tcw1.copyTo(Tcw1.col(3));
@@ -439,9 +451,9 @@ private:
 			std::vector<std::pair<size_t, size_t> > matchIndices;
 			matcher.SearchForTriangulation(keyframe1, keyframe2, F12, matchIndices, false);
 
-			const cv::Mat Rcw2 = keyframe2->GetRotation();
+			const cv::Mat Rcw2 = cv::Mat(keyframe2->GetPose().R());
 			const cv::Mat Rwc2 = Rcw2.t();
-			const cv::Mat tcw2 = keyframe2->GetTranslation();
+			const cv::Mat tcw2 = cv::Mat(keyframe2->GetPose().t());
 			const cv::Mat Tcw2(3, 4, CV_32F);
 			Rcw2.copyTo(Tcw2.colRange(0, 3));
 			tcw2.copyTo(Tcw2.col(3));

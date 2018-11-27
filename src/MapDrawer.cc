@@ -90,7 +90,7 @@ void MapDrawer::DrawKeyFrames(bool drawKF, bool drawGraph) const
 	{
 		for (KeyFrame* keyframe : keyframes)
 		{
-			const cv::Mat Twc = keyframe->GetPoseInverse().t();
+			const cv::Mat Twc = keyframe->GetPose().Inverse().Mat().t();
 
 			glPushMatrix();
 

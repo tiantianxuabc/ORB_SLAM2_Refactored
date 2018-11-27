@@ -588,8 +588,8 @@ int ORBmatcher::SearchForTriangulation(const KeyFrame* keyframe1, const KeyFrame
 {
 	//Compute epipole in second image
 	const cv::Mat Cw = keyframe1->GetCameraCenter();
-	const cv::Mat R2w = keyframe2->GetRotation();
-	const cv::Mat t2w = keyframe2->GetTranslation();
+	const cv::Mat R2w = cv::Mat(keyframe2->GetPose().R());
+	const cv::Mat t2w = cv::Mat(keyframe2->GetPose().t());
 	const cv::Mat C2 = R2w * Cw + t2w;
 	const float invZ = 1.f / C2.at<float>(2);
 	const float epx = keyframe2->camera.fx * C2.at<float>(0) * invZ + keyframe2->camera.cx;
@@ -691,8 +691,8 @@ int ORBmatcher::SearchForTriangulation(const KeyFrame* keyframe1, const KeyFrame
 
 int ORBmatcher::Fuse(KeyFrame* keyframe, const std::vector<MapPoint*>& mappoints, float th)
 {
-	cv::Mat Rcw = keyframe->GetRotation();
-	cv::Mat tcw = keyframe->GetTranslation();
+	cv::Mat Rcw = cv::Mat(keyframe->GetPose().R());
+	cv::Mat tcw = cv::Mat(keyframe->GetPose().t());
 
 	const float fx = keyframe->camera.fx;
 	const float fy = keyframe->camera.fy;
@@ -940,12 +940,12 @@ int ORBmatcher::SearchBySim3(KeyFrame* keyframe1, KeyFrame* keyframe2, std::vect
 	const float cy = keyframe1->camera.cy;
 
 	// Camera 1 from world
-	const cv::Mat R1w = keyframe1->GetRotation();
-	const cv::Mat t1w = keyframe1->GetTranslation();
+	const cv::Mat R1w = cv::Mat(keyframe1->GetPose().R());
+	const cv::Mat t1w = cv::Mat(keyframe1->GetPose().t());
 
 	//Camera 2 from world
-	const cv::Mat R2w = keyframe2->GetRotation();
-	const cv::Mat t2w = keyframe2->GetTranslation();
+	const cv::Mat R2w = cv::Mat(keyframe2->GetPose().R());
+	const cv::Mat t2w = cv::Mat(keyframe2->GetPose().t());
 
 	//Transformation between cameras
 	cv::Mat sR12 = s12 * R12;

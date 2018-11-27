@@ -228,10 +228,10 @@ Sim3Solver::Sim3Solver(const KeyFrame* keyframe1, const KeyFrame* keyframe2, con
 	Xc1_.reserve(nkeypoints1_);
 	Xc2_.reserve(nkeypoints1_);
 
-	const cv::Mat Rcw1 = keyframe1->GetRotation();
-	const cv::Mat tcw1 = keyframe1->GetTranslation();
-	const cv::Mat Rcw2 = keyframe2->GetRotation();
-	const cv::Mat tcw2 = keyframe2->GetTranslation();
+	const cv::Mat Rcw1 = cv::Mat(keyframe1->GetPose().R());
+	const cv::Mat tcw1 = cv::Mat(keyframe1->GetPose().t());
+	const cv::Mat Rcw2 = cv::Mat(keyframe2->GetPose().R());
+	const cv::Mat tcw2 = cv::Mat(keyframe2->GetPose().t());
 
 	allIndices_.reserve(nkeypoints1_);
 

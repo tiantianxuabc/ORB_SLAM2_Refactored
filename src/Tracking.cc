@@ -56,7 +56,7 @@ void GlobalBundleAdjustemnt(Map* map, int niterations, bool* stopFlag = nullptr,
 TrackPoint::TrackPoint(const Frame& frame, bool lost)
 	: referenceKF(frame.referenceKF), timestamp(frame.timestamp), lost(lost)
 {
-	Tcr = frame.pose * CameraPose(frame.referenceKF->GetPoseInverse());
+	Tcr = frame.pose * frame.referenceKF->GetPose().Inverse();
 }
 
 struct TrackerParameters
@@ -1274,7 +1274,7 @@ public:
 		// Scale initial baseline
 		cv::Mat Tc2w = pKFcur->GetPose();
 		Tc2w.col(3).rowRange(0, 3) = Tc2w.col(3).rowRange(0, 3)*invMedianDepth;
-		pKFcur->SetPose(Tc2w);
+		pKFcur->SetPose(CameraPose(Tc2w));
 
 		// Scale points
 		vector<MapPoint*> vpAllMapPoints = pKFini->GetMapPointMatches();

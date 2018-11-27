@@ -74,58 +74,51 @@ void KeyFrame::ComputeBoW()
 	voc_->transform(Converter::toDescriptorVector(descriptorsL), bowVector, featureVector, 4);
 }
 
-void KeyFrame::SetPose(const cv::Mat& Tcw_)
+void KeyFrame::SetPose(const CameraPose& pose)
 {
 	LOCK_MUTEX_POSE();
-	Tcw_.copyTo(Tcw);
-	cv::Mat Rcw = GetR(Tcw);
-	cv::Mat tcw = Gett(Tcw);
-	cv::Mat Rwc = Rcw.t();
-	Ow = -Rwc * tcw;
-
-	Twc = cv::Mat::eye(4, 4, Tcw.type());
-	Rwc.copyTo(GetR(Twc));
-	Ow.copyTo(Gett(Twc));
+	pose_ = pose;
+	cv::Mat Twc = pose.Inverse().Mat();
 	cv::Mat center = (cv::Mat_<float>(4, 1) << halfBaseline_, 0, 0, 1);
 	Cw = Twc * center;
 }
 
-cv::Mat KeyFrame::GetPose() const
+CameraPose KeyFrame::GetPose() const
 {
 	LOCK_MUTEX_POSE();
-	return Tcw.clone();
-}
-
-cv::Mat KeyFrame::GetPoseInverse() const
-{
-	LOCK_MUTEX_POSE();
-	return Twc.clone();
+	return pose_;
 }
 
 cv::Mat KeyFrame::GetCameraCenter() const
 {
 	LOCK_MUTEX_POSE();
-	return Ow.clone();
+	return cv::Mat(pose_.Invt());
 }
 
-cv::Mat KeyFrame::GetStereoCenter() const
-{
-	LOCK_MUTEX_POSE();
-	return Cw.clone();
-}
-
-
-cv::Mat KeyFrame::GetRotation() const
-{
-	LOCK_MUTEX_POSE();
-	return GetR(Tcw).clone();
-}
-
-cv::Mat KeyFrame::GetTranslation() const
-{
-	LOCK_MUTEX_POSE();
-	return Gett(Tcw).clone();
-}
+//cv::Mat KeyFrame::GetPoseInverse() const
+//{
+//	LOCK_MUTEX_POSE();
+//	return Twc.clone();
+//}
+//
+//cv::Mat KeyFrame::GetStereoCenter() const
+//{
+//	LOCK_MUTEX_POSE();
+//	return Cw.clone();
+//}
+//
+//
+//cv::Mat KeyFrame::GetRotation() const
+//{
+//	LOCK_MUTEX_POSE();
+//	return GetR(Tcw).clone();
+//}
+//
+//cv::Mat KeyFrame::GetTranslation() const
+//{
+//	LOCK_MUTEX_POSE();
+//	return Gett(Tcw).clone();
+//}
 
 void KeyFrame::AddConnection(KeyFrame* keyframe, int weight)
 {
@@ -498,7 +491,7 @@ void KeyFrame::SetBadFlag()
 			child->ChangeParent(parent_);
 
 		parent_->EraseChild(this);
-		Tcp = Tcw * parent_->GetPoseInverse();
+		Tcp = pose_ * parent_->GetPose().Inverse();
 		bad_ = true;
 	}
 
@@ -553,7 +546,7 @@ cv::Mat KeyFrame::UnprojectStereo(int i) const
 	cv::Mat x3Dc = (cv::Mat_<float>(3, 1) << Xc, Yc, Zc);
 
 	LOCK_MUTEX_POSE();
-	return GetR(Twc) * x3Dc + Gett(Twc);
+	return cv::Mat(pose_.InvR()) * x3Dc + cv::Mat(pose_.Invt());
 }
 
 float KeyFrame::ComputeSceneMedianDepth(int q) const
@@ -564,7 +557,7 @@ float KeyFrame::ComputeSceneMedianDepth(int q) const
 		LOCK_MUTEX_FEATURES();
 		LOCK_MUTEX_POSE();
 		mappoints = mappoints_;
-		Tcw_ = Tcw.clone();
+		Tcw_ = pose_.Mat();
 	}
 
 	std::vector<float> depths;
