@@ -104,7 +104,7 @@ std::vector<KeyFrame*> KeyFrameDatabase::DetectLoopCandidates(KeyFrame* keyframe
 	for (KeyFrame* sharingKF : wordSharingKFs)
 		maxCommonWords = std::max(maxCommonWords, sharingKF->loopWords);
 
-	const int minCommonWords = static_cast<float>(0.8f * maxCommonWords);
+	const int minCommonWords = static_cast<int>(0.8f * maxCommonWords);
 
 	int nscores = 0;
 
