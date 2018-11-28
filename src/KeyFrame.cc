@@ -78,9 +78,6 @@ void KeyFrame::SetPose(const CameraPose& pose)
 {
 	LOCK_MUTEX_POSE();
 	pose_ = pose;
-	cv::Mat Twc = pose.Inverse().Mat();
-	cv::Mat center = (cv::Mat_<float>(4, 1) << halfBaseline_, 0, 0, 1);
-	Cw_ = Twc * center;
 }
 
 CameraPose KeyFrame::GetPose() const
@@ -94,31 +91,6 @@ Point3D KeyFrame::GetCameraCenter() const
 	LOCK_MUTEX_POSE();
 	return pose_.Invt();
 }
-
-//cv::Mat KeyFrame::GetPoseInverse() const
-//{
-//	LOCK_MUTEX_POSE();
-//	return Twc.clone();
-//}
-//
-//cv::Mat KeyFrame::GetStereoCenter() const
-//{
-//	LOCK_MUTEX_POSE();
-//	return Cw.clone();
-//}
-//
-//
-//cv::Mat KeyFrame::GetRotation() const
-//{
-//	LOCK_MUTEX_POSE();
-//	return GetR(Tcw).clone();
-//}
-//
-//cv::Mat KeyFrame::GetTranslation() const
-//{
-//	LOCK_MUTEX_POSE();
-//	return Gett(Tcw).clone();
-//}
 
 void KeyFrame::AddConnection(KeyFrame* keyframe, int weight)
 {
@@ -562,10 +534,6 @@ float KeyFrame::ComputeSceneMedianDepth(int q) const
 
 	std::vector<float> depths;
 	depths.reserve(N);
-
-	// cv::Mat Rcw2 = Tcw_.row(2).colRange(0, 3);
-	// Rcw2 = Rcw2.t();
-	// const float zcw = Tcw_.at<float>(2, 3);
 
 	const auto Rcw2 = Tcw_.R().row(2).t();
 	const float zcw = Tcw_.t()(2);

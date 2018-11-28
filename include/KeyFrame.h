@@ -170,8 +170,6 @@ protected:
 	// SE3 Pose and camera center
 	CameraPose pose_;
 	
-	cv::Mat Cw_; // Stereo middel point. Only for visualization
-
 	// MapPoints associated to keypoints
 	std::vector<MapPoint*> mappoints_;
 
