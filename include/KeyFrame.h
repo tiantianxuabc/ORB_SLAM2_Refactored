@@ -70,7 +70,7 @@ public:
 	void ChangeParent(KeyFrame* pKF);
 	std::set<KeyFrame*> GetChildren() const;
 	KeyFrame* GetParent() const;
-	bool hasChild(KeyFrame* pKF) const;
+	bool HasChild(KeyFrame* pKF) const;
 
 	// Loop Edges
 	void AddLoopEdge(KeyFrame* pKF);
