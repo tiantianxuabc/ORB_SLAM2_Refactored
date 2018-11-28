@@ -55,32 +55,32 @@ public:
 
 	// Covisibility graph functions
 	void AddConnection(KeyFrame* keyframe, int weight);
-	void EraseConnection(KeyFrame* pKF);
+	void EraseConnection(KeyFrame* keyframe);
 	void UpdateConnections();
 	void UpdateBestCovisibles();
 	std::set<KeyFrame *> GetConnectedKeyFrames() const;
 	std::vector<KeyFrame* > GetVectorCovisibleKeyFrames() const;
 	std::vector<KeyFrame*> GetBestCovisibilityKeyFrames(int N) const;
 	std::vector<KeyFrame*> GetCovisiblesByWeight(int w) const;
-	int GetWeight(KeyFrame* pKF) const;
+	int GetWeight(KeyFrame* keyframe) const;
 
 	// Spanning tree functions
-	void AddChild(KeyFrame* pKF);
-	void EraseChild(KeyFrame* pKF);
-	void ChangeParent(KeyFrame* pKF);
+	void AddChild(KeyFrame* keyframe);
+	void EraseChild(KeyFrame* keyframe);
+	void ChangeParent(KeyFrame* keyframe);
 	std::set<KeyFrame*> GetChildren() const;
 	KeyFrame* GetParent() const;
-	bool HasChild(KeyFrame* pKF) const;
+	bool HasChild(KeyFrame* keyframe) const;
 
 	// Loop Edges
-	void AddLoopEdge(KeyFrame* pKF);
+	void AddLoopEdge(KeyFrame* keyframe);
 	std::set<KeyFrame*> GetLoopEdges() const;
 
 	// MapPoint observation functions
-	void AddMapPoint(MapPoint* pMP, size_t idx);
+	void AddMapPoint(MapPoint* mappoint, size_t idx);
 	void EraseMapPointMatch(size_t idx);
-	void EraseMapPointMatch(MapPoint* pMP);
-	void ReplaceMapPointMatch(size_t idx, MapPoint* pMP);
+	void EraseMapPointMatch(MapPoint* mappoint);
+	void ReplaceMapPointMatch(size_t idx, MapPoint* mappoint);
 	std::set<MapPoint*> GetMapPoints() const;
 	std::vector<MapPoint*> GetMapPointMatches() const;
 	int TrackedMapPoints(int minObs) const;
@@ -170,7 +170,7 @@ protected:
 	// SE3 Pose and camera center
 	CameraPose pose_;
 	
-	cv::Mat Cw; // Stereo middel point. Only for visualization
+	cv::Mat Cw_; // Stereo middel point. Only for visualization
 
 	// MapPoints associated to keypoints
 	std::vector<MapPoint*> mappoints_;

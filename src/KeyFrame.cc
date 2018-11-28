@@ -80,7 +80,7 @@ void KeyFrame::SetPose(const CameraPose& pose)
 	pose_ = pose;
 	cv::Mat Twc = pose.Inverse().Mat();
 	cv::Mat center = (cv::Mat_<float>(4, 1) << halfBaseline_, 0, 0, 1);
-	Cw = Twc * center;
+	Cw_ = Twc * center;
 }
 
 CameraPose KeyFrame::GetPose() const
@@ -369,7 +369,7 @@ KeyFrame* KeyFrame::GetParent() const
 	return parent_;
 }
 
-bool KeyFrame::hasChild(KeyFrame* keyframe) const
+bool KeyFrame::HasChild(KeyFrame* keyframe) const
 {
 	LOCK_MUTEX_CONNECTIONS();
 	return children_.count(keyframe) > 0;

@@ -842,7 +842,7 @@ void Optimizer::OptimizeEssentialGraph(Map* map, KeyFrame* loopKF, KeyFrame* cur
 			if (!connectedKF)
 				continue;
 
-			if (connectedKF == parentKF || keyframe->hasChild(connectedKF) || loopEdges.count(connectedKF))
+			if (connectedKF == parentKF || keyframe->HasChild(connectedKF) || loopEdges.count(connectedKF))
 				continue;
 
 			if (connectedKF->isBad() || connectedKF->id >= keyframe->id)
