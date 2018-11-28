@@ -867,30 +867,30 @@ static float ReadDepthFactor(const cv::FileStorage& fs)
 static void PrintSettings(const CameraParams& camera, const cv::Mat1f& distCoeffs,
 	float fps, bool rgb, const ORBextractor::Parameters& param, float thDepth, int sensor)
 {
-	cout << endl << "Camera Parameters: " << endl;
-	cout << "- fx: " << camera.fx << endl;
-	cout << "- fy: " << camera.fy << endl;
-	cout << "- cx: " << camera.cx << endl;
-	cout << "- cy: " << camera.cy << endl;
-	cout << "- k1: " << distCoeffs(0) << endl;
-	cout << "- k2: " << distCoeffs(1) << endl;
+	std::cout << std::endl << "Camera Parameters: " << std::endl;
+	std::cout << "- fx: " << camera.fx << std::endl;
+	std::cout << "- fy: " << camera.fy << std::endl;
+	std::cout << "- cx: " << camera.cx << std::endl;
+	std::cout << "- cy: " << camera.cy << std::endl;
+	std::cout << "- k1: " << distCoeffs(0) << std::endl;
+	std::cout << "- k2: " << distCoeffs(1) << std::endl;
 	if (distCoeffs.rows == 5)
-		cout << "- k3: " << distCoeffs(4) << endl;
-	cout << "- p1: " << distCoeffs(2) << endl;
-	cout << "- p2: " << distCoeffs(3) << endl;
-	cout << "- fps: " << fps << endl;
+		std::cout << "- k3: " << distCoeffs(4) << std::endl;
+	std::cout << "- p1: " << distCoeffs(2) << std::endl;
+	std::cout << "- p2: " << distCoeffs(3) << std::endl;
+	std::cout << "- fps: " << fps << std::endl;
 
-	cout << "- color order: " << (rgb ? "RGB" : "BGR") << " (ignored if grayscale)" << endl;
+	std::cout << "- color order: " << (rgb ? "RGB" : "BGR") << " (ignored if grayscale)" << std::endl;
 
-	cout << endl << "ORB Extractor Parameters: " << endl;
-	cout << "- Number of Features: " << param.nfeatures << endl;
-	cout << "- Scale Levels: " << param.nlevels << endl;
-	cout << "- Scale Factor: " << param.scaleFactor << endl;
-	cout << "- Initial Fast Threshold: " << param.iniThFAST << endl;
-	cout << "- Minimum Fast Threshold: " << param.minThFAST << endl;
+	std::cout << std::endl << "ORB Extractor Parameters: " << std::endl;
+	std::cout << "- Number of Features: " << param.nfeatures << std::endl;
+	std::cout << "- Scale Levels: " << param.nlevels << std::endl;
+	std::cout << "- Scale Factor: " << param.scaleFactor << std::endl;
+	std::cout << "- Initial Fast Threshold: " << param.iniThFAST << std::endl;
+	std::cout << "- Minimum Fast Threshold: " << param.minThFAST << std::endl;
 
 	if (sensor == System::STEREO || sensor == System::RGBD)
-		cout << endl << "Depth Threshold (Close/Far Points): " << thDepth << endl;
+		std::cout << std::endl << "Depth Threshold (Close/Far Points): " << thDepth << std::endl;
 }
 
 class InitialPoseEstimator
