@@ -89,12 +89,12 @@ public:
 	int firstFrame;
 	
 	// Variables used by the tracking
-	float mTrackProjX;
-	float mTrackProjY;
-	float mTrackProjXR;
-	bool mbTrackInView;
-	int mnTrackScaleLevel;
-	float mTrackViewCos;
+	float trackProjX;
+	float trackProjY;
+	float trackProjXR;
+	bool trackInView;
+	int trackScaleLevel;
+	float trackViewCos;
 	frameid_t trackReferenceForFrame;
 	frameid_t lastFrameSeen;
 

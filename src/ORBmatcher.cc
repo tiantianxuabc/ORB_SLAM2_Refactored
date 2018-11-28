@@ -121,16 +121,16 @@ int ORBmatcher::SearchByProjection(Frame& frame, const std::vector<MapPoint*>& m
 
 	for (MapPoint* mappoint : mappoints)
 	{
-		if (!mappoint->mbTrackInView || mappoint->isBad())
+		if (!mappoint->trackInView || mappoint->isBad())
 			continue;
 
-		const int predictedScale = mappoint->mnTrackScaleLevel;
+		const int predictedScale = mappoint->trackScaleLevel;
 
 		// The size of the window will depend on the viewing direction
-		const float r = RadiusByViewingCos(mappoint->mTrackViewCos);
+		const float r = RadiusByViewingCos(mappoint->trackViewCos);
 		const float radius = th * r * frame.pyramid.scaleFactors[predictedScale];
-		const float u = mappoint->mTrackProjX;
-		const float v = mappoint->mTrackProjY;
+		const float u = mappoint->trackProjX;
+		const float v = mappoint->trackProjY;
 
 		const std::vector<size_t> indices = frame.GetFeaturesInArea(u, v, radius, predictedScale - 1, predictedScale);
 		if (indices.empty())
@@ -152,7 +152,7 @@ int ORBmatcher::SearchByProjection(Frame& frame, const std::vector<MapPoint*>& m
 
 			if (frame.uright[idx] > 0)
 			{
-				if (fabsf(mappoint->mTrackProjXR - frame.uright[idx]) > radius)
+				if (fabsf(mappoint->trackProjXR - frame.uright[idx]) > radius)
 					continue;
 			}
 

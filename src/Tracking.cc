@@ -213,7 +213,7 @@ static int DiscardOutliers(Frame& currFrame)
 			currFrame.mappoints[i] = nullptr;
 			currFrame.outlier[i] = false;
 
-			mappoint->mbTrackInView = false;
+			mappoint->trackInView = false;
 			mappoint->lastFrameSeen = currFrame.id;
 		}
 		else if (currFrame.mappoints[i]->Observations() > 0)
@@ -398,7 +398,7 @@ static void ConvertToGray(const cv::Mat& src, cv::Mat& dst, bool RGB)
 // and fill variables of the MapPoint to be used by the tracking
 static bool IsInFrustum(const Frame& frame, MapPoint* mappoint, float minViewingCos)
 {
-	mappoint->mbTrackInView = false;
+	mappoint->trackInView = false;
 
 	const CameraParams& camera = frame.camera;
 	const CameraPose& pose = frame.pose;
@@ -448,12 +448,12 @@ static bool IsInFrustum(const Frame& frame, MapPoint* mappoint, float minViewing
 	const int scale = mappoint->PredictScale(dist, (Frame*)&frame);
 
 	// Data used by the tracking
-	mappoint->mbTrackInView = true;
-	mappoint->mTrackProjX = u;
-	mappoint->mTrackProjXR = u - camera.bf * invZ;
-	mappoint->mTrackProjY = v;
-	mappoint->mnTrackScaleLevel = scale;
-	mappoint->mTrackViewCos = viewCos;
+	mappoint->trackInView = true;
+	mappoint->trackProjX = u;
+	mappoint->trackProjXR = u - camera.bf * invZ;
+	mappoint->trackProjY = v;
+	mappoint->trackScaleLevel = scale;
+	mappoint->trackViewCos = viewCos;
 
 	return true;
 }
@@ -474,7 +474,7 @@ static void SearchLocalPoints(const LocalMap& localMap, Frame& currFrame, float 
 		{
 			mappoint->IncreaseVisible();
 			mappoint->lastFrameSeen = currFrame.id;
-			mappoint->mbTrackInView = false;
+			mappoint->trackInView = false;
 		}
 	}
 
