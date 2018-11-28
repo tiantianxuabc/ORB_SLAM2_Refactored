@@ -60,27 +60,6 @@ struct ScalePyramidInfo
 	std::vector<float> invSigmaSq;
 };
 
-//struct CameraPose
-//{
-//	static inline cv::Mat GetR(const cv::Mat& T) { return T(cv::Range(0, 3), cv::Range(0, 3)); }
-//	static inline cv::Mat Gett(const cv::Mat& T) { return T(cv::Range(0, 3), cv::Range(3, 4)); }
-//
-//	// Computes rotation, translation and camera center matrices from the camera pose.
-//	void Update();
-//
-//	// Returns inverse of rotation
-//	cv::Mat GetRotationInverse() const;
-//
-//	// Camera pose.
-//	cv::Mat Tcw;
-//
-//	// Rotation, translation and camera center
-//	cv::Mat Rcw;
-//	cv::Mat tcw;
-//	cv::Mat Rwc;
-//	cv::Mat Ow; //==mtwc
-//};
-
 class FeaturesGrid
 {
 
