@@ -20,14 +20,15 @@
 
 #include "LocalMapping.h"
 
+#include <mutex>
+
 #include "Tracking.h"
 #include "LoopClosing.h"
 #include "ORBmatcher.h"
 #include "Usleep.h"
 #include "KeyFrame.h"
 #include "Map.h"
-
-#include<mutex>
+#include "Optimizer.h"
 
 #define LOCK_MUTEX_NEW_KF()    std::unique_lock<std::mutex> lock1(mutexNewKFs_);
 #define LOCK_MUTEX_RESET()     std::unique_lock<std::mutex> lock2(mutexReset_);
@@ -37,13 +38,6 @@
 
 namespace ORB_SLAM2
 {
-
-namespace Optimizer
-{
-
-void LocalBundleAdjustment(KeyFrame* pKF, bool *pbStopFlag, Map *pMap);
-
-} // namespace Optimizer
 
 static cv::Mat SkewSymmetricMatrix(const cv::Mat1f& v)
 {

@@ -40,18 +40,10 @@
 #include "PnPsolver.h"
 #include "Usleep.h"
 #include "CameraParameters.h"
+#include "Optimizer.h"
 
 namespace ORB_SLAM2
 {
-
-namespace Optimizer
-{
-
-int PoseOptimization(Frame* pFrame);
-void GlobalBundleAdjustemnt(Map* map, int niterations, bool* stopFlag = nullptr, frameid_t loopKFId = 0,
-	bool robust = true);
-
-}
 
 TrackPoint::TrackPoint(const Frame& frame, bool lost)
 	: referenceKF(frame.referenceKF), timestamp(frame.timestamp), lost(lost)
