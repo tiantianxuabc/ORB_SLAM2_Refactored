@@ -19,12 +19,13 @@
 */
 
 #include "Frame.h"
-#include "ORBmatcher.h"
 
+#include "ORBmatcher.h"
 #include "MapPoint.h"
 #include "ORBVocabulary.h"
 #include "KeyFrame.h"
 #include "ORBextractor.h"
+#include "Converter.h"
 
 #include <thread>
 #include <functional>
@@ -34,13 +35,6 @@ namespace ORB_SLAM2
 
 using KeyPoints = std::vector<cv::KeyPoint>;
 using Pyramid = std::vector<cv::Mat>;
-
-namespace Converter
-{
-
-std::vector<cv::Mat> toDescriptorVector(const cv::Mat &Descriptors);
-
-} // namespace Converter
 
 frameid_t Frame::nextId = 0;
 bool Frame::initialComputation = true;

@@ -24,7 +24,6 @@
 
 #include <thread>
 #include <iomanip>
-#include <Eigen/Geometry>
 
 #include "KeyFrame.h"
 #include "Tracking.h"
@@ -35,16 +34,10 @@
 #include "ORBVocabulary.h"
 #include "Viewer.h"
 #include "Usleep.h"
+#include "Converter.h"
 
 namespace ORB_SLAM2
 {
-
-namespace Converter
-{
-
-std::vector<float> toQuaternion(const cv::Mat &M);
-
-} // namespace Converter
 
 #define LOCK_MUTEX_RESET() unique_lock<mutex> lock1(mutexReset_);
 #define LOCK_MUTEX_MODE()  unique_lock<mutex> lock2(mutexMode_);

@@ -21,11 +21,7 @@
 #ifndef CONVERTER_H
 #define CONVERTER_H
 
-#include<opencv2/core/core.hpp>
-
-#include<Eigen/Dense>
-#include"Thirdparty/g2o/g2o/types/types_six_dof_expmap.h"
-#include"Thirdparty/g2o/g2o/types/types_seven_dof_expmap.h"
+#include <opencv2/core/core.hpp>
 
 namespace ORB_SLAM2
 {
@@ -34,21 +30,6 @@ namespace Converter
 {
 
 std::vector<cv::Mat> toDescriptorVector(const cv::Mat &Descriptors);
-
-g2o::SE3Quat toSE3Quat(const cv::Mat &cvT);
-g2o::SE3Quat toSE3Quat(const g2o::Sim3 &gSim3);
-
-cv::Mat toCvMat(const g2o::SE3Quat &SE3);
-cv::Mat toCvMat(const g2o::Sim3 &Sim3);
-cv::Mat toCvMat(const Eigen::Matrix<double, 4, 4> &m);
-cv::Mat toCvMat(const Eigen::Matrix3d &m);
-cv::Mat toCvMat(const Eigen::Matrix<double, 3, 1> &m);
-cv::Mat toCvSE3(const Eigen::Matrix<double, 3, 3> &R, const Eigen::Matrix<double, 3, 1> &t);
-
-Eigen::Matrix<double, 3, 1> toVector3d(const cv::Mat &cvVector);
-Eigen::Matrix<double, 3, 1> toVector3d(const cv::Point3f &cvPoint);
-Eigen::Matrix<double, 3, 3> toMatrix3d(const cv::Mat &cvMat3);
-
 std::vector<float> toQuaternion(const cv::Mat &M);
 
 } // namespace Converter
