@@ -27,6 +27,7 @@
 #include <opencv2/opencv.hpp>
 
 #include "CameraParameters.h"
+#include "Sim3.h"
 #include "Point.h"
 
 namespace ORB_SLAM2
@@ -39,15 +40,8 @@ class Sim3Solver
 {
 public:
 
-	struct Sim3
-	{
-		cv::Mat R;
-		cv::Mat t;
-		float scale;
-		cv::Mat T;
-	};
-
-	Sim3Solver(const KeyFrame* pKF1, const KeyFrame* pKF2, const std::vector<MapPoint*> &vpMatched12, bool bFixScale = true);
+	Sim3Solver(const KeyFrame* keyframe1, const KeyFrame* keyframe2, const std::vector<MapPoint*>& matches,
+		bool fixScale = true);
 	void SetRansacParameters(double probability = 0.99, int minInliers = 6, int maxIterations = 300);
 	bool iterate(int maxk, Sim3& sim3, std::vector<bool>& isInlier);
 	bool terminate() const;
@@ -92,9 +86,7 @@ private:
 	// Calibration
 	CameraParams camera1_;
 	CameraParams camera2_;
-	//cv::Mat K1_;
-	//cv::Mat K2_;
-
+	
 	bool terminate_;
 };
 

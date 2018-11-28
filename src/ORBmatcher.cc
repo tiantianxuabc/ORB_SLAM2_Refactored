@@ -820,7 +820,7 @@ int ORBmatcher::Fuse(KeyFrame* keyframe, const std::vector<MapPoint*>& mappoints
 	return nfused;
 }
 
-int ORBmatcher::Fuse(KeyFrame* keyframe, const cv::Mat& Scw, const std::vector<MapPoint*>& mappoints,
+int ORBmatcher::Fuse(KeyFrame* keyframe, const Sim3& Scw, const std::vector<MapPoint*>& mappoints,
 	float th, std::vector<MapPoint*>& replacePoints)
 {
 	// Get Calibration Parameters for later projection
@@ -830,7 +830,7 @@ int ORBmatcher::Fuse(KeyFrame* keyframe, const cv::Mat& Scw, const std::vector<M
 	const float cy = keyframe->camera.cy;
 
 	// Decompose Scw
-	const cv::Mat sRcw = GetR(Scw);
+	/*const cv::Mat sRcw = GetR(Scw);
 	const float scale = static_cast<float>(sqrt(sRcw.row(0).dot(sRcw.row(0))));
 	const cv::Mat _Rcw = sRcw / scale;
 	const cv::Mat _tcw = Gett(Scw) / scale;
@@ -838,7 +838,12 @@ int ORBmatcher::Fuse(KeyFrame* keyframe, const cv::Mat& Scw, const std::vector<M
 
 	const CameraPose::Mat33 Rcw(_Rcw);
 	const CameraPose::Mat31 tcw(_tcw);
-	const Vec3D Ow(_Ow);
+	const Vec3D Ow(_Ow);*/
+
+	const double invs = 1. / Scw.Scale();
+	const auto Rcw = Scw.R();
+	const auto tcw = invs * Scw.t();
+	const auto Ow = -Rcw.t() * tcw;
 
 	// Set of MapPoints already found in the KeyFrame
 	const std::set<MapPoint*> alreadyFound = keyframe->GetMapPoints();
@@ -940,7 +945,7 @@ int ORBmatcher::Fuse(KeyFrame* keyframe, const cv::Mat& Scw, const std::vector<M
 }
 
 int ORBmatcher::SearchBySim3(KeyFrame* keyframe1, KeyFrame* keyframe2, std::vector<MapPoint*>& matches12,
-	float s12, const cv::Mat &R12, const cv::Mat &_t12, float th)
+	const Sim3& S12, float th)
 {
 	const float fx = keyframe1->camera.fx;
 	const float fy = keyframe1->camera.fy;
@@ -956,14 +961,7 @@ int ORBmatcher::SearchBySim3(KeyFrame* keyframe1, KeyFrame* keyframe2, std::vect
 	const auto t2w = keyframe2->GetPose().t();
 
 	//Transformation between cameras
-	cv::Mat _sR12 = s12 * R12;
-	cv::Mat _sR21 = (1.0 / s12) * R12.t();
-	cv::Mat _t21 = -_sR21 * _t12;
-
-	const CameraPose::Mat33 sR12(_sR12);
-	const CameraPose::Mat33 sR21(_sR21);
-	const CameraPose::Mat31 t12(_t12);
-	const CameraPose::Mat31 t21(_t21);
+	const Sim3 S21 = S12.Inverse();
 
 	const std::vector<MapPoint*> mappoints1 = keyframe1->GetMapPointMatches();
 	const std::vector<MapPoint*> mappoints2 = keyframe2->GetMapPointMatches();
@@ -998,7 +996,7 @@ int ORBmatcher::SearchBySim3(KeyFrame* keyframe1, KeyFrame* keyframe2, std::vect
 
 		const Point3D Xw1 = mappoint1->GetWorldPos();
 		const Point3D Xc1 = R1w * Xw1 + t1w;
-		const Point3D Xc2 = sR21 * Xc1 + t21;
+		const Point3D Xc2 = S21.Map(Xc1);
 
 		// Depth must be positive
 		if (Xc2(2) < 0.f)
@@ -1057,7 +1055,7 @@ int ORBmatcher::SearchBySim3(KeyFrame* keyframe1, KeyFrame* keyframe2, std::vect
 		}
 	}
 
-	// Transform from KF2 to KF2 and search
+	// Transform from KF2 to KF1 and search
 	for (int i2 = 0; i2 < N2; i2++)
 	{
 		MapPoint* mappoint2 = mappoints2[i2];
@@ -1066,7 +1064,7 @@ int ORBmatcher::SearchBySim3(KeyFrame* keyframe1, KeyFrame* keyframe2, std::vect
 
 		const Point3D Xw2 = mappoint2->GetWorldPos();
 		const Point3D Xc2 = R2w * Xw2 + t2w;
-		const Point3D Xc1 = sR12 * Xc2 + t12;
+		const Point3D Xc1 = S12.Map(Xc2);
 
 		// Depth must be positive
 		if (Xc1(2) < 0.f)

@@ -37,7 +37,6 @@
 #include "KeyFrame.h"
 #include "LoopClosing.h"
 #include "Frame.h"
-#include "Converter.h"
 
 namespace ORB_SLAM2
 {
@@ -171,6 +170,20 @@ static Point3D FromVector3d(const Eigen::Vector3d& v)
 	return Point3D(v(0), v(1), v(2));
 }
 
+static g2o::Sim3 ToG2OSim3(const Sim3& S)
+{
+	const Eigen::Matrix3d R = ConvertRotation<Eigen::Matrix3d>(S.R());
+	const Eigen::Vector3d t = ConvertTranslation<Eigen::Vector3d>(S.t());
+	return g2o::Sim3(R, t, S.Scale());
+}
+
+static Sim3 FromG2OSim3(const g2o::Sim3& S)
+{
+	const CameraPose::Mat33 R = ConvertRotation<CameraPose::Mat33>(S.rotation().matrix());
+	const CameraPose::Mat31 t = ConvertTranslation<CameraPose::Mat31>(S.translation());
+	return Sim3(R, t, S.scale());
+}
+
 void Optimizer::GlobalBundleAdjustemnt(Map* map, int niterations, bool* stopFlag, frameid_t loopKFId, bool robust)
 {
 	std::vector<KeyFrame*> keyframes = map->GetAllKeyFrames();
@@ -194,7 +207,7 @@ void Optimizer::BundleAdjustment(const std::vector<KeyFrame*>& keyframes, const 
 		if (keyframe->isBad())
 			continue;
 
-		auto vertex = CreateVertexSE3(Converter::toSE3Quat(keyframe->GetPose()), keyframe->id, keyframe->id == 0);
+		auto vertex = CreateVertexSE3(ToSE3Quat(keyframe->GetPose()), keyframe->id, keyframe->id == 0);
 		optimizer.addVertex(vertex);
 		maxKFId = std::max(maxKFId, keyframe->id);
 	}
@@ -500,7 +513,7 @@ void Optimizer::LocalBundleAdjustment(KeyFrame* currKeyFrame, bool* stopFlag, Ma
 	// Set Local KeyFrame vertices
 	for (KeyFrame* localKF : localKFs)
 	{
-		auto vertex = CreateVertexSE3(Converter::toSE3Quat(localKF->GetPose()), localKF->id, localKF->id == 0);
+		auto vertex = CreateVertexSE3(ToSE3Quat(localKF->GetPose()), localKF->id, localKF->id == 0);
 		optimizer.addVertex(vertex);
 		maxKFId = std::max(maxKFId, localKF->id);
 	}
@@ -508,7 +521,7 @@ void Optimizer::LocalBundleAdjustment(KeyFrame* currKeyFrame, bool* stopFlag, Ma
 	// Set Fixed KeyFrame vertices
 	for (KeyFrame* fixedKF : fixedCameras)
 	{
-		auto vertex = CreateVertexSE3(Converter::toSE3Quat(fixedKF->GetPose()), fixedKF->id, true);
+		auto vertex = CreateVertexSE3(ToSE3Quat(fixedKF->GetPose()), fixedKF->id, true);
 		optimizer.addVertex(vertex);
 		maxKFId = std::max(maxKFId, fixedKF->id);
 	}
@@ -680,7 +693,7 @@ void Optimizer::LocalBundleAdjustment(KeyFrame* currKeyFrame, bool* stopFlag, Ma
 	{
 		const int id = localMP->id + maxKFId + 1;
 		g2o::VertexSBAPointXYZ* vertex = static_cast<g2o::VertexSBAPointXYZ*>(optimizer.vertex(id));
-		localMP->SetWorldPos(Converter::toCvMat(vertex->estimate()));
+		localMP->SetWorldPos(FromVector3d(vertex->estimate()));
 		localMP->UpdateNormalAndDepth();
 	}
 }
@@ -704,9 +717,8 @@ void Optimizer::OptimizeEssentialGraph(Map* map, KeyFrame* loopKF, KeyFrame* cur
 
 	const frameid_t maxKFid = map->GetMaxKFid();
 
-	using AlignedAllocator = Eigen::aligned_allocator<g2o::Sim3>;
-	std::vector<g2o::Sim3, AlignedAllocator> nonCorrectedScw(maxKFid + 1);
-	std::vector<g2o::Sim3, AlignedAllocator> correctedSwc(maxKFid + 1);
+	std::vector<Sim3> nonCorrectedScw(maxKFid + 1);
+	std::vector<Sim3> correctedSwc(maxKFid + 1);
 	std::vector<g2o::VertexSim3Expmap*> vertices(maxKFid + 1);
 
 	// Set KeyFrame vertices
@@ -723,16 +735,15 @@ void Optimizer::OptimizeEssentialGraph(Map* map, KeyFrame* loopKF, KeyFrame* cur
 
 		if (it != std::end(correctedSim3))
 		{
-			nonCorrectedScw[id] = it->second;
-			vertex->setEstimate(it->second);
+			const Sim3& Scw = it->second;
+			nonCorrectedScw[id] = Scw;
+			vertex->setEstimate(ToG2OSim3(Scw));
 		}
 		else
 		{
-			Eigen::Matrix3d Rcw = Converter::toMatrix3d(cv::Mat(keyframe->GetPose().R()));
-			Eigen::Vector3d tcw = ToVector3d(cv::Mat(keyframe->GetPose().t()));
-			g2o::Sim3 Siw(Rcw, tcw, 1.0);
-			nonCorrectedScw[id] = Siw;
-			vertex->setEstimate(Siw);
+			Sim3 Scw(keyframe->GetPose());
+			nonCorrectedScw[id] = Scw;
+			vertex->setEstimate(ToG2OSim3(Scw));
 		}
 
 		if (keyframe == loopKF)
@@ -757,8 +768,8 @@ void Optimizer::OptimizeEssentialGraph(Map* map, KeyFrame* loopKF, KeyFrame* cur
 	{
 		KeyFrame* keyframe = connection.first;
 		const frameid_t id1 = keyframe->id;
-		const g2o::Sim3 Siw = nonCorrectedScw[id1];
-		const g2o::Sim3 Swi = Siw.inverse();
+		const Sim3 Siw = nonCorrectedScw[id1];
+		const Sim3 Swi = Siw.Inverse();
 
 		for (KeyFrame* connectedKF : connection.second)
 		{
@@ -766,13 +777,13 @@ void Optimizer::OptimizeEssentialGraph(Map* map, KeyFrame* loopKF, KeyFrame* cur
 			if ((id1 != currKF->id || id2 != loopKF->id) && keyframe->GetWeight(connectedKF) < minWeight)
 				continue;
 
-			const g2o::Sim3 Sjw = nonCorrectedScw[id2];
-			const g2o::Sim3 Sji = Sjw * Swi;
+			const Sim3 Sjw = nonCorrectedScw[id2];
+			const Sim3 Sji = Sjw * Swi;
 
 			g2o::EdgeSim3* e = new g2o::EdgeSim3();
 			e->setVertex(1, optimizer.vertex(id2));
 			e->setVertex(0, optimizer.vertex(id1));
-			e->setMeasurement(Sji);
+			e->setMeasurement(ToG2OSim3(Sji));
 			e->information() = lambda;
 			optimizer.addEdge(e);
 			insertedEdges.insert(MakeMinMaxPair(id1, id2));
@@ -784,8 +795,8 @@ void Optimizer::OptimizeEssentialGraph(Map* map, KeyFrame* loopKF, KeyFrame* cur
 	{
 		const frameid_t id1 = keyframe->id;
 		const auto it1 = nonCorrectedSim3.find(keyframe);
-		const g2o::Sim3 Siw = it1 != std::end(nonCorrectedSim3) ? it1->second : nonCorrectedScw[id1];
-		const g2o::Sim3 Swi = Siw.inverse();
+		const Sim3 Siw = it1 != std::end(nonCorrectedSim3) ? it1->second : nonCorrectedScw[id1];
+		const Sim3 Swi = Siw.Inverse();
 
 		KeyFrame* parentKF = keyframe->GetParent();
 
@@ -794,13 +805,13 @@ void Optimizer::OptimizeEssentialGraph(Map* map, KeyFrame* loopKF, KeyFrame* cur
 		{
 			const frameid_t id2 = parentKF->id;
 			const auto it2 = nonCorrectedSim3.find(parentKF);
-			const g2o::Sim3 Sjw = it2 != std::end(nonCorrectedSim3) ? it2->second : nonCorrectedScw[id2];
-			const g2o::Sim3 Sji = Sjw * Swi;
+			const Sim3 Sjw = it2 != std::end(nonCorrectedSim3) ? it2->second : nonCorrectedScw[id2];
+			const Sim3 Sji = Sjw * Swi;
 
 			g2o::EdgeSim3* e = new g2o::EdgeSim3();
 			e->setVertex(1, optimizer.vertex(id2));
 			e->setVertex(0, optimizer.vertex(id1));
-			e->setMeasurement(Sji);
+			e->setMeasurement(ToG2OSim3(Sji));
 			e->information() = lambda;
 			optimizer.addEdge(e);
 		}
@@ -814,13 +825,13 @@ void Optimizer::OptimizeEssentialGraph(Map* map, KeyFrame* loopKF, KeyFrame* cur
 
 			const frameid_t id3 = loopEdge->id;
 			const auto it3 = nonCorrectedSim3.find(loopEdge);
-			const g2o::Sim3 Slw = it3 != std::end(nonCorrectedSim3) ? it3->second : nonCorrectedScw[id3];
-			const g2o::Sim3 Sli = Slw * Swi;
+			const Sim3 Slw = it3 != std::end(nonCorrectedSim3) ? it3->second : nonCorrectedScw[id3];
+			const Sim3 Sli = Slw * Swi;
 
 			g2o::EdgeSim3* e = new g2o::EdgeSim3();
 			e->setVertex(1, optimizer.vertex(id3));
 			e->setVertex(0, optimizer.vertex(id1));
-			e->setMeasurement(Sli);
+			e->setMeasurement(ToG2OSim3(Sli));
 			e->information() = lambda;
 			optimizer.addEdge(e);
 		}
@@ -842,13 +853,13 @@ void Optimizer::OptimizeEssentialGraph(Map* map, KeyFrame* loopKF, KeyFrame* cur
 
 			const frameid_t id4 = connectedKF->id;
 			const auto it4 = nonCorrectedSim3.find(connectedKF);
-			const g2o::Sim3 Snw = it4 != std::end(nonCorrectedSim3) ? it4->second : nonCorrectedScw[id4];
-			const g2o::Sim3 Sni = Snw * Swi;
+			const Sim3 Snw = it4 != std::end(nonCorrectedSim3) ? it4->second : nonCorrectedScw[id4];
+			const Sim3 Sni = Snw * Swi;
 
 			g2o::EdgeSim3* e = new g2o::EdgeSim3();
 			e->setVertex(1, optimizer.vertex(id4));
 			e->setVertex(0, optimizer.vertex(id1));
-			e->setMeasurement(Sni);
+			e->setMeasurement(ToG2OSim3(Sni));
 			e->information() = lambda;
 			optimizer.addEdge(e);
 		}
@@ -866,17 +877,11 @@ void Optimizer::OptimizeEssentialGraph(Map* map, KeyFrame* loopKF, KeyFrame* cur
 		const frameid_t id = keyframe->id;
 
 		g2o::VertexSim3Expmap* vertex = static_cast<g2o::VertexSim3Expmap*>(optimizer.vertex(id));
-		g2o::Sim3 correctedSiw = vertex->estimate();
-		correctedSwc[id] = correctedSiw.inverse();
-		Eigen::Matrix3d eigR = correctedSiw.rotation().toRotationMatrix();
-		Eigen::Vector3d eigt = correctedSiw.translation();
-		const double s = correctedSiw.scale();
-
-		eigt *= (1. / s); //[R t/s;0 1]
-
-		cv::Mat Tiw = Converter::toCvSE3(eigR, eigt);
-
-		keyframe->SetPose(CameraPose(Tiw));
+		const Sim3 correctedSiw = FromG2OSim3(vertex->estimate());
+		correctedSwc[id] = correctedSiw.Inverse();
+		const double invs = 1. / correctedSiw.Scale();
+		const CameraPose Tiw(correctedSiw.R(), invs * correctedSiw.t());
+		keyframe->SetPose(Tiw);
 	}
 
 	// Correct points. Transform to "non-optimized" reference keyframe pose and transform back with optimized pose
@@ -888,22 +893,19 @@ void Optimizer::OptimizeEssentialGraph(Map* map, KeyFrame* loopKF, KeyFrame* cur
 		KeyFrame* referenceKF = mappoint->GetReferenceKeyFrame();
 		const int id = mappoint->correctedByKF == currKF->id ? mappoint->correctedReference : referenceKF->id;
 
-		g2o::Sim3 Srw = nonCorrectedScw[id];
-		g2o::Sim3 correctedSwr = correctedSwc[id];
+		const Sim3 Srw = nonCorrectedScw[id];
+		const Sim3 correctedSwr = correctedSwc[id];
+		const Sim3 correction = correctedSwr * Srw;
 
 		const Point3D P3Dw = mappoint->GetWorldPos();
-		Eigen::Matrix<double, 3, 1> eigP3Dw = ToVector3d(P3Dw);
-		Eigen::Matrix<double, 3, 1> eigCorrectedP3Dw = correctedSwr.map(Srw.map(eigP3Dw));
-
-		cv::Mat cvCorrectedP3Dw = Converter::toCvMat(eigCorrectedP3Dw);
-		mappoint->SetWorldPos(cvCorrectedP3Dw);
-
+		const Point3D CorrectedP3Dw = correction.Map(P3Dw);
+		mappoint->SetWorldPos(CorrectedP3Dw);
 		mappoint->UpdateNormalAndDepth();
 	}
 }
 
-int Optimizer::OptimizeSim3(KeyFrame* keyframe1, KeyFrame* keyframe2, std::vector<MapPoint*>& matches1,
-	g2o::Sim3& S12, float maxChi2, bool fixScale)
+int Optimizer::OptimizeSim3(KeyFrame* keyframe1, KeyFrame* keyframe2, std::vector<MapPoint*>& matches1, Sim3& S12,
+	float maxChi2, bool fixScale)
 {
 	g2o::SparseOptimizer optimizer;
 	CreateOptimizer<g2o::LinearSolverDense, g2o::BlockSolverX>(optimizer);
@@ -921,7 +923,7 @@ int Optimizer::OptimizeSim3(KeyFrame* keyframe1, KeyFrame* keyframe2, std::vecto
 	// Set Sim3 vertex
 	g2o::VertexSim3Expmap * vertex = new g2o::VertexSim3Expmap();
 	vertex->_fix_scale = fixScale;
-	vertex->setEstimate(S12);
+	vertex->setEstimate(ToG2OSim3(S12));
 	vertex->setId(0);
 	vertex->setFixed(false);
 	vertex->_principle_point1[0] = camera1.cx;
@@ -1055,7 +1057,7 @@ int Optimizer::OptimizeSim3(KeyFrame* keyframe1, KeyFrame* keyframe2, std::vecto
 	}
 
 	// Recover optimized Sim3
-	S12 = vertex->estimate();
+	S12 = FromG2OSim3(vertex->estimate());
 
 	return ninliers;
 }

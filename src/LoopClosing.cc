@@ -24,7 +24,6 @@
 #include <thread>
 
 #include "Sim3Solver.h"
-#include "Converter.h"
 #include "Optimizer.h"
 #include "ORBmatcher.h"
 #include "Map.h"
@@ -52,8 +51,7 @@ public:
 	struct Loop
 	{
 		KeyFrame* matchedKF;
-		cv::Mat Scw;
-		g2o::Sim3 ScwG2O;
+		Sim3 Scw;
 		std::vector<MapPoint*> matchedPoints;
 		std::vector<MapPoint*> loopMapPoints;
 	};
@@ -119,8 +117,8 @@ public:
 				// Perform 5 Ransac Iterations
 				std::vector<bool> isInlier;
 				auto solver = solvers[i];
-				Sim3Solver::Sim3 sim3;
-				const bool found = solver->iterate(5, sim3, isInlier);
+				Sim3 Scm;
+				const bool found = solver->iterate(5, Scm, isInlier);
 				
 				// If Ransac reachs max. iterations discard keyframe
 				if (solver->terminate())
@@ -136,23 +134,16 @@ public:
 					for (size_t j = 0; j < isInlier.size(); j++)
 						matches[j] = isInlier[j] ? vmatches[i][j] : nullptr;
 
-					const cv::Mat R = sim3.R;
-					const cv::Mat t = sim3.t;
-					const float s = sim3.scale;
-					matcher.SearchBySim3(currentKF, candidateKF, matches, s, R, t, 7.5f);
+					matcher.SearchBySim3(currentKF, candidateKF, matches, Scm, 7.5f);
 
-					g2o::Sim3 Scm(Converter::toMatrix3d(R), Converter::toVector3d(t), s);
 					const int nInliers = Optimizer::OptimizeSim3(currentKF, candidateKF, matches, Scm, 10, fixScale);
 
 					// If optimization is succesful stop ransacs and continue
 					if (nInliers >= 20)
 					{
-						cv::Mat Rcw(candidateKF->GetPose().R());
-						cv::Mat tcw(candidateKF->GetPose().t());
-						g2o::Sim3 Smw(Converter::toMatrix3d(Rcw), Converter::toVector3d(tcw), 1.0);
+						Sim3 Smw(candidateKF->GetPose());
 						loop.matchedKF = candidateKF;
-						loop.ScwG2O = Scm * Smw;
-						loop.Scw = Converter::toCvMat(loop.ScwG2O);
+						loop.Scw = Scm * Smw;
 						loop.matchedPoints = matches;
 						return true;
 					}
@@ -532,7 +523,7 @@ public:
 		std::cout << "Loop detected!" << std::endl;
 
 		KeyFrame* matchedKF = loop.matchedKF;
-		g2o::Sim3& ScwG2O = loop.ScwG2O;
+		const Sim3& Scw = loop.Scw;
 		std::vector<MapPoint*>& matchedPoints = loop.matchedPoints;
 		std::vector<MapPoint*>& loopMapPoints = loop.loopMapPoints;
 
@@ -561,7 +552,7 @@ public:
 		connectedKFs.push_back(currentKF);
 
 		KeyFrameAndPose CorrectedSim3, NonCorrectedSim3;
-		CorrectedSim3[currentKF] = ScwG2O;
+		CorrectedSim3[currentKF] = Scw;
 		const CameraPose Twc = currentKF->GetPose().Inverse();
 
 
@@ -573,30 +564,25 @@ public:
 				const CameraPose Tiw = connectedKF->GetPose();
 				if (connectedKF != currentKF)
 				{
-					CameraPose Tic = Tiw * Twc;
-					cv::Mat Ric = cv::Mat(Tic.R());
-					cv::Mat tic = cv::Mat(Tic.t());
-					g2o::Sim3 g2oSic(Converter::toMatrix3d(Ric), Converter::toVector3d(tic), 1.0);
-					g2o::Sim3 g2oCorrectedSiw = g2oSic * ScwG2O;
+					const CameraPose Tic = Tiw * Twc;
+					const Sim3 Sic(Tic);
+					const Sim3 CorrectedSiw = Sic * Scw;
 					//Pose corrected with the Sim3 of the loop closure
-					CorrectedSim3[connectedKF] = g2oCorrectedSiw;
+					CorrectedSim3[connectedKF] = CorrectedSiw;
 				}
 
-				cv::Mat Riw = cv::Mat(Tiw.R());
-				cv::Mat tiw = cv::Mat(Tiw.t());
-				g2o::Sim3 g2oSiw(Converter::toMatrix3d(Riw), Converter::toVector3d(tiw), 1.0);
 				//Pose without correction
-				NonCorrectedSim3[connectedKF] = g2oSiw;
+				NonCorrectedSim3[connectedKF] = Sim3(Tiw);
 			}
 
 			// Correct all MapPoints obsrved by current keyframe and neighbors, so that they align with the other side of the loop
-			//for (KeyFrameAndPose::iterator mit = CorrectedSim3.begin(), mend = CorrectedSim3.end(); mit != mend; mit++)
 			for (const auto& v : CorrectedSim3)
 			{
 				KeyFrame* connectedKF = v.first;
-				g2o::Sim3 g2oCorrectedSiw = v.second;
-				g2o::Sim3 g2oCorrectedSwi = g2oCorrectedSiw.inverse();
-				g2o::Sim3 g2oSiw = NonCorrectedSim3[connectedKF];
+				const Sim3& CorrectedSiw = v.second;
+				const Sim3& CorrectedSwi = CorrectedSiw.Inverse();
+				const Sim3& Siw = NonCorrectedSim3[connectedKF];
+				const Sim3 correction = CorrectedSwi * Siw;
 
 				for (MapPoint* mappiont : connectedKF->GetMapPointMatches())
 				{
@@ -604,27 +590,23 @@ public:
 						continue;
 					
 					// Project with non-corrected pose and project back with corrected pose
-					cv::Mat P3Dw = cv::Mat(mappiont->GetWorldPos());
-					Eigen::Matrix<double, 3, 1> eigP3Dw = Converter::toVector3d(P3Dw);
-					Eigen::Matrix<double, 3, 1> eigCorrectedP3Dw = g2oCorrectedSwi.map(g2oSiw.map(eigP3Dw));
+					const Point3D P3Dw = mappiont->GetWorldPos();
+					const Point3D CorrectedP3Dw = correction.Map(P3Dw);
 
-					cv::Mat cvCorrectedP3Dw = Converter::toCvMat(eigCorrectedP3Dw);
-					mappiont->SetWorldPos(cvCorrectedP3Dw);
+					mappiont->SetWorldPos(CorrectedP3Dw);
 					mappiont->correctedByKF = currentKF->id;
 					mappiont->correctedReference = connectedKF->id;
 					mappiont->UpdateNormalAndDepth();
 				}
 
 				// Update keyframe pose with corrected Sim3. First transform Sim3 to SE3 (scale translation)
-				Eigen::Matrix3d eigR = g2oCorrectedSiw.rotation().toRotationMatrix();
-				Eigen::Vector3d eigt = g2oCorrectedSiw.translation();
-				double s = g2oCorrectedSiw.scale();
-
-				eigt *= (1. / s); //[R t/s;0 1]
-
-				cv::Mat correctedTiw = Converter::toCvSE3(eigR, eigt);
-
-				connectedKF->SetPose(CameraPose(correctedTiw));
+				
+				// [R t/s;0 1]
+				const auto R = CorrectedSiw.R();
+				const auto t = CorrectedSiw.t();
+				const double invs = 1. / CorrectedSiw.Scale();
+				
+				connectedKF->SetPose(CameraPose(R, invs * t));
 
 				// Make sure connections are updated
 				connectedKF->UpdateConnections();
@@ -659,11 +641,11 @@ public:
 		for (const auto& v : CorrectedSim3)
 		{
 			KeyFrame* connectedKF = v.first;
-			g2o::Sim3 g2oScw = v.second;
-			cv::Mat cvScw = Converter::toCvMat(g2oScw);
+			const Sim3& Scw = v.second;
+			//cv::Mat cvScw = Converter::toCvMat(Scw);
 
 			std::vector<MapPoint*> replacePoints(loopMapPoints.size(), nullptr);
-			matcher.Fuse(connectedKF, cvScw, loopMapPoints, 4, replacePoints);
+			matcher.Fuse(connectedKF, Scw, loopMapPoints, 4, replacePoints);
 
 			// Get Map Mutex
 			LOCK_MUTEX_MAP_UPDATE();
@@ -859,7 +841,7 @@ public:
 		finished_ = true;
 	}
 
-	EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+	//EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
 private:
 

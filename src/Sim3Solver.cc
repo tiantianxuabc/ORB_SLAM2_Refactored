@@ -35,16 +35,6 @@
 namespace ORB_SLAM2
 {
 
-using Sim3 = Sim3Solver::Sim3;
-
-static void CopySim3(const Sim3& src, Sim3& dst)
-{
-	dst.T = src.T.clone();
-	dst.R = src.R.clone();
-	dst.t = src.t.clone();
-	dst.scale = src.scale;
-}
-
 static void ComputeCentroid(const cv::Mat& P, cv::Mat& Pr, cv::Mat& C)
 {
 	cv::reduce(P, C, 1, CV_REDUCE_SUM);
@@ -98,14 +88,16 @@ static void ComputeRotation(const cv::Mat1f& M, cv::Mat& R)
 	cv::Rodrigues(vec, R); // computes the rotation matrix from angle-axis
 }
 
-static void ComputeRotationSVD(cv::Mat& M, cv::Mat& R)
+static void ComputeRotationSVD(cv::Mat1f& M, cv::Matx33f& R)
 {
-	cv::Mat w, U, Vh;
+	cv::Mat1f w, U, Vh;
 	cv::SVD::compute(M.t(), w, U, Vh, cv::SVD::MODIFY_A | cv::SVD::FULL_UV);
-	cv::Mat S = cv::Mat::eye(3, 3, CV_32F);
+	cv::Mat1f S = cv::Mat1f::eye(3, 3);
 	if (cv::determinant(U) * cv::determinant(Vh) < 0)
-		S.at<float>(2, 2) = -1.f;
-	R = U * S * Vh;
+		S(2, 2) = -1.f;
+
+	cv::Mat1f _R = U * S * Vh;
+	R = cv::Matx33f(_R);
 }
 
 static void ComputeSim3(const cv::Mat& P1, const cv::Mat& P2, Sim3& S12, Sim3& S21, bool fixScale)
@@ -117,68 +109,54 @@ static void ComputeSim3(const cv::Mat& P1, const cv::Mat& P2, Sim3& S12, Sim3& S
 
 	cv::Mat Pr1(P1.size(), P1.type()); // Relative coordinates to centroid (set 1)
 	cv::Mat Pr2(P2.size(), P2.type()); // Relative coordinates to centroid (set 2)
-	cv::Mat O1(3, 1, Pr1.type()); // Centroid of P1
-	cv::Mat O2(3, 1, Pr2.type()); // Centroid of P2
+	cv::Mat _O1(3, 1, Pr1.type()); // Centroid of P1
+	cv::Mat _O2(3, 1, Pr2.type()); // Centroid of P2
 
-	ComputeCentroid(P1, Pr1, O1);
-	ComputeCentroid(P2, Pr2, O2);
+	ComputeCentroid(P1, Pr1, _O1);
+	ComputeCentroid(P2, Pr2, _O2);
+
+	const cv::Matx31f O1(_O1);
+	const cv::Matx31f O2(_O2);
 
 	// Step 2: Compute M matrix
 
-	cv::Mat M = Pr2 * Pr1.t();
+	cv::Mat1f M = Pr2 * Pr1.t();
 
 	// Step 3 ~ Step 4: Compute Rotation matrix
-	//ComputeRotation(M, S12.R);
-	ComputeRotationSVD(M, S12.R);
+	cv::Matx33f R12;
+	ComputeRotationSVD(M, R12);
 
 	// Step 5: Rotate set 2
 
-	cv::Mat P3 = S12.R * Pr2;
+	cv::Mat1f P3 = cv::Mat(R12) * Pr2;
 
 	// Step 6: Scale
-	S12.scale = 1.f;
+	float s12 = 1.f;
 	if (!fixScale)
 	{
-		auto Squared = [](float x) { return x * x; };
 		const double nom = Pr1.dot(P3);
 		double den = 0;
 		for (int i = 0; i < P3.rows; i++)
 			for (int j = 0; j < P3.cols; j++)
-				den += Squared(P3.at<float>(i, j) * P3.at<float>(i, j));
-		S12.scale = static_cast<float>(nom / den);
+				den += P3(i, j) * P3(i, j);
+		s12 = static_cast<float>(nom / den);
 	}
 
 	// Step 7: Translation
-
-	S12.t.create(1, 3, P1.type());
-	S12.t = O1 - S12.scale * S12.R * O2;
-
+	const cv::Matx31f t12 = O1 - s12 * R12 * O2;
+	
 	// Step 8: Transformation
-	cv::Mat sR12, sR21;
-
-	S12.T = cv::Mat::eye(4, 4, P1.type());
-	S21.T = cv::Mat::eye(4, 4, P1.type());
-
+	
 	// Step 8.1 T12
-	sR12 = S12.scale * S12.R;
-	sR12.copyTo(GetR(S12.T));
-	S12.t.copyTo(Gett(S12.T));
-
+	S12 = Sim3(R12, t12, s12);
+	
 	// Step 8.2 T21
-	S21.R = S12.R.t();
-	S21.scale = 1.f / S12.scale;
-	sR21 = S21.scale * S21.R;
-	S21.t = -sR21 * S12.t;
-	sR21.copyTo(GetR(S21.T));
-	S21.t.copyTo(Gett(S21.T));
+	S21 = S12.Inverse();
 }
 
-static void Project(const std::vector<Point3D>& points3D, std::vector<Point2D>& points2D, const cv::Mat& Tcw,
+static void Project(const std::vector<Point3D>& points3D, std::vector<Point2D>& points2D, const Sim3& Tcw,
 	const CameraParams& camera)
 {
-	const CameraPose::Mat33 Rcw = GetR(Tcw);
-	const CameraPose::Mat31 tcw = Gett(Tcw);
-
 	const float fx = camera.fx;
 	const float fy = camera.fy;
 	const float cx = camera.cx;
@@ -189,7 +167,7 @@ static void Project(const std::vector<Point3D>& points3D, std::vector<Point2D>& 
 
 	for (size_t i = 0; i < points3D.size(); i++)
 	{
-		const Point3D P3Dc = Rcw * points3D[i] + tcw;
+		const Point3D P3Dc = Tcw.Map(points3D[i]);
 		const float invZ = 1.f / (P3Dc(2));
 		const float u = P3Dc(0) * invZ;
 		const float v = P3Dc(1) * invZ;
@@ -340,8 +318,8 @@ bool Sim3Solver::iterate(int maxk, Sim3& sim3, std::vector<bool>& isInlier)
 
 		//CheckInliers();
 		std::vector<Point2D> proj1, proj2;
-		Project(Xc2_, proj1, S12.T, camera1_);
-		Project(Xc1_, proj2, S21.T, camera2_);
+		Project(Xc2_, proj1, S12, camera1_);
+		Project(Xc1_, proj2, S21, camera2_);
 
 		int ninliers = 0;
 		for (size_t i = 0; i < points1_.size(); i++)
@@ -360,10 +338,10 @@ bool Sim3Solver::iterate(int maxk, Sim3& sim3, std::vector<bool>& isInlier)
 		if (ninliers >= maxInliers_)
 		{
 			maxInliers_ = ninliers;
-			CopySim3(S12, bestS12_);
+			bestS12_ = S12;
 			if (ninliers > minInliers_)
 			{
-				CopySim3(bestS12_, sim3);
+				sim3 = bestS12_;
 				for (int i = 0; i < nmatches_; i++)
 					if (inliers_[i])
 						isInlier[indices1_[i]] = true;

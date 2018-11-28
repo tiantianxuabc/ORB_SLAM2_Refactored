@@ -30,6 +30,7 @@
 #include "MapPoint.h"
 #include "KeyFrame.h"
 #include "Frame.h"
+#include "Sim3.h"
 
 namespace ORB_SLAM2
 {
@@ -76,13 +77,14 @@ public:
 
 	// Search matches between MapPoints seen in KF1 and KF2 transforming by a Sim3 [s12*R12|t12]
 	// In the stereo and RGB-D case, s12=1
-	int SearchBySim3(KeyFrame* keyframe1, KeyFrame* keyframe2, std::vector<MapPoint*>& matches12, float s12, const cv::Mat &R12, const cv::Mat &t12, float th);
+	int SearchBySim3(KeyFrame* keyframe1, KeyFrame* keyframe2, std::vector<MapPoint*>& matches12,
+		const Sim3& S12, float th);
 
 	// Project MapPoints into KeyFrame and search for duplicated MapPoints.
 	int Fuse(KeyFrame* keyframe, const std::vector<MapPoint*>& mappoints, float th = 3.f);
 
 	// Project MapPoints into KeyFrame using a given Sim3 and search for duplicated MapPoints.
-	int Fuse(KeyFrame* keyframe, const cv::Mat& Scw, const std::vector<MapPoint*>& mappoints,
+	int Fuse(KeyFrame* keyframe, const Sim3& Scw, const std::vector<MapPoint*>& mappoints,
 		float th, std::vector<MapPoint*>& replacePoints);
 
 public:

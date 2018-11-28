@@ -39,6 +39,7 @@ public:
 	float Scale() const { return s_; }
 	Point3D Map(const Point3D& x) const { return s_ * R_ * x + t_; }
 
+	Mat33 sR() const { return s_ * R_; }
 	Mat33 InvR() const { return R_.t(); }
 	Mat31 Invt() const { return -(1.f / s_) * R_.t() * t_; }
 	float Invs() const { return 1.f / s_; }
