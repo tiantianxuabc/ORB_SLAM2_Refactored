@@ -372,7 +372,7 @@ KeyFrame* KeyFrame::GetParent() const
 bool KeyFrame::hasChild(KeyFrame* keyframe) const
 {
 	LOCK_MUTEX_CONNECTIONS();
-	return children_.count(keyframe);
+	return children_.count(keyframe) > 0;
 }
 
 void KeyFrame::AddLoopEdge(KeyFrame* keyframe)
