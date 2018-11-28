@@ -50,11 +50,6 @@ public:
 	CameraPose GetPose() const;
 	Point3D GetCameraCenter() const;
 
-	/*cv::Mat GetPoseInverse() const;
-	cv::Mat GetStereoCenter() const;
-	cv::Mat GetRotation() const;
-	cv::Mat GetTranslation() const;*/
-
 	// Bag of Words Representation
 	void ComputeBoW();
 
@@ -109,11 +104,6 @@ public:
 	// Compute Scene Depth (q=2 median). Used in monocular.
 	float ComputeSceneMedianDepth(int q) const;
 
-	static bool lId(KeyFrame* pKF1, KeyFrame* pKF2) {
-		return pKF1->id < pKF2->id;
-	}
-
-
 	// The following variables are accesed from only 1 thread or never change (no mutex needed).
 public:
 
@@ -150,7 +140,6 @@ public:
 	// Calibration parameters
 	const CameraParams camera;
 	const float thDepth;
-	//const float fx, fy, cx, cy, invfx, invfy, mbf, mb, mThDepth;
 
 	// Number of KeyPoints
 	const int N;
@@ -180,10 +169,7 @@ protected:
 
 	// SE3 Pose and camera center
 	CameraPose pose_;
-	/*cv::Mat Tcw;
-	cv::Mat Twc;
-	cv::Mat Ow;*/
-
+	
 	cv::Mat Cw; // Stereo middel point. Only for visualization
 
 	// MapPoints associated to keypoints
@@ -192,9 +178,6 @@ protected:
 	// BoW
 	KeyFrameDatabase* keyFrameDB_;
 	ORBVocabulary* voc_;
-
-	// Grid over the image to speed up feature matching
-	//std::vector<std::vector <std::vector<size_t>>> mGrid;
 
 	std::map<KeyFrame*, int> connectionTo_;
 	std::vector<KeyFrame*> orderedConnectedKeyFrames_;

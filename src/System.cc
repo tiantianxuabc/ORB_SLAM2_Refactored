@@ -356,7 +356,8 @@ public:
 		}
 
 		std::vector<KeyFrame*> keyframes = map_.GetAllKeyFrames();
-		std::sort(std::begin(keyframes), std::end(keyframes), KeyFrame::lId);
+		std::sort(std::begin(keyframes), std::end(keyframes),
+			[](const KeyFrame* lhs, const KeyFrame* rhs) { return lhs->id < rhs->id; });
 
 		// Transform all keyframes so that the first keyframe is at the origin.
 		// After a loop closure the first keyframe might not be at the origin.
@@ -413,7 +414,8 @@ public:
 		std::cout << std::endl << "Saving keyframe trajectory to " << filename << " ..." << std::endl;
 
 		std::vector<KeyFrame*> keyframes = map_.GetAllKeyFrames();
-		std::sort(std::begin(keyframes), std::end(keyframes), KeyFrame::lId);
+		std::sort(std::begin(keyframes), std::end(keyframes),
+			[](const KeyFrame* lhs, const KeyFrame* rhs) { return lhs->id < rhs->id; });
 
 		// Transform all keyframes so that the first keyframe is at the origin.
 		// After a loop closure the first keyframe might not be at the origin.
@@ -455,7 +457,8 @@ public:
 		}
 
 		std::vector<KeyFrame*> keyframes = map_.GetAllKeyFrames();
-		std::sort(std::begin(keyframes), std::end(keyframes), KeyFrame::lId);
+		std::sort(std::begin(keyframes), std::end(keyframes),
+			[](const KeyFrame* lhs, const KeyFrame* rhs) { return lhs->id < rhs->id; });
 
 		// Transform all keyframes so that the first keyframe is at the origin.
 		// After a loop closure the first keyframe might not be at the origin.
