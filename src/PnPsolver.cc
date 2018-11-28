@@ -126,12 +126,12 @@ void PnPsolver::SetRansacParameters(double probability, int minInliers, int maxI
     mRansacEpsilon = epsilon;
     mRansacMinSet = minSet;
 
-    N = mvP2D.size(); // number of correspondences
+    N = static_cast<int>(mvP2D.size()); // number of correspondences
 
     mvbInliersi.resize(N);
 
     // Adjust Parameters according to number of correspondences
-    int nMinInliers = N*mRansacEpsilon;
+    int nMinInliers = static_cast<int>(N*mRansacEpsilon);
     if(nMinInliers<mRansacMinInliers)
         nMinInliers=mRansacMinInliers;
     if(nMinInliers<minSet)
@@ -147,7 +147,7 @@ void PnPsolver::SetRansacParameters(double probability, int minInliers, int maxI
     if(mRansacMinInliers==N)
         nIterations=1;
     else
-        nIterations = ceil(log(1-mRansacProb)/log(1-pow(mRansacEpsilon,3)));
+        nIterations = static_cast<int>(ceil(log(1-mRansacProb)/log(1-pow(mRansacEpsilon,3))));
 
     mRansacMaxIts = max(1,min(nIterations,mRansacMaxIts));
 
@@ -190,9 +190,9 @@ cv::Mat PnPsolver::iterate(int nIterations, bool &bNoMore, vector<bool> &vbInlie
         // Get min set of points
         for(short i = 0; i < mRansacMinSet; ++i)
         {
-            int randi = DUtils::Random::RandomInt(0, vAvailableIndices.size()-1);
+            int randi = DUtils::Random::RandomInt(0, static_cast<int>(vAvailableIndices.size())-1);
 
-            int idx = vAvailableIndices[randi];
+            int idx = static_cast<int>(vAvailableIndices[randi]);
 
             add_correspondence(mvP3Dw[idx].x,mvP3Dw[idx].y,mvP3Dw[idx].z,mvP2D[idx].x,mvP2D[idx].y);
 
@@ -266,11 +266,11 @@ bool PnPsolver::Refine()
     {
         if(mvbBestInliers[i])
         {
-            vIndices.push_back(i);
+            vIndices.push_back(static_cast<int>(i));
         }
     }
 
-    set_maximum_number_of_correspondences(vIndices.size());
+    set_maximum_number_of_correspondences(static_cast<int>(vIndices.size()));
 
     reset_correspondences();
 
@@ -314,15 +314,15 @@ void PnPsolver::CheckInliers()
         cv::Point3f P3Dw = mvP3Dw[i];
         cv::Point2f P2D = mvP2D[i];
 
-        float Xc = mRi[0][0]*P3Dw.x+mRi[0][1]*P3Dw.y+mRi[0][2]*P3Dw.z+mti[0];
-        float Yc = mRi[1][0]*P3Dw.x+mRi[1][1]*P3Dw.y+mRi[1][2]*P3Dw.z+mti[1];
-        float invZc = 1/(mRi[2][0]*P3Dw.x+mRi[2][1]*P3Dw.y+mRi[2][2]*P3Dw.z+mti[2]);
+        float Xc = static_cast<float>(mRi[0][0]*P3Dw.x+mRi[0][1]*P3Dw.y+mRi[0][2]*P3Dw.z+mti[0]);
+        float Yc = static_cast<float>(mRi[1][0]*P3Dw.x+mRi[1][1]*P3Dw.y+mRi[1][2]*P3Dw.z+mti[1]);
+        float invZc = static_cast<float>(1/(mRi[2][0]*P3Dw.x+mRi[2][1]*P3Dw.y+mRi[2][2]*P3Dw.z+mti[2]));
 
         double ue = uc + fu * Xc * invZc;
         double ve = vc + fv * Yc * invZc;
 
-        float distX = P2D.x-ue;
-        float distY = P2D.y-ve;
+        float distX = static_cast<float>(P2D.x-ue);
+        float distY = static_cast<float>(P2D.y-ve);
 
         float error2 = distX*distX+distY*distY;
 
