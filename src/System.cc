@@ -395,7 +395,7 @@ public:
 			const auto Rwc = Twc.R();
 			const auto twc = Twc.t();
 
-			std::vector<float> q = Converter::toQuaternion(cv::Mat(Rwc));
+			const auto q = Converter::toQuaternion(Rwc);
 
 			ofs << std::setprecision(6) << track.timestamp << " ";
 			ofs << std::setprecision(9) << twc(0) << " " << twc(1) << " " << twc(2) << " ";
@@ -433,7 +433,7 @@ public:
 
 			const auto R = keyframe->GetPose().InvR();
 			const auto t = keyframe->GetCameraCenter();
-			std::vector<float> q = Converter::toQuaternion(cv::Mat(R));
+			const auto q = Converter::toQuaternion(R);
 			ofs << std::setprecision(6) << keyframe->timestamp << " ";
 			ofs << std::setprecision(7) << t(0) << " " << t(1) << " " << t(2) << " ";
 			ofs << q[0] << " " << q[1] << " " << q[2] << " " << q[3] << std::endl;

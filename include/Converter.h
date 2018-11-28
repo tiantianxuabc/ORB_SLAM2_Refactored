@@ -31,6 +31,7 @@ namespace Converter
 
 std::vector<cv::Mat> toDescriptorVector(const cv::Mat &Descriptors);
 std::vector<float> toQuaternion(const cv::Mat &M);
+cv::Vec4d toQuaternion(const cv::Matx33f& _R);
 
 } // namespace Converter
 

@@ -62,6 +62,14 @@ std::vector<float> toQuaternion(const cv::Mat &M)
 
 	return v;
 }
-}
 
-} //namespace ORB_SLAM
+cv::Vec4d toQuaternion(const cv::Matx33f& _R)
+{
+	Eigen::Matrix3d R;
+	for (int i = 0; i < 3; i++) for (int j = 0; j < 3; j++) R(i, j) = _R(i, j);
+	Eigen::Quaterniond q(R);
+	return cv::Vec4d(q.x(), q.y(), q.z(), q.w());
+};
+
+} // namespace Converter
+} // namespace ORB_SLAM
