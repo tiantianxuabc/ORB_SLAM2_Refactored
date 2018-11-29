@@ -48,6 +48,8 @@ namespace ORB_SLAM2
 void UndistortKeyPoints(const KeyPoints& src, KeyPoints& dst, const cv::Mat& K, const cv::Mat1f& distCoeffs);
 ImageBounds ComputeImageBounds(const cv::Mat& image, const cv::Mat& K, const cv::Mat1f& distCoeffs);
 void GetScalePyramidInfo(const ORBextractor* extractor, ScalePyramidInfo& pyramid);
+void ComputeStereoFromRGBD(const KeyPoints& keypoints, const KeyPoints& keypointsUn, const cv::Mat& depthImage,
+	const CameraParams& camera, std::vector<float>& uright, std::vector<float>& depth);
 
 TrackPoint::TrackPoint(const Frame& frame, bool lost)
 	: referenceKF(frame.referenceKF), timestamp(frame.timestamp), lost(lost)
@@ -1707,9 +1709,26 @@ public:
 	{
 		ConvertToGray(image, imageL_, RGB_);
 
-		depth.convertTo(depthMap_, CV_32F, depthFactor_);
+		// Scale Level Info
+		ScalePyramidInfo pyramid;
+		GetScalePyramidInfo(extractorL_.get(), pyramid);
 
-		currFrame_ = Frame(imageL_, depthMap_, timestamp, extractorL_.get(), voc_, camera_, distCoeffs_, thDepth_);
+		// ORB extraction
+		extractorL_->Extract(imageL_, keypointsL_, descriptorsL_);
+
+		// Undistortion
+		UndistortKeyPoints(keypointsL_, keypointsUn_, camera_.Mat(), distCoeffs_);
+
+		// Associate a "right" coordinate to a keypoint if there is valid depth in the depthmap.
+		depth.convertTo(depthMap_, CV_32F, depthFactor_);
+		ComputeStereoFromRGBD(keypointsL_, keypointsUn_, depthMap_, camera_, uright_, depth_);
+
+		// Computes image bounds for the undistorted image
+		if (imageBounds_.Empty())
+			imageBounds_ = ComputeImageBounds(imageL_, camera_.Mat(), distCoeffs_);
+
+		currFrame_ = Frame(voc_, timestamp, camera_, thDepth_, keypointsL_, keypointsUn_,
+			uright_, depth_, descriptorsL_, pyramid, imageBounds_);
 
 		tracker_->Update(currFrame_);
 

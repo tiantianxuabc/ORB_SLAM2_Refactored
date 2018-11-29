@@ -99,7 +99,7 @@ ImageBounds ComputeImageBounds(const cv::Mat& image, const cv::Mat& K, const cv:
 }
 
 // Associate a "right" coordinate to a keypoint if there is valid depth in the depthmap.
-static void ComputeStereoFromRGBD(const KeyPoints& keypoints, const KeyPoints& keypointsUn, const cv::Mat& depthImage,
+void ComputeStereoFromRGBD(const KeyPoints& keypoints, const KeyPoints& keypointsUn, const cv::Mat& depthImage,
 	const CameraParams& camera, std::vector<float>& uright, std::vector<float>& depth)
 {
 	const int nkeypoints = static_cast<int>(keypoints.size());
