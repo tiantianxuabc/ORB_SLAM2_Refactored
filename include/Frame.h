@@ -138,7 +138,7 @@ public:
 	// Vector of keypoints (original for visualization) and undistorted (actually used by the system).
 	// In the stereo case, mvKeysUn is redundant as images must be rectified.
 	// In the RGB-D case, RGB images can be distorted.
-	std::vector<cv::KeyPoint> keypointsL, keypointsR;
+	std::vector<cv::KeyPoint> keypointsL;
 	std::vector<cv::KeyPoint> keypointsUn;
 
 	// Corresponding stereo coordinate and depth for each keypoint.
@@ -151,7 +151,7 @@ public:
 	DBoW2::FeatureVector featureVector;
 
 	// ORB descriptor, each row associated to a keypoint.
-	cv::Mat descriptorsL, descriptorsR;
+	cv::Mat descriptorsL;
 
 	// MapPoints associated to keypoints, NULL pointer if no association.
 	std::vector<MapPoint*> mappoints;

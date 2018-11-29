@@ -237,11 +237,10 @@ Frame::Frame() {}
 //Copy Constructor
 Frame::Frame(const Frame& frame)
 	: voc(frame.voc), timestamp(frame.timestamp), camera(frame.camera), thDepth(frame.thDepth), N(frame.N),
-	keypointsL(frame.keypointsL), keypointsR(frame.keypointsR), keypointsUn(frame.keypointsUn),
-	uright(frame.uright), depth(frame.depth), bowVector(frame.bowVector), featureVector(frame.featureVector),
-	descriptorsL(frame.descriptorsL.clone()), descriptorsR(frame.descriptorsR.clone()), mappoints(frame.mappoints),
-	outlier(frame.outlier), id(frame.id), referenceKF(frame.referenceKF), pyramid(frame.pyramid), grid(frame.grid),
-	imageBounds(frame.imageBounds)
+	keypointsL(frame.keypointsL), keypointsUn(frame.keypointsUn), uright(frame.uright), depth(frame.depth),
+	bowVector(frame.bowVector), featureVector(frame.featureVector), descriptorsL(frame.descriptorsL.clone()),
+	mappoints(frame.mappoints), outlier(frame.outlier), id(frame.id), referenceKF(frame.referenceKF),
+	pyramid(frame.pyramid), grid(frame.grid), imageBounds(frame.imageBounds)
 {
 	if (!frame.pose.Empty())
 		SetPose(frame.pose);
