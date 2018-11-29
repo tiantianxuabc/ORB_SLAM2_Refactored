@@ -175,9 +175,8 @@ public:
 	// Scale pyramid info.
 	ScalePyramidInfo pyramid;
 
-	// Undistorted Image Bounds (computed once).
-	static ImageBounds imageBounds;
-	static bool initialComputation;
+	// Undistorted Image Bounds
+	ImageBounds imageBounds;
 };
 
 }// namespace ORB_SLAM

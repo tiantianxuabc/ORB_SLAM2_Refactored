@@ -1791,7 +1791,7 @@ public:
 		cv::FileStorage settings(settingsFile, cv::FileStorage::READ);
 		camera_ = ReadCameraParams(settings);
 		distCoeffs_ = ReadDistCoeffs(settings);
-		Frame::initialComputation = true;
+		imageBounds_ = ImageBounds();
 	}
 
 	void Reset() override

@@ -34,8 +34,6 @@ namespace ORB_SLAM2
 {
 
 frameid_t Frame::nextId = 0;
-bool Frame::initialComputation = true;
-ImageBounds Frame::imageBounds;
 
 static inline int Round(float v) { return static_cast<int>(std::round(v)); }
 static inline int RoundUp(float v) { return static_cast<int>(std::ceil(v)); }
@@ -242,7 +240,8 @@ Frame::Frame(const Frame& frame)
 	keypointsL(frame.keypointsL), keypointsR(frame.keypointsR), keypointsUn(frame.keypointsUn),
 	uright(frame.uright), depth(frame.depth), bowVector(frame.bowVector), featureVector(frame.featureVector),
 	descriptorsL(frame.descriptorsL.clone()), descriptorsR(frame.descriptorsR.clone()), mappoints(frame.mappoints),
-	outlier(frame.outlier), id(frame.id), referenceKF(frame.referenceKF), pyramid(frame.pyramid), grid(frame.grid)
+	outlier(frame.outlier), id(frame.id), referenceKF(frame.referenceKF), pyramid(frame.pyramid), grid(frame.grid),
+	imageBounds(frame.imageBounds)
 {
 	if (!frame.pose.Empty())
 		SetPose(frame.pose);
@@ -253,7 +252,8 @@ Frame::Frame(ORBVocabulary* voc, double timestamp, const CameraParams& camera, f
 	const std::vector<float>& uright, const std::vector<float>& depth, const cv::Mat& descriptors,
 	const ScalePyramidInfo& pyramid, const ImageBounds& imageBounds)
 	: voc(voc), timestamp(timestamp), camera(camera), thDepth(thDepth), keypointsL(keypoints), keypointsUn(keypointsUn),
-	uright(uright), depth(depth), descriptorsL(descriptors.clone()), pyramid(pyramid), referenceKF(nullptr)
+	uright(uright), depth(depth), descriptorsL(descriptors.clone()), pyramid(pyramid), imageBounds(imageBounds),
+	referenceKF(nullptr)
 {
 	// Frame ID
 	id = nextId++;
@@ -263,12 +263,6 @@ Frame::Frame(ORBVocabulary* voc, double timestamp, const CameraParams& camera, f
 	mappoints.assign(N, nullptr);
 	outlier.assign(N, false);
 
-	// This is done only for the first Frame (or after a change in the calibration)
-	if (initialComputation)
-	{
-		this->imageBounds = imageBounds;
-		initialComputation = false;
-	}
 	grid.AssignFeatures(keypointsUn, imageBounds, pyramid.nlevels);
 }
 
@@ -276,7 +270,7 @@ Frame::Frame(ORBVocabulary* voc, double timestamp, const CameraParams& camera, f
 	const std::vector<cv::KeyPoint>& keypoints, const std::vector<cv::KeyPoint>& keypointsUn,
 	const cv::Mat& descriptors, const ScalePyramidInfo& pyramid, const ImageBounds& imageBounds)
 	: voc(voc), timestamp(timestamp), camera(camera), thDepth(thDepth), keypointsL(keypoints), keypointsUn(keypointsUn),
-	descriptorsL(descriptors.clone()), pyramid(pyramid), referenceKF(nullptr)
+	descriptorsL(descriptors.clone()), pyramid(pyramid), imageBounds(imageBounds), referenceKF(nullptr)
 {
 	// Frame ID
 	id = nextId++;
@@ -290,12 +284,6 @@ Frame::Frame(ORBVocabulary* voc, double timestamp, const CameraParams& camera, f
 	mappoints.assign(N, nullptr);
 	outlier.assign(N, false);
 
-	// This is done only for the first Frame (or after a change in the calibration)
-	if (initialComputation)
-	{
-		this->imageBounds = imageBounds;
-		initialComputation = false;
-	}
 	grid.AssignFeatures(keypointsUn, imageBounds, pyramid.nlevels);
 }
 
