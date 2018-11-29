@@ -41,7 +41,7 @@ static inline int Round(float v) { return static_cast<int>(std::round(v)); }
 static inline int RoundUp(float v) { return static_cast<int>(std::ceil(v)); }
 static inline int RoundDn(float v) { return static_cast<int>(std::floor(v)); }
 
-static void GetScalePyramidInfo(ORBextractor* extractor, ScalePyramidInfo& pyramid)
+void GetScalePyramidInfo(const ORBextractor* extractor, ScalePyramidInfo& pyramid)
 {
 	pyramid.nlevels = extractor->GetLevels();
 	pyramid.scaleFactor = extractor->GetScaleFactor();
@@ -55,7 +55,7 @@ static void GetScalePyramidInfo(ORBextractor* extractor, ScalePyramidInfo& pyram
 // Undistort keypoints given OpenCV distortion parameters.
 // Only for the RGB-D case. Stereo must be already rectified!
 // (called in the constructor).
-static void UndistortKeyPoints(const KeyPoints& src, KeyPoints& dst, const cv::Mat& K, const cv::Mat1f& distCoeffs)
+void UndistortKeyPoints(const KeyPoints& src, KeyPoints& dst, const cv::Mat& K, const cv::Mat1f& distCoeffs)
 {
 	if (distCoeffs(0) == 0.f)
 	{
@@ -141,6 +141,11 @@ float ImageBounds::Height() const
 bool ImageBounds::Contains(float x, float y) const
 {
 	return x >= minx && x < maxx && y >= miny && y < maxy;
+}
+
+bool ImageBounds::Empty() const
+{
+	return Width() <= 0.f || Height() <= 0.f;
 }
 
 //////////////////////////////////////////////////////////////////////////////////
@@ -243,6 +248,29 @@ Frame::Frame(const Frame& frame)
 		SetPose(frame.pose);
 }
 
+Frame::Frame(ORBVocabulary* voc, double timestamp, const CameraParams& camera, float thDepth,
+	const std::vector<cv::KeyPoint>& keypoints, const std::vector<cv::KeyPoint>& keypointsUn,
+	const std::vector<float>& uright, const std::vector<float>& depth, const cv::Mat& descriptors,
+	const ScalePyramidInfo& pyramid, const ImageBounds& imageBounds)
+	: voc(voc), timestamp(timestamp), camera(camera), thDepth(thDepth), keypointsL(keypoints), keypointsUn(keypointsUn),
+	uright(uright), depth(depth), descriptorsL(descriptors.clone()), pyramid(pyramid), referenceKF(nullptr)
+{
+	// Frame ID
+	id = nextId++;
+
+	N = static_cast<int>(keypoints.size());
+
+	mappoints.assign(N, nullptr);
+	outlier.assign(N, false);
+
+	// This is done only for the first Frame (or after a change in the calibration)
+	if (initialComputation)
+	{
+		this->imageBounds = imageBounds;
+		initialComputation = false;
+	}
+	grid.AssignFeatures(keypointsUn, imageBounds, pyramid.nlevels);
+}
 
 Frame::Frame(const cv::Mat& imageL, const cv::Mat& imageR, double timestamp, ORBextractor* extractorL,
 	ORBextractor* extractorR, ORBVocabulary* voc, const CameraParams& camera, const cv::Mat& distCoef, float thDepth)

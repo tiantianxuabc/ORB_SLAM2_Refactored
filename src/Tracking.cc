@@ -45,6 +45,10 @@
 namespace ORB_SLAM2
 {
 
+void UndistortKeyPoints(const KeyPoints& src, KeyPoints& dst, const cv::Mat& K, const cv::Mat1f& distCoeffs);
+ImageBounds ComputeImageBounds(const cv::Mat& image, const cv::Mat& K, const cv::Mat1f& distCoeffs);
+void GetScalePyramidInfo(const ORBextractor* extractor, ScalePyramidInfo& pyramid);
+
 TrackPoint::TrackPoint(const Frame& frame, bool lost)
 	: referenceKF(frame.referenceKF), timestamp(frame.timestamp), lost(lost)
 {
@@ -1668,8 +1672,31 @@ public:
 		ConvertToGray(imageL, imageL_, RGB_);
 		ConvertToGray(imageR, imageR_, RGB_);
 
-		currFrame_ = Frame(imageL_, imageR_, timestamp, extractorL_.get(), extractorR_.get(), voc_,
-			camera_, distCoeffs_, thDepth_);
+		// Scale Level Info
+		ScalePyramidInfo pyramid;
+		GetScalePyramidInfo(extractorL_.get(), pyramid);
+
+		// ORB extraction
+		std::thread threadL([&]() { extractorL_->Extract(imageL_, keypointsL_, descriptorsL_); });
+		std::thread threadR([&]() { extractorR_->Extract(imageR_, keypointsR_, descriptorsR_); });
+		threadL.join();
+		threadR.join();
+
+		// Undistortion
+		UndistortKeyPoints(keypointsL_, keypointsUn_, camera_.Mat(), distCoeffs_);
+
+		// Stereo matching
+		ComputeStereoMatches(
+			keypointsL_, descriptorsL_, extractorL_->GetImagePyramid(),
+			keypointsR_, descriptorsR_, extractorR_->GetImagePyramid(),
+			pyramid.scaleFactors, pyramid.invScaleFactors, camera_, uright_, depth_);
+
+		// Computes image bounds for the undistorted image
+		if (imageBounds_.Empty())
+			imageBounds_ = ComputeImageBounds(imageL_, camera_.Mat(), distCoeffs_);
+
+		currFrame_ = Frame(voc_, timestamp, camera_, thDepth_, keypointsL_, keypointsUn_,
+			uright_, depth_, descriptorsL_, pyramid, imageBounds_);
 
 		tracker_->Update(currFrame_);
 
@@ -1680,9 +1707,9 @@ public:
 	{
 		ConvertToGray(image, imageL_, RGB_);
 
-		depth.convertTo(depth_, CV_32F, depthFactor_);
+		depth.convertTo(depthMap_, CV_32F, depthFactor_);
 
-		currFrame_ = Frame(imageL_, depth_, timestamp, extractorL_.get(), voc_, camera_, distCoeffs_, thDepth_);
+		currFrame_ = Frame(imageL_, depthMap_, timestamp, extractorL_.get(), voc_, camera_, distCoeffs_, thDepth_);
 
 		tracker_->Update(currFrame_);
 
@@ -1823,7 +1850,12 @@ private:
 	Frame currFrame_;
 	cv::Mat imageL_;
 	cv::Mat imageR_;
-	cv::Mat depth_;
+	cv::Mat depthMap_;
+
+	KeyPoints keypointsL_, keypointsR_, keypointsUn_;
+	std::vector<float> uright_, depth_;
+	cv::Mat descriptorsL_, descriptorsR_;
+	ImageBounds imageBounds_;
 
 	//Other Thread Pointers
 	std::shared_ptr<LocalMapping> localMapper_;

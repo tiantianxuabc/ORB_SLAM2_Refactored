@@ -46,6 +46,7 @@ struct ImageBounds
 	float Width() const;
 	float Height() const;
 	bool Contains(float x, float y) const;
+	bool Empty() const;
 	float minx, maxx, miny, maxy;
 };
 
@@ -89,6 +90,12 @@ public:
 
 	// Copy constructor.
 	Frame(const Frame& frame);
+
+	// Constructor
+	Frame(ORBVocabulary* voc, double timestamp, const CameraParams& camera, float thDepth,
+		const std::vector<cv::KeyPoint>& keypoints, const std::vector<cv::KeyPoint>& keypointsUn,
+		const std::vector<float>& uright, const std::vector<float>& depth, const cv::Mat& descriptors,
+		const ScalePyramidInfo& pyramid, const ImageBounds& imageBounds);
 
 	// Constructor for stereo cameras.
 	Frame(const cv::Mat& imageL, const cv::Mat& imageR, double timestamp, ORBextractor* extractorL, ORBextractor* extractorR,
