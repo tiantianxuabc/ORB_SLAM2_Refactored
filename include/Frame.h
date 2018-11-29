@@ -91,11 +91,16 @@ public:
 	// Copy constructor.
 	Frame(const Frame& frame);
 
-	// Constructor
+	// Constructor for stereo and RGB-D cameras.
 	Frame(ORBVocabulary* voc, double timestamp, const CameraParams& camera, float thDepth,
 		const std::vector<cv::KeyPoint>& keypoints, const std::vector<cv::KeyPoint>& keypointsUn,
 		const std::vector<float>& uright, const std::vector<float>& depth, const cv::Mat& descriptors,
 		const ScalePyramidInfo& pyramid, const ImageBounds& imageBounds);
+
+	// Constructor for Monocular cameras.
+	Frame(ORBVocabulary* voc, double timestamp, const CameraParams& camera, float thDepth,
+		const std::vector<cv::KeyPoint>& keypoints, const std::vector<cv::KeyPoint>& keypointsUn,
+		const cv::Mat& descriptors, const ScalePyramidInfo& pyramid, const ImageBounds& imageBounds);
 
 	// Constructor for stereo cameras.
 	Frame(const cv::Mat& imageL, const cv::Mat& imageR, double timestamp, ORBextractor* extractorL, ORBextractor* extractorR,

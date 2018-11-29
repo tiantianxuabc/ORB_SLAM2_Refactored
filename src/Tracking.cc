@@ -1697,6 +1697,7 @@ public:
 		if (imageBounds_.Empty())
 			imageBounds_ = ComputeImageBounds(imageL_, camera_.Mat(), distCoeffs_);
 
+		// Create frame
 		currFrame_ = Frame(voc_, timestamp, camera_, thDepth_, keypointsL_, keypointsUn_,
 			uright_, depth_, descriptorsL_, pyramid, imageBounds_);
 
@@ -1727,6 +1728,7 @@ public:
 		if (imageBounds_.Empty())
 			imageBounds_ = ComputeImageBounds(imageL_, camera_.Mat(), distCoeffs_);
 
+		// Create frame
 		currFrame_ = Frame(voc_, timestamp, camera_, thDepth_, keypointsL_, keypointsUn_,
 			uright_, depth_, descriptorsL_, pyramid, imageBounds_);
 
@@ -1742,9 +1744,21 @@ public:
 		const int state = tracker_->GetState();
 		const bool init = state == STATE_NOT_INITIALIZED || state == STATE_NO_IMAGES;
 
-		ORBextractor* pORBextractor = init ? extractorIni_.get() : extractorL_.get();
+		auto& extractor = init ? extractorIni_ : extractorL_;
 
-		currFrame_ = Frame(imageL_, timestamp, pORBextractor, voc_, camera_, distCoeffs_, thDepth_);
+		// Scale Level Info
+		ScalePyramidInfo pyramid;
+		GetScalePyramidInfo(extractor.get(), pyramid);
+
+		// ORB extraction
+		extractor->Extract(imageL_, keypointsL_, descriptorsL_);
+
+		// Undistortion
+		UndistortKeyPoints(keypointsL_, keypointsUn_, camera_.Mat(), distCoeffs_);
+
+		// Create frame
+		currFrame_ = Frame(voc_, timestamp, camera_, thDepth_, keypointsL_, keypointsUn_,
+			descriptorsL_, pyramid, imageBounds_);
 
 		tracker_->Update(currFrame_);
 

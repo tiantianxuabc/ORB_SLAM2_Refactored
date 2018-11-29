@@ -272,6 +272,33 @@ Frame::Frame(ORBVocabulary* voc, double timestamp, const CameraParams& camera, f
 	grid.AssignFeatures(keypointsUn, imageBounds, pyramid.nlevels);
 }
 
+Frame::Frame(ORBVocabulary* voc, double timestamp, const CameraParams& camera, float thDepth,
+	const std::vector<cv::KeyPoint>& keypoints, const std::vector<cv::KeyPoint>& keypointsUn,
+	const cv::Mat& descriptors, const ScalePyramidInfo& pyramid, const ImageBounds& imageBounds)
+	: voc(voc), timestamp(timestamp), camera(camera), thDepth(thDepth), keypointsL(keypoints), keypointsUn(keypointsUn),
+	descriptorsL(descriptors.clone()), pyramid(pyramid), referenceKF(nullptr)
+{
+	// Frame ID
+	id = nextId++;
+
+	N = static_cast<int>(keypoints.size());
+
+	// Set no stereo information
+	uright.assign(N, -1);
+	depth.assign(N, -1);
+
+	mappoints.assign(N, nullptr);
+	outlier.assign(N, false);
+
+	// This is done only for the first Frame (or after a change in the calibration)
+	if (initialComputation)
+	{
+		this->imageBounds = imageBounds;
+		initialComputation = false;
+	}
+	grid.AssignFeatures(keypointsUn, imageBounds, pyramid.nlevels);
+}
+
 Frame::Frame(const cv::Mat& imageL, const cv::Mat& imageR, double timestamp, ORBextractor* extractorL,
 	ORBextractor* extractorR, ORBVocabulary* voc, const CameraParams& camera, const cv::Mat& distCoef, float thDepth)
 	: voc(voc), timestamp(timestamp), camera(camera), thDepth(thDepth), referenceKF(nullptr)
