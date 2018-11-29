@@ -102,18 +102,6 @@ public:
 		const std::vector<cv::KeyPoint>& keypoints, const std::vector<cv::KeyPoint>& keypointsUn,
 		const cv::Mat& descriptors, const ScalePyramidInfo& pyramid, const ImageBounds& imageBounds);
 
-	// Constructor for stereo cameras.
-	Frame(const cv::Mat& imageL, const cv::Mat& imageR, double timestamp, ORBextractor* extractorL, ORBextractor* extractorR,
-		ORBVocabulary* voc, const CameraParams& camera, const cv::Mat& distCoef, float thDepth);
-
-	// Constructor for RGB-D cameras.
-	Frame(const cv::Mat& image, const cv::Mat& depth, double timestamp, ORBextractor* extractor,
-		ORBVocabulary* voc, const CameraParams& camera, const cv::Mat& distCoef, float thDepth);
-
-	// Constructor for Monocular cameras.
-	Frame(const cv::Mat& image, double timestamp, ORBextractor* extractor, ORBVocabulary* voc,
-		const CameraParams& camera, const cv::Mat& distCoef, float thDepth);
-
 	// Compute Bag of Words representation.
 	void ComputeBoW();
 
