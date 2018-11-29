@@ -35,6 +35,15 @@
 namespace ORB_SLAM2
 {
 
+using KeyPoints = std::vector<cv::KeyPoint>;
+using Pyramid = std::vector<cv::Mat>;
+
+void ComputeStereoMatches(
+	const KeyPoints& keypointsL, const cv::Mat& descriptorsL, const Pyramid& pyramidL,
+	const KeyPoints& keypointsR, const cv::Mat& descriptorsR, const Pyramid& pyramidR,
+	const std::vector<float>& scaleFactors, const std::vector<float>& invScaleFactors, const CameraParams& camera,
+	std::vector<float>& uright, std::vector<float>& depth);
+
 class ORBmatcher
 {
 public:
@@ -86,11 +95,6 @@ public:
 	// Project MapPoints into KeyFrame using a given Sim3 and search for duplicated MapPoints.
 	int Fuse(KeyFrame* keyframe, const Sim3& Scw, const std::vector<MapPoint*>& mappoints,
 		float th, std::vector<MapPoint*>& replacePoints);
-
-public:
-
-	static const int TH_LOW;
-	static const int TH_HIGH;
 
 private:
 

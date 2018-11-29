@@ -34,20 +34,214 @@
 namespace ORB_SLAM2
 {
 
-const int ORBmatcher::TH_HIGH = 100;
-const int ORBmatcher::TH_LOW = 50;
-static const int HISTO_LENGTH = 30;
-
-static inline float RadiusByViewingCos(float viewCos)
-{
-	return viewCos > 0.998 ? 2.5f : 4.f;
-}
-
 using MatchIdx = std::pair<int, int>;
 
+// Constant numbers
+static const int TH_HIGH = 100;
+static const int TH_LOW = 50;
+static const int HISTO_LENGTH = 30;
+
+static const int PATCH_RADIUS = 5;
+static const int PATCH_SIZE = 2 * PATCH_RADIUS + 1;
+static const int SEARCH_RADIUS = 5;
+
+// Inline functions
+static inline int Round(float v) { return static_cast<int>(std::round(v)); }
+static inline int RoundUp(float v) { return static_cast<int>(std::ceil(v)); }
+static inline int RoundDn(float v) { return static_cast<int>(std::floor(v)); }
+static inline float RadiusByViewingCos(float viewCos) { return viewCos > 0.998 ? 2.5f : 4.f; }
 template <typename T> static inline T InvalidMatch() { return 0; }
 template <> static inline MapPoint* InvalidMatch<MapPoint*>() { return nullptr; }
 template <> static inline int InvalidMatch<int>() { return -1; }
+
+static int PatchDistance(const cv::Mat1b& patchL, const cv::Mat1b& patchR)
+{
+	const int sub = patchL(PATCH_RADIUS, PATCH_RADIUS) - patchR(PATCH_RADIUS, PATCH_RADIUS);
+	int sum = 0;
+	for (int y = 0; y < PATCH_SIZE; y++)
+		for (int x = 0; x < PATCH_SIZE; x++)
+			sum += std::abs(patchL(y, x) - patchR(y, x) - sub);
+	return sum;
+}
+
+// Search a match for each keypoint in the left image to a keypoint in the right image.
+// If there is a match, depth is computed and the right coordinate associated to the left keypoint is stored.
+void ComputeStereoMatches(
+	const KeyPoints& keypointsL, const cv::Mat& descriptorsL, const Pyramid& pyramidL,
+	const KeyPoints& keypointsR, const cv::Mat& descriptorsR, const Pyramid& pyramidR,
+	const std::vector<float>& scaleFactors, const std::vector<float>& invScaleFactors, const CameraParams& camera,
+	std::vector<float>& uright, std::vector<float>& depth)
+{
+	const int nkeypointsL = static_cast<int>(keypointsL.size());
+	uright.assign(nkeypointsL, -1.f);
+	depth.assign(nkeypointsL, -1.f);
+
+	//Assign keypoints to row table
+	const int nrows = pyramidL[0].rows;
+	std::vector<std::vector<int>> rowIndices(nrows);
+
+	for (int i = 0; i < nrows; i++)
+		rowIndices[i].reserve(200);
+
+	const int nkeypointsR = static_cast<int>(keypointsR.size());
+	for (int iR = 0; iR < nkeypointsR; iR++)
+	{
+		const cv::KeyPoint& keypoint = keypointsR[iR];
+		const float y0 = keypoint.pt.y;
+		const float r = 2.f * scaleFactors[keypoint.octave];
+		const int miny = RoundDn(y0 - r);
+		const int maxy = RoundUp(y0 + r);
+		for (int y = miny; y <= maxy; y++)
+			rowIndices[y].push_back(iR);
+	}
+
+	// Set limits for search
+	const float minZ = camera.baseline;
+	const float mind = 0;
+	const float maxd = camera.bf / minZ;
+
+	// For each left keypoint search a match in the right image
+	std::vector<std::pair<int, int>> distIndices;
+	distIndices.reserve(nkeypointsL);
+
+	std::vector<int> distances(2 * SEARCH_RADIUS + 1);
+
+	const int TH_ORB_DIST = (TH_HIGH + TH_LOW) / 2;
+	const float eps = 0.01f;
+
+	for (int iL = 0; iL < nkeypointsL; iL++)
+	{
+		const cv::KeyPoint& keypointL = keypointsL[iL];
+		const int octaveL = keypointL.octave;
+		const float vL = keypointL.pt.y;
+		const float uL = keypointL.pt.x;
+
+		const std::vector<int>& candidates = rowIndices[static_cast<int>(vL)];
+
+		if (candidates.empty())
+			continue;
+
+		const float minu = uL - maxd;
+		const float maxu = uL - mind;
+
+		if (maxu < 0)
+			continue;
+
+		int minDist = TH_HIGH;
+		int bestIdxR = 0;
+
+		const cv::Mat& descL = descriptorsL.row(iL);
+
+		// Compare descriptor to right keypoints
+		for (int iR : candidates)
+		{
+			const cv::KeyPoint& keypointR = keypointsR[iR];
+			const int octaveR = keypointR.octave;
+
+			if (octaveR < octaveL - 1 || octaveR > octaveL + 1)
+				continue;
+
+			const float uR = keypointR.pt.x;
+
+			if (uR >= minu && uR <= maxu)
+			{
+				const cv::Mat& descR = descriptorsR.row(iR);
+				const int dist = ORBmatcher::DescriptorDistance(descL, descR);
+
+				if (dist < minDist)
+				{
+					minDist = dist;
+					bestIdxR = iR;
+				}
+			}
+		}
+
+		// Subpixel match by correlation
+		if (minDist < TH_ORB_DIST)
+		{
+			const cv::Mat& imageL = pyramidL[octaveL];
+			const cv::Mat& imageR = pyramidR[octaveL];
+
+			// coordinates in image pyramid at keypoint scale
+			const float scaleFactor = invScaleFactors[octaveL];
+			const int suL = Round(scaleFactor * keypointL.pt.x);
+			const int svL = Round(scaleFactor * keypointL.pt.y);
+			const int suR = Round(scaleFactor * keypointsR[bestIdxR].pt.x);
+
+			// sliding window search
+			const cv::Rect roiL(suL - PATCH_RADIUS, svL - PATCH_RADIUS, PATCH_SIZE, PATCH_SIZE);
+			cv::Mat IL = imageL(roiL);
+
+			int minDist = std::numeric_limits<int>::max();
+			int bestdxR = 0;
+
+			if (suR + SEARCH_RADIUS - PATCH_RADIUS < 0 || suR + SEARCH_RADIUS + PATCH_RADIUS + 1 >= imageR.cols)
+				continue;
+
+			for (int dxR = -SEARCH_RADIUS; dxR <= SEARCH_RADIUS; dxR++)
+			{
+				const cv::Rect roiR(suR + dxR - PATCH_RADIUS, svL - PATCH_RADIUS, PATCH_SIZE, PATCH_SIZE);
+				cv::Mat IR = imageR(roiR);
+
+				const int dist = PatchDistance(IL, IR);
+				if (dist < minDist)
+				{
+					minDist = dist;
+					bestdxR = dxR;
+				}
+
+				distances[SEARCH_RADIUS + dxR] = dist;
+			}
+
+			if (bestdxR == -SEARCH_RADIUS || bestdxR == SEARCH_RADIUS)
+				continue;
+
+			// Sub-pixel match (Parabola fitting)
+			const int dist1 = distances[SEARCH_RADIUS + bestdxR - 1];
+			const int dist2 = distances[SEARCH_RADIUS + bestdxR];
+			const int dist3 = distances[SEARCH_RADIUS + bestdxR + 1];
+
+			const float deltaR = (dist1 - dist3) / (2.f * (dist1 + dist3 - 2.f * dist2));
+
+			if (deltaR < -1 || deltaR > 1)
+				continue;
+
+			// Re-scaled coordinate
+			float bestuR = scaleFactors[octaveL] * (suR + bestdxR + deltaR);
+
+			float disparity = (uL - bestuR);
+
+			if (disparity >= mind && disparity < maxd)
+			{
+				if (disparity <= 0)
+				{
+					disparity = eps;
+					bestuR = uL - eps;
+				}
+				depth[iL] = camera.bf / disparity;
+				uright[iL] = bestuR;
+				distIndices.push_back(std::make_pair(minDist, iL));
+			}
+		}
+	}
+
+	std::sort(std::begin(distIndices), std::end(distIndices), std::greater<std::pair<int, int>>());
+	const int m = std::max(static_cast<int>(distIndices.size()) / 2 - 1, 0);
+	const int median = distIndices[m].first;
+	const float thDist = 1.5f * 1.4f * median;
+
+	for (const auto& v : distIndices)
+	{
+		const int dist = v.first;
+		const int idx = v.second;
+
+		if (dist < thDist)
+			break;
+
+		uright[idx] = -1;
+		depth[idx] = -1;
+	}
+}
 
 template <typename T>
 static int CheckOrientation(const std::vector<cv::KeyPoint>& keypoints1, const std::vector<cv::KeyPoint>& keypoints2,
