@@ -350,7 +350,7 @@ int ORBmatcher::SearchByProjection(Frame& frame, const std::vector<MapPoint*>& m
 					continue;
 			}
 
-			const cv::Mat desc2 = frame.descriptorsL.row(static_cast<int>(idx));
+			const cv::Mat desc2 = frame.descriptors.row(static_cast<int>(idx));
 			const int dist = DescriptorDistance(desc1, desc2);
 			if (dist < bestDist)
 			{
@@ -488,7 +488,7 @@ int ORBmatcher::SearchByBoW(KeyFrame* keyframe, Frame& frame, std::vector<MapPoi
 				if (matches[idx2])
 					continue;
 
-				const cv::Mat desc2 = frame.descriptorsL.row(idx2);
+				const cv::Mat desc2 = frame.descriptors.row(idx2);
 				const int dist = DescriptorDistance(desc1, desc2);
 				if (dist < bestDist)
 				{
@@ -654,7 +654,7 @@ int ORBmatcher::SearchForInitialization(Frame& frame1, Frame& frame2, std::vecto
 		if (indices2.empty())
 			continue;
 
-		const cv::Mat desc1 = frame1.descriptorsL.row(static_cast<int>(idx1));
+		const cv::Mat desc1 = frame1.descriptors.row(static_cast<int>(idx1));
 
 		int bestDist = std::numeric_limits<int>::max();
 		int secondBestDist = std::numeric_limits<int>::max();
@@ -662,7 +662,7 @@ int ORBmatcher::SearchForInitialization(Frame& frame1, Frame& frame2, std::vecto
 
 		for (size_t idx2 : indices2)
 		{
-			const cv::Mat desc2 = frame2.descriptorsL.row(static_cast<int>(idx2));
+			const cv::Mat desc2 = frame2.descriptors.row(static_cast<int>(idx2));
 			const int dist = DescriptorDistance(desc1, desc2);
 
 			if (matchedDistance[idx2] <= dist)
@@ -1379,7 +1379,7 @@ int ORBmatcher::SearchByProjection(Frame& currFrame, const Frame& lastFrame, flo
 		if (!currFrame.imageBounds.Contains(u, v))
 			continue;
 
-		const int octave1 = lastFrame.keypointsL[idx1].octave;
+		const int octave1 = lastFrame.keypoints[idx1].octave;
 
 		// Search in a window. Size depends on scale
 		const float radius = th*currFrame.pyramid.scaleFactors[octave1];
@@ -1408,7 +1408,7 @@ int ORBmatcher::SearchByProjection(Frame& currFrame, const Frame& lastFrame, flo
 					continue;
 			}
 
-			const cv::Mat desc2 = currFrame.descriptorsL.row(static_cast<int>(idx2));
+			const cv::Mat desc2 = currFrame.descriptors.row(static_cast<int>(idx2));
 			const int dist = DescriptorDistance(desc1, desc2);
 			if (dist < bestDist)
 			{
@@ -1506,7 +1506,7 @@ int ORBmatcher::SearchByProjection(Frame& frame, KeyFrame* keyframe, const std::
 			if (frame.mappoints[idx2])
 				continue;
 
-			const cv::Mat desc2 = frame.descriptorsL.row(static_cast<int>(idx2));
+			const cv::Mat desc2 = frame.descriptors.row(static_cast<int>(idx2));
 			const int dist = DescriptorDistance(desc1, desc2);
 			if (dist < bestDist)
 			{

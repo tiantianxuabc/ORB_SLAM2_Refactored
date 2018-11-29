@@ -69,7 +69,7 @@ MapPoint::MapPoint(const Point3D& Xw, Map* map, Frame* frame, int idx) :
 	maxDistance_ = scaleFactor * dist;
 	minDistance_ = maxDistance_ / frame->pyramid.scaleFactors.back();
 
-	frame->descriptorsL.row(idx).copyTo(descriptor_);
+	frame->descriptors.row(idx).copyTo(descriptor_);
 
 	// MapPoints can be created from Tracking and Local Mapping. This mutex avoid conflicts with id.
 	LOCK_MUTEX_POINT_CREATION();

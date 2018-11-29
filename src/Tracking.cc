@@ -1141,7 +1141,7 @@ public:
 		if (!initializer_)
 		{
 			// Set Reference Frame
-			if (currFrame.keypointsL.size() > 100)
+			if (currFrame.keypoints.size() > 100)
 			{
 				initFrame_ = Frame(currFrame);
 				lastFrame_ = Frame(currFrame);
@@ -1162,7 +1162,7 @@ public:
 		else
 		{
 			// Try to initialize
-			if ((int)currFrame.keypointsL.size() <= 100)
+			if ((int)currFrame.keypoints.size() <= 100)
 			{
 				delete initializer_;
 				initializer_ = static_cast<Initializer*>(NULL);

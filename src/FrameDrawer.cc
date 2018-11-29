@@ -168,7 +168,7 @@ void FrameDrawer::Update(Tracking* tracker)
 	std::unique_lock<std::mutex> lock(mutex_);
 
 	tracker->GetImGray().copyTo(image_);
-	currKeyPoints_ = tracker->GetCurrentFrame().keypointsL;
+	currKeyPoints_ = tracker->GetCurrentFrame().keypoints;
 	const Frame& currFrame = tracker->GetCurrentFrame();
 
 	const int nkeypoints = static_cast<int>(currKeyPoints_.size());
@@ -178,7 +178,7 @@ void FrameDrawer::Update(Tracking* tracker)
 	const int state = tracker->GetLastProcessedState();
 	if (state == Tracking::STATE_NOT_INITIALIZED)
 	{
-		initKeyPoints_ = tracker->GetInitialFrame().keypointsL;
+		initKeyPoints_ = tracker->GetInitialFrame().keypoints;
 		initMatches_ = tracker->GetIniMatches();
 	}
 	else if (state == Tracking::STATE_OK)
