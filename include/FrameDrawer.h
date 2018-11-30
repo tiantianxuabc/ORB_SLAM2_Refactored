@@ -25,6 +25,8 @@
 
 #include <opencv2/opencv.hpp>
 
+#include "Frame.h"
+
 namespace ORB_SLAM2
 {
 
@@ -38,7 +40,7 @@ public:
 	FrameDrawer(Map* pMap);
 
 	// Update info from the last processed frame.
-	void Update(Tracking *pTracker);
+	void Update(const Tracking* tracker, const Frame& currFrame, const cv::Mat& image);
 
 	// Draw last processed frame.
 	cv::Mat DrawFrame();

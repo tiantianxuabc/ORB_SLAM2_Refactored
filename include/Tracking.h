@@ -56,6 +56,8 @@ class Tracking
 
 public:
 
+	using Pointer = std::shared_ptr<Tracking>;
+
 	// Tracking states
 	enum State
 	{
@@ -66,22 +68,26 @@ public:
 		STATE_LOST = 3
 	};
 
-	static std::shared_ptr<Tracking> Create(System* system, ORBVocabulary* voc, Map* map,
-		KeyFrameDatabase* keyframeDB, const string& settingsFile, int sensor);
+	struct Parameters
+	{
+		//New KeyFrame rules (according to fps)
+		int minFrames;
+		int maxFrames;
 
-	// Preprocess the input and call Track(). Extract features and performs stereo matching.
-	virtual cv::Mat GrabImageStereo(const cv::Mat& imageL, const cv::Mat& imageR, double timestamp) = 0;
-	virtual cv::Mat GrabImageRGBD(const cv::Mat& image, const cv::Mat& depth, double timestamp) = 0;
-	virtual cv::Mat GrabImageMonocular(const cv::Mat& image, double timestamp) = 0;
+		// Threshold close/far points
+		// Points seen as close by the stereo/RGBD sensor are considered reliable
+		// and inserted from just one frame. Far points requiere a match in two keyframes.
+		float thDepth;
 
+		Parameters(int minFrames, int maxFrames, float thDepth);
+	};
+
+	static Pointer Create(System* system, ORBVocabulary* voc, Map* map, KeyFrameDatabase* keyframeDB,
+		int sensor, const Parameters& param);
+
+	virtual cv::Mat Update(Frame& currFrame) = 0;
 	virtual void SetLocalMapper(const std::shared_ptr<LocalMapping>& localMapper) = 0;
 	virtual void SetLoopClosing(const std::shared_ptr<LoopClosing>& loopClosing) = 0;
-	virtual void SetViewer(Viewer* viewer) = 0;
-
-	// Load new settings
-	// The focal lenght should be similar or scale prediction will fail when projecting points
-	// TODO: Modify MapPoint::PredictScale to take into account focal lenght
-	virtual void ChangeCalibration(const string& settingsFile) = 0;
 
 	// Use this function if you have deactivated local mapping and you only want to localize the camera.
 	virtual void InformOnlyTracking(bool flag) = 0;
@@ -91,11 +97,9 @@ public:
 	virtual int GetState() const = 0;
 	virtual int GetLastProcessedState() const = 0;
 
-	virtual const Frame& GetCurrentFrame() const = 0;
 	virtual const Frame& GetInitialFrame() const = 0;
-	virtual cv::Mat GetImGray() const = 0;
-
 	virtual const std::vector<int>& GetIniMatches() const = 0;
+	virtual const std::vector<int>& GetNumObservations() const = 0;
 
 	// Lists used to recover the full camera trajectory at the end of the execution.
 	// Basically we store the reference keyframe for each frame and its relative transformation

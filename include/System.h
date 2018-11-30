@@ -70,6 +70,7 @@ public:
 	virtual bool MapChanged() const = 0;
 
 	// Reset the system (clear map)
+	virtual void RequestReset() = 0;
 	virtual void Reset() = 0;
 
 	// All threads will be requested to finish.
@@ -104,6 +105,11 @@ public:
 	virtual int GetTrackingState() const = 0;
 	virtual std::vector<MapPoint*> GetTrackedMapPoints() const = 0;
 	virtual std::vector<cv::KeyPoint> GetTrackedKeyPointsUn() const = 0;
+
+	// Load new settings
+	// The focal lenght should be similar or scale prediction will fail when projecting points
+	// TODO: Modify MapPoint::PredictScale to take into account focal lenght
+	virtual void ChangeCalibration(const Path& settingsFile) = 0;
 };
 
 } // namespace ORB_SLAM

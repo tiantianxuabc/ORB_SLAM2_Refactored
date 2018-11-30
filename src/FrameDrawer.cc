@@ -163,14 +163,12 @@ cv::Mat FrameDrawer::DrawFrame()
 	return draw;
 }
 
-void FrameDrawer::Update(Tracking* tracker)
+void FrameDrawer::Update(const Tracking* tracker, const Frame& currFrame, const cv::Mat& image)
 {
 	std::unique_lock<std::mutex> lock(mutex_);
-
-	tracker->GetImGray().copyTo(image_);
-	currKeyPoints_ = tracker->GetCurrentFrame().keypoints;
-	const Frame& currFrame = tracker->GetCurrentFrame();
-
+	image.copyTo(image_);
+	currKeyPoints_ = currFrame.keypoints;
+	
 	const int nkeypoints = static_cast<int>(currKeyPoints_.size());
 	status_.assign(nkeypoints, MAPPOINT_STATUS_NONE);
 	localizationMode_ = tracker->OnlyTracking();
@@ -183,12 +181,15 @@ void FrameDrawer::Update(Tracking* tracker)
 	}
 	else if (state == Tracking::STATE_OK)
 	{
+		const std::vector<int>& nobservations = tracker->GetNumObservations();
+		CV_Assert(nobservations.size() == currKeyPoints_.size());
+
 		for (int i = 0; i < nkeypoints; i++)
 		{
-			const MapPoint* mappoint = currFrame.mappoints[i];
-			if (!mappoint || currFrame.outlier[i])
+			if (nobservations[i] < 0)
 				continue;
-			status_[i] = mappoint->Observations() > 0 ? MAPPOINT_STATUS_MAP : MAPPOINT_STATUS_VO;
+
+			status_[i] = nobservations[i] > 0 ? MAPPOINT_STATUS_MAP : MAPPOINT_STATUS_VO;
 		}
 	}
 	state_ = state;

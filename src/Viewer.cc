@@ -157,7 +157,7 @@ void Viewer::Run()
 			localizationMode = false;
 			followCamera = true;
 			menuFollowCamera = true;
-			system_->Reset();
+			system_->RequestReset();
 			menuReset = false;
 		}
 
@@ -244,9 +244,9 @@ void Viewer::SetCurrentCameraPose(const cv::Mat& Tcw)
 	mapDrawer_->SetCurrentCameraPose(Tcw);
 }
 
-void Viewer::UpdateFrame(Tracking* tracker)
+void Viewer::UpdateFrame(const Tracking* tracker, const Frame& currFrame, const cv::Mat& image)
 {
-	frameDrawer_->Update(tracker);
+	frameDrawer_->Update(tracker, currFrame, image);
 }
 
 }

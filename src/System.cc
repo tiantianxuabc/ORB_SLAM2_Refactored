@@ -18,13 +18,12 @@
 * along with ORB-SLAM2. If not, see <http://www.gnu.org/licenses/>.
 */
 
-
-
 #include "System.h"
 
 #include <thread>
 #include <iomanip>
 
+#include "Frame.h"
 #include "KeyFrame.h"
 #include "Tracking.h"
 #include "Map.h"
@@ -35,6 +34,8 @@
 #include "Viewer.h"
 #include "Usleep.h"
 #include "Converter.h"
+#include "ORBextractor.h"
+#include "ORBmatcher.h"
 
 namespace ORB_SLAM2
 {
@@ -42,6 +43,180 @@ namespace ORB_SLAM2
 #define LOCK_MUTEX_RESET() unique_lock<mutex> lock1(mutexReset_);
 #define LOCK_MUTEX_MODE()  unique_lock<mutex> lock2(mutexMode_);
 #define LOCK_MUTEX_STATE() unique_lock<mutex> lock3(mutexState_);
+
+static CameraParams ReadCameraParams(const cv::FileStorage& fs)
+{
+	CameraParams param;
+	param.fx = fs["Camera.fx"];
+	param.fy = fs["Camera.fy"];
+	param.cx = fs["Camera.cx"];
+	param.cy = fs["Camera.cy"];
+	param.bf = fs["Camera.bf"];
+	param.baseline = param.bf / param.fx;
+	return param;
+}
+
+static cv::Mat1f ReadDistCoeffs(const cv::FileStorage& fs)
+{
+	const float k1 = fs["Camera.k1"];
+	const float k2 = fs["Camera.k2"];
+	const float p1 = fs["Camera.p1"];
+	const float p2 = fs["Camera.p2"];
+	const float k3 = fs["Camera.k3"];
+	cv::Mat1f distCoeffs = k3 == 0 ? (cv::Mat1f(4, 1) << k1, k2, p1, p2) : (cv::Mat1f(5, 1) << k1, k2, p1, p2, k3);
+	return distCoeffs;
+}
+
+static float ReadFps(const cv::FileStorage& fs)
+{
+	const float fps = fs["Camera.fps"];
+	return fps == 0 ? 30 : fps;
+}
+
+static ORBextractor::Parameters ReadExtractorParams(const cv::FileStorage& fs)
+{
+	ORBextractor::Parameters param;
+	param.nfeatures = fs["ORBextractor.nFeatures"];
+	param.scaleFactor = fs["ORBextractor.scaleFactor"];
+	param.nlevels = fs["ORBextractor.nLevels"];
+	param.iniThFAST = fs["ORBextractor.iniThFAST"];
+	param.minThFAST = fs["ORBextractor.minThFAST"];
+	return param;
+}
+
+static float ReadDepthFactor(const cv::FileStorage& fs)
+{
+	const float factor = fs["DepthMapFactor"];
+	return fabs(factor) < 1e-5 ? 1 : 1.f / factor;
+}
+
+static void PrintSettings(const CameraParams& camera, const cv::Mat1f& distCoeffs,
+	float fps, bool rgb, const ORBextractor::Parameters& param, float thDepth, int sensor)
+{
+	std::cout << std::endl << "Camera Parameters: " << std::endl;
+	std::cout << "- fx: " << camera.fx << std::endl;
+	std::cout << "- fy: " << camera.fy << std::endl;
+	std::cout << "- cx: " << camera.cx << std::endl;
+	std::cout << "- cy: " << camera.cy << std::endl;
+	std::cout << "- k1: " << distCoeffs(0) << std::endl;
+	std::cout << "- k2: " << distCoeffs(1) << std::endl;
+	if (distCoeffs.rows == 5)
+		std::cout << "- k3: " << distCoeffs(4) << std::endl;
+	std::cout << "- p1: " << distCoeffs(2) << std::endl;
+	std::cout << "- p2: " << distCoeffs(3) << std::endl;
+	std::cout << "- fps: " << fps << std::endl;
+
+	std::cout << "- color order: " << (rgb ? "RGB" : "BGR") << " (ignored if grayscale)" << std::endl;
+
+	std::cout << std::endl << "ORB Extractor Parameters: " << std::endl;
+	std::cout << "- Number of Features: " << param.nfeatures << std::endl;
+	std::cout << "- Scale Levels: " << param.nlevels << std::endl;
+	std::cout << "- Scale Factor: " << param.scaleFactor << std::endl;
+	std::cout << "- Initial Fast Threshold: " << param.iniThFAST << std::endl;
+	std::cout << "- Minimum Fast Threshold: " << param.minThFAST << std::endl;
+
+	if (sensor == System::STEREO || sensor == System::RGBD)
+		std::cout << std::endl << "Depth Threshold (Close/Far Points): " << thDepth << std::endl;
+}
+
+static void ConvertToGray(const cv::Mat& src, cv::Mat& dst, bool RGB)
+{
+	static const int codes[] = { cv::COLOR_RGB2GRAY, cv::COLOR_BGR2GRAY, cv::COLOR_RGBA2GRAY, cv::COLOR_BGRA2GRAY };
+
+	const int ch = src.channels();
+	CV_Assert(ch == 1 || ch == 3 || ch == 4);
+
+	if (ch == 1)
+	{
+		dst = src;
+		return;
+	}
+
+	const int idx = ((ch == 3 ? 0 : 1) << 1) + (RGB ? 0 : 1);
+	cv::cvtColor(src, dst, codes[idx]);
+}
+
+static void GetScalePyramidInfo(const ORBextractor* extractor, ScalePyramidInfo& pyramid)
+{
+	pyramid.nlevels = extractor->GetLevels();
+	pyramid.scaleFactor = extractor->GetScaleFactor();
+	pyramid.logScaleFactor = log(pyramid.scaleFactor);
+	pyramid.scaleFactors = extractor->GetScaleFactors();
+	pyramid.invScaleFactors = extractor->GetInverseScaleFactors();
+	pyramid.sigmaSq = extractor->GetScaleSigmaSquares();
+	pyramid.invSigmaSq = extractor->GetInverseScaleSigmaSquares();
+}
+
+// Undistort keypoints given OpenCV distortion parameters.
+// Only for the RGB-D case. Stereo must be already rectified!
+// (called in the constructor).
+static void UndistortKeyPoints(const KeyPoints& src, KeyPoints& dst, const cv::Mat& K, const cv::Mat1f& distCoeffs)
+{
+	if (distCoeffs(0) == 0.f)
+	{
+		dst = src;
+		return;
+	}
+
+	std::vector<cv::Point2f> points(src.size());
+	for (size_t i = 0; i < src.size(); i++)
+		points[i] = src[i].pt;
+
+	cv::undistortPoints(points, points, K, distCoeffs, cv::Mat(), K);
+
+	dst.resize(src.size());
+	for (size_t i = 0; i < src.size(); i++)
+	{
+		cv::KeyPoint keypoint = src[i];
+		keypoint.pt = points[i];
+		dst[i] = keypoint;
+	}
+}
+
+// Computes image bounds for the undistorted image (called in the constructor).
+static ImageBounds ComputeImageBounds(const cv::Mat& image, const cv::Mat& K, const cv::Mat1f& distCoeffs)
+{
+	const float h = static_cast<float>(image.rows);
+	const float w = static_cast<float>(image.cols);
+
+	if (distCoeffs(0) == 0.f)
+		return ImageBounds(0.f, w, 0.f, h);
+
+	std::vector<cv::Point2f> corners = { { 0, 0 },{ w, 0 },{ 0, h },{ w, h } };
+	cv::undistortPoints(corners, corners, K, distCoeffs, cv::Mat(), K);
+
+	ImageBounds imageBounds;
+	imageBounds.minx = std::min(corners[0].x, corners[2].x);
+	imageBounds.maxx = std::max(corners[1].x, corners[3].x);
+	imageBounds.miny = std::min(corners[0].y, corners[1].y);
+	imageBounds.maxy = std::max(corners[2].y, corners[3].y);
+	return imageBounds;
+}
+
+// Associate a "right" coordinate to a keypoint if there is valid depth in the depthmap.
+static void ComputeStereoFromRGBD(const KeyPoints& keypoints, const KeyPoints& keypointsUn, const cv::Mat& depthImage,
+	const CameraParams& camera, std::vector<float>& uright, std::vector<float>& depth)
+{
+	const int nkeypoints = static_cast<int>(keypoints.size());
+
+	uright.assign(nkeypoints, -1.f);
+	depth.assign(nkeypoints, -1.f);
+
+	for (int i = 0; i < nkeypoints; i++)
+	{
+		const cv::KeyPoint& keypoint = keypoints[i];
+		const cv::KeyPoint& keypointUn = keypointsUn[i];
+
+		const int v = static_cast<int>(keypoint.pt.y);
+		const int u = static_cast<int>(keypoint.pt.x);
+		const float d = depthImage.at<float>(v, u);
+		if (d > 0)
+		{
+			depth[i] = d;
+			uright[i] = keypointUn.pt.x - camera.bf / d;
+		}
+	}
+}
 
 class ModeManager
 {
@@ -95,25 +270,26 @@ private:
 	bool deactivateLocalizationMode_;
 };
 
-static void GetTracingResults(const Tracking& tracker, int& state, std::vector<MapPoint*>& mappoints, std::vector<cv::KeyPoint>& keypoints)
+static void GetTracingResults(const Tracking& tracker, const Frame& currFrame,
+	int& state, std::vector<MapPoint*>& mappoints, std::vector<cv::KeyPoint>& keypoints)
 {
 	state = tracker.GetState();
-	mappoints = tracker.GetCurrentFrame().mappoints;
-	keypoints = tracker.GetCurrentFrame().keypointsUn;
+	mappoints = currFrame.mappoints;
+	keypoints = currFrame.keypointsUn;
 }
 
 class ResetManager
 {
 public:
 
-	ResetManager(const std::shared_ptr<Tracking>& tracker) : tracker_(tracker), reset_(false) {}
+	ResetManager(System* system) : system_(system), reset_(false) {}
 
 	void Update()
 	{
 		LOCK_MUTEX_RESET();
 		if (reset_)
 		{
-			tracker_->Reset();
+			system_->Reset();
 			reset_ = false;
 		}
 	}
@@ -125,7 +301,7 @@ public:
 	}
 
 private:
-	std::shared_ptr<Tracking> tracker_;
+	System* system_;
 	// Reset flag
 	mutable std::mutex mutexReset_;
 	bool reset_;
@@ -164,7 +340,7 @@ public:
 		//Load ORB Vocabulary
 		std::cout << std::endl << "Loading ORB Vocabulary. This could take a while..." << std::endl;
 
-		if (!vocabulary_.loadFromTextFile(vocabularyFile))
+		if (!voc_.loadFromTextFile(vocabularyFile))
 		{
 			cerr << "Wrong path to vocabulary. " << std::endl;
 			cerr << "Falied to open at: " << vocabularyFile << std::endl;
@@ -172,19 +348,60 @@ public:
 		}
 		std::cout << "Vocabulary loaded!" << std::endl << std::endl;
 
+		// Load camera parameters from settings file
+		camera_ = ReadCameraParams(settings);
+		distCoeffs_ = ReadDistCoeffs(settings);
+
+		// Load fps
+		const float fps = ReadFps(settings);
+
+		// Max/Min Frames to insert keyframes and to check relocalisation
+		const int minFrames = 0;
+		const int maxFrames = static_cast<int>(fps);
+
+		// Load color
+		RGB_ = static_cast<int>(settings["Camera.RGB"]) != 0;
+
+		// Load ORB parameters
+		ORBextractor::Parameters extractorParams = ReadExtractorParams(settings);
+
+		// Load depth threshold
+		const float thDepth = camera_.baseline * static_cast<float>(settings["ThDepth"]);
+		thDepth_ = thDepth;
+
+		// Load depth factor
+		depthFactor_ = sensor == System::RGBD ? ReadDepthFactor(settings) : 1.f;
+
+		// Print settings
+		PrintSettings(camera_, distCoeffs_, fps, RGB_, extractorParams, thDepth, sensor);
+
+		// Initialize ORB extractors
+		extractorL_ = std::make_unique<ORBextractor>(extractorParams);
+		extractorR_ = std::make_unique<ORBextractor>(extractorParams);
+
+		if (sensor == System::MONOCULAR)
+		{
+			extractorParams.nfeatures *= 2;
+			extractorIni_ = std::make_unique<ORBextractor>(extractorParams);
+		}
+
+		// Scale Level Info
+		GetScalePyramidInfo(extractorL_.get(), pyramid_);
+		
 		//Create KeyFrame Database
-		keyFrameDB_ = std::make_shared<KeyFrameDatabase>(vocabulary_);
+		keyFrameDB_ = std::make_shared<KeyFrameDatabase>(voc_);
 
 		//Initialize the Tracking thread
 		//(it will live in the main thread of execution, the one that called this constructor)
-		tracker_ = Tracking::Create(this, &vocabulary_, &map_, keyFrameDB_.get(), settingsFile, sensor_);
+		const Tracking::Parameters trackParams(minFrames, maxFrames, thDepth);
+		tracker_ = Tracking::Create(this, &voc_, &map_, keyFrameDB_.get(), sensor_, trackParams);
 
 		//Initialize the Local Mapping thread and launch
 		localMapper_ = LocalMapping::Create(&map_, sensor_ == MONOCULAR);
 		threads_[THREAD_LOCAL_MAPPING] = thread(&ORB_SLAM2::LocalMapping::Run, localMapper_);
 
 		//Initialize the Loop Closing thread and launch
-		loopCloser_ = LoopClosing::Create(&map_, keyFrameDB_.get(), &vocabulary_, sensor_ != MONOCULAR);
+		loopCloser_ = LoopClosing::Create(&map_, keyFrameDB_.get(), &voc_, sensor_ != MONOCULAR);
 		threads_[THREAD_LOOP_CLOSING] = thread(&ORB_SLAM2::LoopClosing::Run, loopCloser_);
 
 		//Initialize the Viewer thread and launch
@@ -192,7 +409,6 @@ public:
 		{
 			viewer_ = std::make_shared<Viewer>(this, &map_, settingsFile);
 			threads_[THREAD_VIEWER] = thread(&Viewer::Run, viewer_.get());
-			tracker_->SetViewer(viewer_.get());
 		}
 
 		//Set pointers between threads
@@ -205,7 +421,7 @@ public:
 		loopCloser_->SetTracker(tracker_);
 		loopCloser_->SetLocalMapper(localMapper_);
 
-		resetManager_ = std::make_shared<ResetManager>(tracker_);
+		resetManager_ = std::make_shared<ResetManager>(this);
 		modeManager_ = std::make_shared<ModeManager>(tracker_, localMapper_);
 	}
 
@@ -226,10 +442,45 @@ public:
 		// Check reset
 		resetManager_->Update();
 
-		const cv::Mat Tcw = tracker_->GrabImageStereo(imageL, imageR, timestamp);
+		// Color conversion
+		ConvertToGray(imageL, imageL_, RGB_);
+		ConvertToGray(imageR, imageR_, RGB_);
+
+		// ORB extraction
+		std::thread threadL([&]() { extractorL_->Extract(imageL_, keypointsL_, descriptorsL_); });
+		std::thread threadR([&]() { extractorR_->Extract(imageR_, keypointsR_, descriptorsR_); });
+		threadL.join();
+		threadR.join();
+
+		// Undistortion
+		UndistortKeyPoints(keypointsL_, keypointsUn_, camera_.Mat(), distCoeffs_);
+
+		// Stereo matching
+		ComputeStereoMatches(
+			keypointsL_, descriptorsL_, extractorL_->GetImagePyramid(),
+			keypointsR_, descriptorsR_, extractorR_->GetImagePyramid(),
+			pyramid_.scaleFactors, pyramid_.invScaleFactors, camera_, uright_, depth_);
+
+		// Computes image bounds for the undistorted image
+		if (imageBounds_.Empty())
+			imageBounds_ = ComputeImageBounds(imageL_, camera_.Mat(), distCoeffs_);
+
+		// Create frame
+		currFrame_ = Frame(&voc_, timestamp, camera_, thDepth_, keypointsL_, keypointsUn_,
+			uright_, depth_, descriptorsL_, pyramid_, imageBounds_);
+
+		// Update tracker
+		const cv::Mat Tcw = tracker_->Update(currFrame_);
+
+		if (viewer_)
+		{
+			viewer_->UpdateFrame(tracker_.get(), currFrame_, imageL_);
+			if (tracker_->GetState() == Tracking::STATE_OK)
+				viewer_->SetCurrentCameraPose(Tcw);
+		}
 
 		LOCK_MUTEX_STATE();
-		GetTracingResults(*tracker_, trackingState_, trackedMapPoints_, trackedKeyPointsUn_);
+		GetTracingResults(*tracker_, currFrame_, trackingState_, trackedMapPoints_, trackedKeyPointsUn_);
 
 		return Tcw;
 	}
@@ -252,10 +503,39 @@ public:
 		// Check reset
 		resetManager_->Update();
 
-		const cv::Mat Tcw = tracker_->GrabImageRGBD(image, depth, timestamp);
+		// Color conversion
+		ConvertToGray(image, imageL_, RGB_);
+
+		// ORB extraction
+		extractorL_->Extract(imageL_, keypointsL_, descriptorsL_);
+
+		// Undistortion
+		UndistortKeyPoints(keypointsL_, keypointsUn_, camera_.Mat(), distCoeffs_);
+
+		// Associate a "right" coordinate to a keypoint if there is valid depth in the depthmap.
+		depth.convertTo(depthMap_, CV_32F, depthFactor_);
+		ComputeStereoFromRGBD(keypointsL_, keypointsUn_, depthMap_, camera_, uright_, depth_);
+
+		// Computes image bounds for the undistorted image
+		if (imageBounds_.Empty())
+			imageBounds_ = ComputeImageBounds(imageL_, camera_.Mat(), distCoeffs_);
+
+		// Create frame
+		currFrame_ = Frame(&voc_, timestamp, camera_, thDepth_, keypointsL_, keypointsUn_,
+			uright_, depth_, descriptorsL_, pyramid_, imageBounds_);
+
+		// Update tracker
+		const cv::Mat Tcw = tracker_->Update(currFrame_);;
+
+		if (viewer_)
+		{
+			viewer_->UpdateFrame(tracker_.get(), currFrame_, imageL_);
+			if (tracker_->GetState() == Tracking::STATE_OK)
+				viewer_->SetCurrentCameraPose(Tcw);
+		}
 
 		LOCK_MUTEX_STATE();
-		GetTracingResults(*tracker_, trackingState_, trackedMapPoints_, trackedKeyPointsUn_);
+		GetTracingResults(*tracker_, currFrame_, trackingState_, trackedMapPoints_, trackedKeyPointsUn_);
 
 		return Tcw;
 	}
@@ -277,10 +557,35 @@ public:
 		// Check reset
 		resetManager_->Update();
 
-		const cv::Mat Tcw = tracker_->GrabImageMonocular(image, timestamp);
+		// Color conversion
+		ConvertToGray(image, imageL_, RGB_);
+
+		const int state = tracker_->GetState();
+		const bool init = state == Tracking::STATE_NOT_INITIALIZED || state == Tracking::STATE_NO_IMAGES;
+		auto& extractor = init ? extractorIni_ : extractorL_;
+
+		// ORB extraction
+		extractor->Extract(imageL_, keypointsL_, descriptorsL_);
+
+		// Undistortion
+		UndistortKeyPoints(keypointsL_, keypointsUn_, camera_.Mat(), distCoeffs_);
+
+		// Create frame
+		currFrame_ = Frame(&voc_, timestamp, camera_, thDepth_, keypointsL_, keypointsUn_,
+			descriptorsL_, pyramid_, imageBounds_);
+
+		// Update tracker
+		const cv::Mat Tcw = tracker_->Update(currFrame_);;
+
+		if (viewer_)
+		{
+			viewer_->UpdateFrame(tracker_.get(), currFrame_, imageL_);
+			if (tracker_->GetState() == Tracking::STATE_OK)
+				viewer_->SetCurrentCameraPose(Tcw);
+		}
 
 		LOCK_MUTEX_STATE();
-		GetTracingResults(*tracker_, trackingState_, trackedMapPoints_, trackedKeyPointsUn_);
+		GetTracingResults(*tracker_, currFrame_, trackingState_, trackedMapPoints_, trackedKeyPointsUn_);
 
 		return Tcw;
 	}
@@ -313,9 +618,47 @@ public:
 	}
 
 	// Reset the system (clear map)
-	void Reset() override
+	void RequestReset() override
 	{
 		resetManager_->Reset();
+	}
+
+	void Reset() override
+	{
+		std::cout << "System Reseting" << std::endl;
+		if (viewer_)
+		{
+			viewer_->RequestStop();
+			while (!viewer_->isStopped())
+				usleep(3000);
+		}
+
+		// Reset Tracking
+		tracker_->Reset();
+
+		// Reset Local Mapping
+		std::cout << "Reseting Local Mapper...";
+		localMapper_->RequestReset();
+		std::cout << " done" << std::endl;
+
+		// Reset Loop Closing
+		std::cout << "Reseting Loop Closing...";
+		loopCloser_->RequestReset();
+		std::cout << " done" << std::endl;
+
+		// Clear BoW Database
+		std::cout << "Reseting Database...";
+		keyFrameDB_->clear();
+		std::cout << " done" << std::endl;
+
+		// Clear Map (this erase MapPoints and KeyFrames)
+		map_.Clear();
+
+		KeyFrame::nextId = 0;
+		Frame::nextId = 0;
+
+		if (viewer_)
+			viewer_->Release();
 	}
 
 	// All threads will be requested to finish.
@@ -526,13 +869,21 @@ public:
 		return trackedKeyPointsUn_;
 	}
 
+	void ChangeCalibration(const string& settingsFile) override
+	{
+		cv::FileStorage settings(settingsFile, cv::FileStorage::READ);
+		camera_ = ReadCameraParams(settings);
+		distCoeffs_ = ReadDistCoeffs(settings);
+		imageBounds_ = ImageBounds();
+	}
+
 private:
 
 	// Input sensor
 	Sensor sensor_;
 
 	// ORB vocabulary used for place recognition and feature matching.
-	ORBVocabulary vocabulary_;
+	ORBVocabulary voc_;
 
 	// KeyFrame database for place recognition (relocalization and loop detection).
 	std::shared_ptr<KeyFrameDatabase> keyFrameDB_;
@@ -571,6 +922,37 @@ private:
 	std::vector<MapPoint*> trackedMapPoints_;
 	std::vector<cv::KeyPoint> trackedKeyPointsUn_;
 	mutable std::mutex mutexState_;
+
+	// Current Frame
+	Frame currFrame_;
+	cv::Mat imageL_;
+	cv::Mat imageR_;
+	cv::Mat depthMap_;
+
+	KeyPoints keypointsL_, keypointsR_, keypointsUn_;
+	std::vector<float> uright_, depth_;
+	cv::Mat descriptorsL_, descriptorsR_;
+	ImageBounds imageBounds_;
+
+	// ORB
+	std::unique_ptr<ORBextractor> extractorL_;
+	std::unique_ptr<ORBextractor> extractorR_;
+	std::unique_ptr<ORBextractor> extractorIni_;
+
+	// Scale Level Info
+	ScalePyramidInfo pyramid_;
+
+	// Calibration matrix
+	CameraParams camera_;
+	cv::Mat1f distCoeffs_;
+
+	// For RGB-D inputs only. For some datasets (e.g. TUM) the depthmap values are scaled.
+	float depthFactor_;
+
+	// Color order (true RGB, false BGR, ignored if grayscale)
+	bool RGB_;
+
+	float thDepth_;
 };
 
 System::Pointer System::Create(const Path& vocabularyFile, const Path& settingsFile, Sensor sensor, bool useViewer)

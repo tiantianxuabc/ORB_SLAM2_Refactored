@@ -28,6 +28,8 @@
 #include <mutex>
 #include <memory>
 
+#include "Frame.h"
+
 namespace ORB_SLAM2
 {
 
@@ -54,7 +56,7 @@ public:
 	void Release();
 
 	void SetCurrentCameraPose(const cv::Mat& Tcw);
-	void UpdateFrame(Tracking* tracker);
+	void UpdateFrame(const Tracking* tracker, const Frame& currFrame, const cv::Mat& image);
 
 private:
 
