@@ -398,17 +398,17 @@ public:
 
 		//Initialize the Local Mapping thread and launch
 		localMapper_ = LocalMapping::Create(&map_, sensor_ == MONOCULAR);
-		threads_[THREAD_LOCAL_MAPPING] = thread(&ORB_SLAM2::LocalMapping::Run, localMapper_);
+		threads_[THREAD_LOCAL_MAPPING] = std::thread(&ORB_SLAM2::LocalMapping::Run, localMapper_);
 
 		//Initialize the Loop Closing thread and launch
 		loopCloser_ = LoopClosing::Create(&map_, keyFrameDB_.get(), &voc_, sensor_ != MONOCULAR);
-		threads_[THREAD_LOOP_CLOSING] = thread(&ORB_SLAM2::LoopClosing::Run, loopCloser_);
+		threads_[THREAD_LOOP_CLOSING] = std::thread(&ORB_SLAM2::LoopClosing::Run, loopCloser_);
 
 		//Initialize the Viewer thread and launch
 		if (useViewer)
 		{
 			viewer_ = std::make_shared<Viewer>(this, &map_, settingsFile);
-			threads_[THREAD_VIEWER] = thread(&Viewer::Run, viewer_.get());
+			threads_[THREAD_VIEWER] = std::thread(&Viewer::Run, viewer_);
 		}
 
 		//Set pointers between threads
