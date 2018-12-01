@@ -525,7 +525,7 @@ public:
 			descriptorsL_, pyramid_, imageBounds_);
 
 		// Update tracker
-		const cv::Mat Tcw = tracker_->Update(currFrame_);;
+		const cv::Mat Tcw = tracker_->Update(currFrame_);
 
 		if (viewer_)
 		{
@@ -574,7 +574,7 @@ public:
 		currFrame_ = Frame(&voc_, timestamp, camera_, keypointsL_, keypointsUn_, descriptorsL_, pyramid_, imageBounds_);
 
 		// Update tracker
-		const cv::Mat Tcw = tracker_->Update(currFrame_);;
+		const cv::Mat Tcw = tracker_->Update(currFrame_);
 
 		if (viewer_)
 		{
@@ -719,7 +719,7 @@ public:
 			if (track.lost)
 				continue;
 
-			KeyFrame* keyframe = (KeyFrame*)track.referenceKF;
+			const KeyFrame* keyframe = track.referenceKF;
 
 			CameraPose Trw = CameraPose::Origin();
 
@@ -768,7 +768,7 @@ public:
 
 		for (size_t i = 0; i < keyframes.size(); i++)
 		{
-			KeyFrame* keyframe = keyframes[i];
+			const KeyFrame* keyframe = keyframes[i];
 
 			if (keyframe->isBad())
 				continue;
@@ -779,7 +779,6 @@ public:
 			ofs << std::setprecision(6) << keyframe->timestamp << " ";
 			ofs << std::setprecision(7) << t(0) << " " << t(1) << " " << t(2) << " ";
 			ofs << q[0] << " " << q[1] << " " << q[2] << " " << q[3] << std::endl;
-
 		}
 
 		std::cout << std::endl << "trajectory saved!" << std::endl;
@@ -817,7 +816,7 @@ public:
 		// which is true when tracking failed.
 		for (const auto& track : tracker_->GetTrajectory())
 		{
-			KeyFrame* keyframe = (KeyFrame*)track.referenceKF;
+			const KeyFrame* keyframe = track.referenceKF;
 
 			CameraPose Trw = CameraPose::Origin();
 
