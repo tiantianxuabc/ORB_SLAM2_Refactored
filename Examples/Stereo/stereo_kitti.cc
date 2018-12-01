@@ -72,7 +72,7 @@ int main(int argc, char **argv)
 	std::vector<std::string> IRs;
 	std::vector<double> timestamps;
 
-	const int nframes = LoadImages(argv[3], ILs, IRs, timestamps);
+	const int nimages = LoadImages(argv[3], ILs, IRs, timestamps);
 
 	// Create SLAM system. It initializes all system threads and gets ready to process frames.
 	const bool useViewer = argc > 4 ? std::stoi(argv[4]) != 0 : true;
@@ -80,14 +80,14 @@ int main(int argc, char **argv)
 
 	// Vector for tracking time statistics
 	std::vector<double> trackTimes;
-	trackTimes.resize(nframes);
+	trackTimes.resize(nimages);
 
 	std::cout << std::endl << "-------" << std::endl;
 	std::cout << "Start processing sequence ..." << std::endl;
-	std::cout << "Images in the sequence: " << nframes << std::endl << std::endl;
+	std::cout << "Images in the sequence: " << nimages << std::endl << std::endl;
 
 	// Main loop
-	for (int i = 0; i < nframes; i++)
+	for (int i = 0; i < nimages; i++)
 	{
 		// Read left and right images from file
 		const cv::Mat IL = cv::imread(ILs[i], cv::IMREAD_UNCHANGED);
@@ -108,7 +108,7 @@ int main(int argc, char **argv)
 		const auto t2 = std::chrono::steady_clock::now();
 
 		const double T1 = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1).count();
-		const double T2 = i < nframes - 1 ? timestamps[i + 1] - timestamp : timestamp - timestamps[i - 1];
+		const double T2 = i < nimages - 1 ? timestamps[i + 1] - timestamp : timestamp - timestamps[i - 1];
 
 		trackTimes[i] = T1;
 
@@ -125,8 +125,8 @@ int main(int argc, char **argv)
 	const double totalTime = std::accumulate(std::begin(trackTimes), std::end(trackTimes), 0.);
 
 	std::cout << "-------" << std::endl << std::endl;
-	std::cout << "median tracking time: " << trackTimes[nframes / 2] << std::endl;
-	std::cout << "mean tracking time: " << totalTime / nframes << std::endl;
+	std::cout << "median tracking time: " << trackTimes[nimages / 2] << std::endl;
+	std::cout << "mean tracking time: " << totalTime / nimages << std::endl;
 
 	// Save camera trajectory
 	SLAM->SaveTrajectoryKITTI("CameraTrajectory.txt");

@@ -28,7 +28,7 @@
 
 #include <opencv2/opencv.hpp>
 
-#include "System.h"
+#include <System.h>
 
 static inline void usleep(int64_t usec) { std::this_thread::sleep_for(std::chrono::microseconds(usec)); }
 
