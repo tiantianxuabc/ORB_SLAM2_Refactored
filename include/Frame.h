@@ -92,15 +92,13 @@ public:
 	Frame(const Frame& frame);
 
 	// Constructor for stereo and RGB-D cameras.
-	Frame(ORBVocabulary* voc, double timestamp, const CameraParams& camera, float thDepth,
-		const std::vector<cv::KeyPoint>& keypoints, const std::vector<cv::KeyPoint>& keypointsUn,
-		const std::vector<float>& uright, const std::vector<float>& depth, const cv::Mat& descriptors,
-		const ScalePyramidInfo& pyramid, const ImageBounds& imageBounds);
+	Frame(ORBVocabulary* voc, double timestamp, const CameraParams& camera, const std::vector<cv::KeyPoint>& keypoints,
+		const std::vector<cv::KeyPoint>& keypointsUn, const std::vector<float>& uright, const std::vector<float>& depth,
+		const cv::Mat& descriptors, const ScalePyramidInfo& pyramid, const ImageBounds& imageBounds);
 
 	// Constructor for Monocular cameras.
-	Frame(ORBVocabulary* voc, double timestamp, const CameraParams& camera, float thDepth,
-		const std::vector<cv::KeyPoint>& keypoints, const std::vector<cv::KeyPoint>& keypointsUn,
-		const cv::Mat& descriptors, const ScalePyramidInfo& pyramid, const ImageBounds& imageBounds);
+	Frame(ORBVocabulary* voc, double timestamp, const CameraParams& camera, const std::vector<cv::KeyPoint>& keypoints,
+		const std::vector<cv::KeyPoint>& keypointsUn, const cv::Mat& descriptors, const ScalePyramidInfo& pyramid, const ImageBounds& imageBounds);
 
 	// Compute Bag of Words representation.
 	void ComputeBoW();
@@ -127,10 +125,6 @@ public:
 
 	// Calibration matrix
 	CameraParams camera;
-
-	// Threshold close/far points. Close points are inserted from 1 view.
-	// Far points are inserted as in the monocular case from 2 views.
-	float thDepth;
 
 	// Number of KeyPoints.
 	int N;

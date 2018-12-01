@@ -53,11 +53,11 @@ KeyFrame::KeyFrame(const Frame& frame, Map* map, KeyFrameDatabase* keyframeDB) :
 	frameId(frame.id), timestamp(frame.timestamp), grid(frame.grid),
 	trackReferenceForFrame(0), fuseTargetForKF(0), BALocalForKF(0), BAFixedForKF(0),
 	loopQuery(0), loopWords(0), relocQuery(0), relocWords(0), BAGlobalForKF(0),
-	camera(frame.camera), thDepth(frame.thDepth), N(frame.N), keypointsL(frame.keypoints), keypointsUn(frame.keypointsUn),
+	camera(frame.camera), N(frame.N), keypointsL(frame.keypoints), keypointsUn(frame.keypointsUn),
 	uright(frame.uright), depth(frame.depth), descriptorsL(frame.descriptors.clone()),
 	bowVector(frame.bowVector), featureVector(frame.featureVector), pyramid(frame.pyramid), imageBounds(frame.imageBounds),
 	mappoints_(frame.mappoints), keyFrameDB_(keyframeDB),
-	voc_(frame.voc), firstConnection_(true), parent_(NULL), notErase_(false),
+	voc_(frame.voc), firstConnection_(true), parent_(nullptr), notErase_(false),
 	toBeErased_(false), bad_(false), halfBaseline_(frame.camera.baseline / 2), map_(map)
 {
 	id = nextId++;

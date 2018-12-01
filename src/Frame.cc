@@ -154,7 +154,7 @@ Frame::Frame() {}
 
 //Copy Constructor
 Frame::Frame(const Frame& frame)
-	: voc(frame.voc), timestamp(frame.timestamp), camera(frame.camera), thDepth(frame.thDepth), N(frame.N),
+	: voc(frame.voc), timestamp(frame.timestamp), camera(frame.camera), N(frame.N),
 	keypoints(frame.keypoints), keypointsUn(frame.keypointsUn), uright(frame.uright), depth(frame.depth),
 	bowVector(frame.bowVector), featureVector(frame.featureVector), descriptors(frame.descriptors.clone()),
 	mappoints(frame.mappoints), outlier(frame.outlier), id(frame.id), referenceKF(frame.referenceKF),
@@ -164,13 +164,11 @@ Frame::Frame(const Frame& frame)
 		SetPose(frame.pose);
 }
 
-Frame::Frame(ORBVocabulary* voc, double timestamp, const CameraParams& camera, float thDepth,
-	const std::vector<cv::KeyPoint>& keypoints, const std::vector<cv::KeyPoint>& keypointsUn,
-	const std::vector<float>& uright, const std::vector<float>& depth, const cv::Mat& descriptors,
-	const ScalePyramidInfo& pyramid, const ImageBounds& imageBounds)
-	: voc(voc), timestamp(timestamp), camera(camera), thDepth(thDepth), keypoints(keypoints), keypointsUn(keypointsUn),
-	uright(uright), depth(depth), descriptors(descriptors.clone()), pyramid(pyramid), imageBounds(imageBounds),
-	referenceKF(nullptr)
+Frame::Frame(ORBVocabulary* voc, double timestamp, const CameraParams& camera, const std::vector<cv::KeyPoint>& keypoints,
+	const std::vector<cv::KeyPoint>& keypointsUn, const std::vector<float>& uright, const std::vector<float>& depth,
+	const cv::Mat& descriptors, const ScalePyramidInfo& pyramid, const ImageBounds& imageBounds)
+	: voc(voc), timestamp(timestamp), camera(camera), keypoints(keypoints), keypointsUn(keypointsUn), uright(uright),
+	depth(depth), descriptors(descriptors.clone()), pyramid(pyramid), imageBounds(imageBounds), referenceKF(nullptr)
 {
 	// Frame ID
 	id = nextId++;
@@ -183,10 +181,9 @@ Frame::Frame(ORBVocabulary* voc, double timestamp, const CameraParams& camera, f
 	grid.AssignFeatures(keypointsUn, imageBounds, pyramid.nlevels);
 }
 
-Frame::Frame(ORBVocabulary* voc, double timestamp, const CameraParams& camera, float thDepth,
-	const std::vector<cv::KeyPoint>& keypoints, const std::vector<cv::KeyPoint>& keypointsUn,
-	const cv::Mat& descriptors, const ScalePyramidInfo& pyramid, const ImageBounds& imageBounds)
-	: voc(voc), timestamp(timestamp), camera(camera), thDepth(thDepth), keypoints(keypoints), keypointsUn(keypointsUn),
+Frame::Frame(ORBVocabulary* voc, double timestamp, const CameraParams& camera, const std::vector<cv::KeyPoint>& keypoints,
+	const std::vector<cv::KeyPoint>& keypointsUn, const cv::Mat& descriptors, const ScalePyramidInfo& pyramid, const ImageBounds& imageBounds)
+	: voc(voc), timestamp(timestamp), camera(camera), keypoints(keypoints), keypointsUn(keypointsUn),
 	descriptors(descriptors.clone()), pyramid(pyramid), imageBounds(imageBounds), referenceKF(nullptr)
 {
 	// Frame ID

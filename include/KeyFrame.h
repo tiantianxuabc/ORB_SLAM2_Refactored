@@ -139,8 +139,7 @@ public:
 
 	// Calibration parameters
 	const CameraParams camera;
-	const float thDepth;
-
+	
 	// Number of KeyPoints
 	const int N;
 

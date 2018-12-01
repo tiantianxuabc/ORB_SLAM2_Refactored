@@ -466,8 +466,8 @@ public:
 			imageBounds_ = ComputeImageBounds(imageL_, camera_.Mat(), distCoeffs_);
 
 		// Create frame
-		currFrame_ = Frame(&voc_, timestamp, camera_, thDepth_, keypointsL_, keypointsUn_,
-			uright_, depth_, descriptorsL_, pyramid_, imageBounds_);
+		currFrame_ = Frame(&voc_, timestamp, camera_, keypointsL_, keypointsUn_, uright_, depth_,
+			descriptorsL_, pyramid_, imageBounds_);
 
 		// Update tracker
 		const cv::Mat Tcw = tracker_->Update(currFrame_);
@@ -521,8 +521,8 @@ public:
 			imageBounds_ = ComputeImageBounds(imageL_, camera_.Mat(), distCoeffs_);
 
 		// Create frame
-		currFrame_ = Frame(&voc_, timestamp, camera_, thDepth_, keypointsL_, keypointsUn_,
-			uright_, depth_, descriptorsL_, pyramid_, imageBounds_);
+		currFrame_ = Frame(&voc_, timestamp, camera_, keypointsL_, keypointsUn_, uright_, depth_,
+			descriptorsL_, pyramid_, imageBounds_);
 
 		// Update tracker
 		const cv::Mat Tcw = tracker_->Update(currFrame_);;
@@ -571,8 +571,7 @@ public:
 		UndistortKeyPoints(keypointsL_, keypointsUn_, camera_.Mat(), distCoeffs_);
 
 		// Create frame
-		currFrame_ = Frame(&voc_, timestamp, camera_, thDepth_, keypointsL_, keypointsUn_,
-			descriptorsL_, pyramid_, imageBounds_);
+		currFrame_ = Frame(&voc_, timestamp, camera_, keypointsL_, keypointsUn_, descriptorsL_, pyramid_, imageBounds_);
 
 		// Update tracker
 		const cv::Mat Tcw = tracker_->Update(currFrame_);;
