@@ -34,9 +34,11 @@
 
 #include "../DUtils/Random.h"
 
-using namespace std;
+//using namespace std;
 
 namespace DBoW2 {
+
+using namespace std;
 
 /// @param TDescriptor class of descriptor
 /// @param F class of descriptor functions

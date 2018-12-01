@@ -451,13 +451,14 @@ struct FeatureVectorIterator
 
 int ORBmatcher::SearchByBoW(KeyFrame* keyframe, Frame& frame, std::vector<MapPoint*>& matches)
 {
-	const vector<MapPoint*> mappoints1 = keyframe->GetMapPointMatches();
+	const std::vector<MapPoint*> mappoints1 = keyframe->GetMapPointMatches();
 
 	matches.assign(frame.N, nullptr);
 
 	int nmatches = 0;
 
-	vector<int> rotHist[HISTO_LENGTH];
+	// TODO remove
+	std::vector<int> rotHist[HISTO_LENGTH];
 	for (int i = 0; i < HISTO_LENGTH; i++)
 		rotHist[i].reserve(500);
 	const float factor = 1.0f / HISTO_LENGTH;
@@ -1449,7 +1450,8 @@ int ORBmatcher::SearchByProjection(Frame& frame, KeyFrame* keyframe, const std::
 	const float cy = frame.camera.cy;
 
 	// Rotation Histogram (to check rotation consistency)
-	vector<int> rotHist[HISTO_LENGTH];
+	// TODO remove
+	std::vector<int> rotHist[HISTO_LENGTH];
 	for (int i = 0; i < HISTO_LENGTH; i++)
 		rotHist[i].reserve(500);
 	const float factor = 1.0f / HISTO_LENGTH;

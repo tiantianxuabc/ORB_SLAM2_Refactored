@@ -40,9 +40,9 @@
 namespace ORB_SLAM2
 {
 
-#define LOCK_MUTEX_RESET() unique_lock<mutex> lock1(mutexReset_);
-#define LOCK_MUTEX_MODE()  unique_lock<mutex> lock2(mutexMode_);
-#define LOCK_MUTEX_STATE() unique_lock<mutex> lock3(mutexState_);
+#define LOCK_MUTEX_RESET() std::unique_lock<std::mutex> lock1(mutexReset_);
+#define LOCK_MUTEX_MODE()  std::unique_lock<std::mutex> lock2(mutexMode_);
+#define LOCK_MUTEX_STATE() std::unique_lock<std::mutex> lock3(mutexState_);
 
 static CameraParams ReadCameraParams(const cv::FileStorage& fs)
 {
@@ -333,7 +333,7 @@ public:
 		cv::FileStorage settings(settingsFile.c_str(), cv::FileStorage::READ);
 		if (!settings.isOpened())
 		{
-			cerr << "Failed to open settings file at: " << settingsFile << std::endl;
+			std::cerr << "Failed to open settings file at: " << settingsFile << std::endl;
 			std::exit(-1);
 		}
 
@@ -342,8 +342,8 @@ public:
 
 		if (!voc_.loadFromTextFile(vocabularyFile))
 		{
-			cerr << "Wrong path to vocabulary. " << std::endl;
-			cerr << "Falied to open at: " << vocabularyFile << std::endl;
+			std::cerr << "Wrong path to vocabulary. " << std::endl;
+			std::cerr << "Falied to open at: " << vocabularyFile << std::endl;
 			std::exit(-1);
 		}
 		std::cout << "Vocabulary loaded!" << std::endl << std::endl;
@@ -431,7 +431,7 @@ public:
 	{
 		if (sensor_ != STEREO)
 		{
-			cerr << "ERROR: you called TrackStereo but input sensor was not set to STEREO." << std::endl;
+			std::cerr << "ERROR: you called TrackStereo but input sensor was not set to STEREO." << std::endl;
 			std::exit(-1);
 		}
 
@@ -492,7 +492,7 @@ public:
 	{
 		if (sensor_ != RGBD)
 		{
-			cerr << "ERROR: you called TrackRGBD but input sensor was not set to RGBD." << std::endl;
+			std::cerr << "ERROR: you called TrackRGBD but input sensor was not set to RGBD." << std::endl;
 			std::exit(-1);
 		}
 
@@ -546,7 +546,7 @@ public:
 	{
 		if (sensor_ != MONOCULAR)
 		{
-			cerr << "ERROR: you called TrackMonocular but input sensor was not set to Monocular." << std::endl;
+			std::cerr << "ERROR: you called TrackMonocular but input sensor was not set to Monocular." << std::endl;
 			std::exit(-1);
 		}
 
@@ -692,7 +692,7 @@ public:
 		std::cout << std::endl << "Saving camera trajectory to " << filename << " ..." << std::endl;
 		if (sensor_ == MONOCULAR)
 		{
-			cerr << "ERROR: SaveTrajectoryTUM cannot be used for monocular." << std::endl;
+			std::cerr << "ERROR: SaveTrajectoryTUM cannot be used for monocular." << std::endl;
 			return;
 		}
 
@@ -792,7 +792,7 @@ public:
 		std::cout << std::endl << "Saving camera trajectory to " << filename << " ..." << std::endl;
 		if (sensor_ == MONOCULAR)
 		{
-			cerr << "ERROR: SaveTrajectoryKITTI cannot be used for monocular." << std::endl;
+			std::cerr << "ERROR: SaveTrajectoryKITTI cannot be used for monocular." << std::endl;
 			return;
 		}
 
@@ -854,19 +854,19 @@ public:
 		return trackingState_;
 	}
 
-	vector<MapPoint*> GetTrackedMapPoints() const override
+	std::vector<MapPoint*> GetTrackedMapPoints() const override
 	{
 		LOCK_MUTEX_STATE();
 		return trackedMapPoints_;
 	}
 
-	vector<cv::KeyPoint> GetTrackedKeyPointsUn() const override
+	std::vector<cv::KeyPoint> GetTrackedKeyPointsUn() const override
 	{
 		LOCK_MUTEX_STATE();
 		return trackedKeyPointsUn_;
 	}
 
-	void ChangeCalibration(const string& settingsFile) override
+	void ChangeCalibration(const std::string& settingsFile) override
 	{
 		cv::FileStorage settings(settingsFile, cv::FileStorage::READ);
 		camera_ = ReadCameraParams(settings);

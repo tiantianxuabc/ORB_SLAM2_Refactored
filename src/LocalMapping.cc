@@ -233,8 +233,8 @@ public:
 
 		stopped_ = false;
 		stopRequested_ = false;
-		for (list<KeyFrame*>::iterator lit = newKeyFrames_.begin(), lend = newKeyFrames_.end(); lit != lend; lit++)
-			delete *lit;
+		for (KeyFrame* keyframe : newKeyFrames_)
+			delete keyframe;
 		newKeyFrames_.clear();
 
 		std::cout << "Local Mapping RELEASE" << std::endl;
@@ -495,7 +495,7 @@ private:
 				else if (stereo2)
 					cosParallaxStereo2 = cosf(Parallax(keyframe2->camera.baseline, keyframe2->depth[idx2]));
 
-				cosParallaxStereo = min(cosParallaxStereo1, cosParallaxStereo2);
+				cosParallaxStereo = std::min(cosParallaxStereo1, cosParallaxStereo2);
 
 				Point3D x3D;
 				if (cosParallaxRays < cosParallaxStereo && cosParallaxRays>0 && (stereo1 || stereo2 || cosParallaxRays < 0.9998))
@@ -726,9 +726,9 @@ private:
 				if (mappoint->Observations() > thObs)
 				{
 					const int scaleLevel = keyframe->keypointsUn[i].octave;
-					const map<KeyFrame*, size_t> observations = mappoint->GetObservations();
+					const std::map<KeyFrame*, size_t> observations = mappoint->GetObservations();
 					int nObs = 0;
-					for (map<KeyFrame*, size_t>::const_iterator mit = observations.begin(), mend = observations.end(); mit != mend; mit++)
+					for (std::map<KeyFrame*, size_t>::const_iterator mit = observations.begin(), mend = observations.end(); mit != mend; mit++)
 					{
 						KeyFrame* pKFi = mit->first;
 						if (pKFi == keyframe)

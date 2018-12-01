@@ -665,7 +665,7 @@ void Optimizer::LocalBundleAdjustment(KeyFrame* currKeyFrame, bool* stopFlag, Ma
 	}
 
 	// Get Map Mutex
-	unique_lock<mutex> lock(map->mutexMapUpdate);
+	std::unique_lock<std::mutex> lock(map->mutexMapUpdate);
 
 	if (!toErase.empty())
 	{
@@ -869,7 +869,7 @@ void Optimizer::OptimizeEssentialGraph(Map* map, KeyFrame* loopKF, KeyFrame* cur
 	optimizer.initializeOptimization();
 	optimizer.optimize(20);
 
-	unique_lock<mutex> lock(map->mutexMapUpdate);
+	std::unique_lock<std::mutex> lock(map->mutexMapUpdate);
 
 	// SE3 Pose Recovering. Sim3:[sR t;0 1] -> SE3:[R t/s;0 1]
 	for (KeyFrame* keyframe : keyframes)

@@ -261,7 +261,7 @@ static bool TrackReferenceKeyFrame(Frame& currFrame, KeyFrame* referenceKF, Fram
 	// We perform first an ORB matching with the reference keyframe
 	// If enough matches are found we setup a PnP solver
 	ORBmatcher matcher(0.7f, true);
-	vector<MapPoint*> mappoints;
+	std::vector<MapPoint*> mappoints;
 
 	const int minMatches = 15;
 	const int nmatches = matcher.SearchByBoW(referenceKF, currFrame, mappoints);
@@ -562,7 +562,7 @@ void CreateMapPoints(Frame& currFrame, KeyFrame* keyframe, Map* map, float thDep
 	}
 }
 
-static void CreateMapPointsVO(Frame& lastFrame, list<MapPoint*>& tempPoints, Map* map, float thDepth)
+static void CreateMapPointsVO(Frame& lastFrame, std::list<MapPoint*>& tempPoints, Map* map, float thDepth)
 {
 	// Create "visual odometry" MapPoints
 	// We sort points according to their measured depth by the stereo/RGB-D sensor
@@ -1065,7 +1065,7 @@ public:
 
 			cv::Mat Rcw; // Current Camera Rotation
 			cv::Mat tcw; // Current Camera Translation
-			vector<bool> triangulated; // Triangulated Correspondences (mvIniMatches)
+			std::vector<bool> triangulated; // Triangulated Correspondences (mvIniMatches)
 
 			if (initializer_->Initialize(currFrame, initMatches_, Rcw, tcw, mvIniP3D, triangulated))
 			{
@@ -1157,7 +1157,7 @@ public:
 		pKFcur->SetPose(CameraPose(Tc2w));
 
 		// Scale points
-		vector<MapPoint*> vpAllMapPoints = pKFini->GetMapPointMatches();
+		std::vector<MapPoint*> vpAllMapPoints = pKFini->GetMapPointMatches();
 		for (size_t iMP = 0; iMP < vpAllMapPoints.size(); iMP++)
 		{
 			if (vpAllMapPoints[iMP])
@@ -1198,7 +1198,7 @@ public:
 		lastProcessedState_ = state_;
 
 		// Get Map Mutex -> Map cannot be changed
-		std::unique_lock<mutex> lock(map_->mutexMapUpdate);
+		std::unique_lock<std::mutex> lock(map_->mutexMapUpdate);
 
 		// Initialize Tracker if not initialized.
 		if (state_ == STATE_NOT_INITIALIZED)
