@@ -29,6 +29,7 @@
 #include "KeyFrame.h"
 #include "Map.h"
 #include "Optimizer.h"
+#include "CameraProjection.h"
 
 #define LOCK_MUTEX_NEW_KF()    std::unique_lock<std::mutex> lock1(mutexNewKFs_);
 #define LOCK_MUTEX_RESET()     std::unique_lock<std::mutex> lock2(mutexReset_);
@@ -384,82 +385,6 @@ private:
 	static inline float NormSq(float x, float y) { return x * x + y * y; }
 	static inline float NormSq(float x, float y, float z) { return x * x + y * y + z * z; }
 
-	struct CameraProjection
-	{
-		CameraProjection(const CameraPose& pose, const CameraParams& camera)
-		{
-			Rcw = pose.R();
-			tcw = pose.t();
-			fu = camera.fx;
-			fv = camera.fy;
-			u0 = camera.cx;
-			v0 = camera.cy;
-			bf = camera.bf;
-		}
-
-		inline Point3D WorldToCamera(const Point3D& Xw) const
-		{
-			return Rcw * Xw + tcw;
-		}
-
-		inline Point2D CameraToImage(const Point3D& Xc) const
-		{
-			const float invZ = 1.f / Xc(2);
-			const float u = invZ * fu * Xc(0) + u0;
-			const float v = invZ * fv * Xc(1) + v0;
-			return Point2D(u, v);
-		}
-
-		inline Point2D WorldToImage(const Point3D& Xw) const
-		{
-			return CameraToImage(WorldToCamera(Xw));
-		}
-
-		inline float DepthToDisparity(float Z) const
-		{
-			return bf / Z;
-		}
-
-		cv::Matx33f Rcw;
-		cv::Matx31f tcw;
-		float fu, fv, u0, v0, bf;
-	};
-
-	struct CameraUnProjection
-	{
-		CameraUnProjection(const CameraPose& pose, const CameraParams& camera)
-		{
-			Rwc = pose.InvR();
-			twc = pose.Invt();
-			invfu = 1.f / camera.fx;
-			invfv = 1.f / camera.fy;
-			u0 = camera.cx;
-			v0 = camera.cy;
-			bf = camera.bf;
-		}
-
-		inline Point3D uvZToCamera(float u, float v, float Z) const
-		{
-			const float X = invfu * (u - u0) * Z;
-			const float Y = invfv * (v - v0) * Z;
-			return Point3D(X, Y, Z);
-		}
-
-		inline Point3D CameraToWorld(const Point3D& Xc) const
-		{
-			return Rwc * Xc + twc;
-		}
-
-		inline Point3D uvZToWorld(float u, float v, float Z) const
-		{
-			return CameraToWorld(uvZToCamera(u, v, Z));
-		}
-
-		cv::Matx33f Rwc;
-		cv::Matx31f twc;
-		float invfu, invfv, u0, v0, bf;
-	};
-
 	void CreateNewMapPoints(KeyFrame* currKeyFrame_)
 	{
 		KeyFrame* keyframe1 = currKeyFrame_;
@@ -575,11 +500,11 @@ private:
 				}
 				else if (stereo1 && cosParallaxStereo1 < cosParallaxStereo2)
 				{
-					Xw = unproj1.uvZToWorld(keypoint1.pt.x, keypoint1.pt.y, Z1);
+					Xw = unproj1.uvZToWorld(keypoint1.pt, Z1);
 				}
 				else if (stereo2 && cosParallaxStereo2 < cosParallaxStereo1)
 				{
-					Xw = unproj2.uvZToWorld(keypoint2.pt.x, keypoint2.pt.y, Z2);
+					Xw = unproj2.uvZToWorld(keypoint2.pt, Z2);
 				}
 				else
 					continue; //No stereo and very low parallax

@@ -79,7 +79,6 @@ struct CameraUnProjection
 		invfv = 1.f / camera.fy;
 		u0 = camera.cx;
 		v0 = camera.cy;
-		bf = camera.bf;
 	}
 
 	inline Point3D uvZToCamera(float u, float v, float Z) const
@@ -99,9 +98,14 @@ struct CameraUnProjection
 		return CameraToWorld(uvZToCamera(u, v, Z));
 	}
 
+	inline Point3D uvZToWorld(const Point2D& pt, float Z) const
+	{
+		return CameraToWorld(uvZToCamera(pt.x, pt.y, Z));
+	}
+
 	cv::Matx33f Rwc;
 	cv::Matx31f twc;
-	float invfu, invfv, u0, v0, bf;
+	float invfu, invfv, u0, v0;
 };
 
 } // namespace ORB_SLAM2
