@@ -110,6 +110,8 @@ public:
 	// The focal lenght should be similar or scale prediction will fail when projecting points
 	// TODO: Modify MapPoint::PredictScale to take into account focal lenght
 	virtual void ChangeCalibration(const Path& settingsFile) = 0;
+
+	virtual ~System();
 };
 
 } // namespace ORB_SLAM

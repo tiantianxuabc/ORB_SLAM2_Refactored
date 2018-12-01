@@ -36,7 +36,9 @@ class KeyFrame;
 class Map
 {
 public:
+
 	Map();
+	~Map();
 
 	void AddKeyFrame(KeyFrame* keyframe);
 	void AddMapPoint(MapPoint* mappoint);
@@ -75,6 +77,9 @@ protected:
 
 	// Index related to a big change in the map (loop closure, global BA)
 	int bigChangeId_;
+
+	std::set<MapPoint*> erasedMappoints_;
+	std::set<KeyFrame*> erasedKeyframes_;
 
 	mutable std::mutex mutexMap_;
 };

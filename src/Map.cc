@@ -32,6 +32,8 @@ namespace ORB_SLAM2
 
 Map::Map() : maxKFId_(0), bigChangeId_(0) {}
 
+Map::~Map() { Clear(); }
+
 void Map::AddKeyFrame(KeyFrame* keyframe)
 {
 	LOCK_MUTEX_MAP();
@@ -52,6 +54,7 @@ void Map::EraseMapPoint(MapPoint* mappoint)
 
 	// TODO: This only erase the pointer.
 	// Delete the MapPoint
+	erasedMappoints_.insert(mappoint);
 }
 
 void Map::EraseKeyFrame(KeyFrame* keyframe)
@@ -60,7 +63,8 @@ void Map::EraseKeyFrame(KeyFrame* keyframe)
 	keyframes_.erase(keyframe);
 
 	// TODO: This only erase the pointer.
-	// Delete the MapPoint
+	// Delete the KeyFrame
+	erasedKeyframes_.insert(keyframe);
 }
 
 void Map::SetReferenceMapPoints(const std::vector<MapPoint*>& mappoints)
@@ -119,9 +123,13 @@ frameid_t Map::GetMaxKFid() const
 
 void Map::Clear()
 {
+	// Merge all MapPoints and delete
+	mappoints_.insert(std::begin(erasedMappoints_), std::end(erasedMappoints_));
 	for (MapPoint* mappoint : mappoints_)
 		delete mappoint;
 
+	// Merge all KeyFrames and delete
+	keyframes_.insert(std::begin(erasedKeyframes_), std::end(erasedKeyframes_));
 	for (KeyFrame* keyframes : keyframes_)
 		delete keyframes;
 

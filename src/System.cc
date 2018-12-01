@@ -955,4 +955,6 @@ System::Pointer System::Create(const Path& vocabularyFile, const Path& settingsF
 	return std::make_unique<SystemImpl>(vocabularyFile, settingsFile, sensor, useViewer);
 }
 
+System::~System() {}
+
 } //namespace ORB_SLAM
