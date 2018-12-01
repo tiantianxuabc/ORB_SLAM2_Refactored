@@ -165,16 +165,18 @@ static Eigen::Vector3d ToVector3d(const Point3D& v)
 	return Eigen::Vector3d(v(0), v(1), v(2));
 }
 
-static Point3D FromVector3d(const Eigen::Vector3d& v)
+static Point3D FromVector3d(const Eigen::Vector3d& _v)
 {
-	return Point3D(v(0), v(1), v(2));
+	Point3D v;
+	for (int i = 0; i < 3; i++) v(i) = static_cast<float>(_v(i));
+	return v;
 }
 
 static g2o::Sim3 ToG2OSim3(const Sim3& S)
 {
 	const Eigen::Matrix3d R = ConvertRotation<Eigen::Matrix3d>(S.R());
 	const Eigen::Vector3d t = ConvertTranslation<Eigen::Vector3d>(S.t());
-	return g2o::Sim3(R, t, S.Scale());
+	return g2o::Sim3(R, t, static_cast<float>(S.Scale()));
 }
 
 static Sim3 FromG2OSim3(const g2o::Sim3& S)
