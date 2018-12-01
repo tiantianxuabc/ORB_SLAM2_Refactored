@@ -401,10 +401,6 @@ private:
 		const cv::Mat Tcw1 = CameraPose(Rcw1, tcw1).Mat();
 		const Point3D Ow1 = keyframe1->GetCameraCenter();
 
-		/*const cv::Mat Tcw1(3, 4, CV_32F);
-		Rcw1.copyTo(Tcw1.colRange(0, 3));
-		tcw1.copyTo(Tcw1.col(3));*/
-
 		const float fx1 = keyframe1->camera.fx;
 		const float fy1 = keyframe1->camera.fy;
 		const float cx1 = keyframe1->camera.cx;
@@ -452,10 +448,6 @@ private:
 			const auto tcw2 = keyframe2->GetPose().t();
 			const cv::Mat Tcw2 = CameraPose(Rcw2, tcw2).Mat();
 
-			/*const cv::Mat Tcw2(3, 4, CV_32F);
-			Rcw2.copyTo(Tcw2.colRange(0, 3));
-			tcw2.copyTo(Tcw2.col(3));*/
-
 			const float fx2 = keyframe2->camera.fx;
 			const float fy2 = keyframe2->camera.fy;
 			const float cx2 = keyframe2->camera.cx;
@@ -465,10 +457,10 @@ private:
 
 			// Triangulate each match
 			const int nmatches = static_cast<int>(matchIndices.size());
-			for (int ikp = 0; ikp < nmatches; ikp++)
+			for (int ik = 0; ik < nmatches; ik++)
 			{
-				const int idx1 = static_cast<int>(matchIndices[ikp].first);
-				const int idx2 = static_cast<int>(matchIndices[ikp].second);
+				const int idx1 = static_cast<int>(matchIndices[ik].first);
+				const int idx2 = static_cast<int>(matchIndices[ik].second);
 
 				const cv::KeyPoint& keypoint1 = keyframe1->keypointsUn[idx1];
 				const float ur1 = keyframe1->uright[idx1];
@@ -534,81 +526,83 @@ private:
 				const auto x3Dt = x3D.t();
 
 				//Check triangulation in front of cameras
-				const float z1 = static_cast<float>(Rcw1.row(2).dot(x3Dt) + tcw1(2));
+				const float z1 = Rcw1.row(2).dot(x3Dt) + tcw1(2);
 				if (z1 <= 0)
 					continue;
 
-				const float z2 = static_cast<float>(Rcw2.row(2).dot(x3Dt) + tcw2(2));
+				const float z2 = Rcw2.row(2).dot(x3Dt) + tcw2(2);
 				if (z2 <= 0)
 					continue;
 
 				//Check reprojection error in first keyframe
-				const float sigmaSquare1 = keyframe1->pyramid.sigmaSq[keypoint1.octave];
-				const float x1 = static_cast<float>(Rcw1.row(0).dot(x3Dt) + tcw1(0));
-				const float y1 = static_cast<float>(Rcw1.row(1).dot(x3Dt) + tcw1(1));
+				const float sigmaSq1 = keyframe1->pyramid.sigmaSq[keypoint1.octave];
+				const float x1 = Rcw1.row(0).dot(x3Dt) + tcw1(0);
+				const float y1 = Rcw1.row(1).dot(x3Dt) + tcw1(1);
 				const float invz1 = 1.f / z1;
 
 				if (!stereo1)
 				{
-					float u1 = fx1*x1*invz1 + cx1;
-					float v1 = fy1*y1*invz1 + cy1;
-					float errX1 = u1 - keypoint1.pt.x;
-					float errY1 = v1 - keypoint1.pt.y;
-					if ((errX1*errX1 + errY1*errY1) > 5.991*sigmaSquare1)
+					const float u1 = fx1*x1*invz1 + cx1;
+					const float v1 = fy1*y1*invz1 + cy1;
+					const float errX1 = u1 - keypoint1.pt.x;
+					const float errY1 = v1 - keypoint1.pt.y;
+					if ((errX1*errX1 + errY1*errY1) > 5.991*sigmaSq1)
 						continue;
 				}
 				else
 				{
-					float u1 = fx1*x1*invz1 + cx1;
-					float u1_r = u1 - keyframe1->camera.bf*invz1;
-					float v1 = fy1*y1*invz1 + cy1;
-					float errX1 = u1 - keypoint1.pt.x;
-					float errY1 = v1 - keypoint1.pt.y;
-					float errX1_r = u1_r - ur1;
-					if ((errX1*errX1 + errY1*errY1 + errX1_r*errX1_r) > 7.8*sigmaSquare1)
+					const float u1 = fx1*x1*invz1 + cx1;
+					const float u1_r = u1 - keyframe1->camera.bf*invz1;
+					const float v1 = fy1*y1*invz1 + cy1;
+					const float errX1 = u1 - keypoint1.pt.x;
+					const float errY1 = v1 - keypoint1.pt.y;
+					const float errX1_r = u1_r - ur1;
+					if ((errX1*errX1 + errY1*errY1 + errX1_r*errX1_r) > 7.8*sigmaSq1)
 						continue;
 				}
 
 				//Check reprojection error in second keyframe
-				const float sigmaSquare2 = keyframe2->pyramid.sigmaSq[keypoint2.octave];
-				const float x2 = static_cast<float>(Rcw2.row(0).dot(x3Dt) + tcw2(0));
-				const float y2 = static_cast<float>(Rcw2.row(1).dot(x3Dt) + tcw2(1));
+				const float sigmaSq2 = keyframe2->pyramid.sigmaSq[keypoint2.octave];
+				const float x2 = Rcw2.row(0).dot(x3Dt) + tcw2(0);
+				const float y2 = Rcw2.row(1).dot(x3Dt) + tcw2(1);
 				const float invz2 = 1.f / z2;
 				if (!stereo2)
 				{
-					float u2 = fx2*x2*invz2 + cx2;
-					float v2 = fy2*y2*invz2 + cy2;
-					float errX2 = u2 - keypoint2.pt.x;
-					float errY2 = v2 - keypoint2.pt.y;
-					if ((errX2*errX2 + errY2*errY2) > 5.991*sigmaSquare2)
+					const float u2 = fx2*x2*invz2 + cx2;
+					const float v2 = fy2*y2*invz2 + cy2;
+					const float errX2 = u2 - keypoint2.pt.x;
+					const float errY2 = v2 - keypoint2.pt.y;
+					if ((errX2*errX2 + errY2*errY2) > 5.991*sigmaSq2)
 						continue;
 				}
 				else
 				{
-					float u2 = fx2*x2*invz2 + cx2;
-					float u2_r = u2 - keyframe1->camera.bf*invz2;
-					float v2 = fy2*y2*invz2 + cy2;
-					float errX2 = u2 - keypoint2.pt.x;
-					float errY2 = v2 - keypoint2.pt.y;
-					float errX2_r = u2_r - ur2;
-					if ((errX2*errX2 + errY2*errY2 + errX2_r*errX2_r) > 7.8*sigmaSquare2)
+					const float u2 = fx2*x2*invz2 + cx2;
+					const float u2_r = u2 - keyframe1->camera.bf*invz2;
+					const float v2 = fy2*y2*invz2 + cy2;
+					const float errX2 = u2 - keypoint2.pt.x;
+					const float errY2 = v2 - keypoint2.pt.y;
+					const float errX2_r = u2_r - ur2;
+					if ((errX2*errX2 + errY2*errY2 + errX2_r*errX2_r) > 7.8*sigmaSq2)
 						continue;
 				}
 
 				//Check scale consistency
 				const Vec3D normal1 = x3D - Ow1;
-				float dist1 = static_cast<float>(cv::norm(normal1));
+				const float dist1 = static_cast<float>(cv::norm(normal1));
 
 				const Vec3D normal2 = x3D - Ow2;
-				float dist2 = static_cast<float>(cv::norm(normal2));
+				const float dist2 = static_cast<float>(cv::norm(normal2));
 
 				if (dist1 == 0 || dist2 == 0)
 					continue;
 
 				const float ratioDist = dist2 / dist1;
-				const float ratioOctave = keyframe1->pyramid.scaleFactors[keypoint1.octave] / keyframe2->pyramid.scaleFactors[keypoint2.octave];
+				const float scale1 = keyframe1->pyramid.scaleFactors[keypoint1.octave];
+				const float scale2 = keyframe2->pyramid.scaleFactors[keypoint2.octave];
+				const float ratioOctave = scale1 / scale2;
 
-				if (ratioDist*ratioFactor<ratioOctave || ratioDist>ratioOctave*ratioFactor)
+				if (ratioDist * ratioFactor < ratioOctave || ratioDist > ratioOctave * ratioFactor)
 					continue;
 
 				// Triangulation is succesfull
