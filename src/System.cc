@@ -397,7 +397,7 @@ public:
 		tracker_ = Tracking::Create(this, &voc_, &map_, keyFrameDB_.get(), sensor_, trackParams);
 
 		//Initialize the Local Mapping thread and launch
-		localMapper_ = LocalMapping::Create(&map_, sensor_ == MONOCULAR);
+		localMapper_ = LocalMapping::Create(&map_, sensor_ == MONOCULAR, thDepth);
 		threads_[THREAD_LOCAL_MAPPING] = std::thread(&ORB_SLAM2::LocalMapping::Run, localMapper_);
 
 		//Initialize the Loop Closing thread and launch

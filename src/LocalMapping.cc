@@ -81,9 +81,9 @@ class LocalMappingImpl : public LocalMapping
 {
 public:
 
-	LocalMappingImpl::LocalMappingImpl(Map* map, bool monocular) :
+	LocalMappingImpl::LocalMappingImpl(Map* map, bool monocular, float thDepth) :
 		monocular_(monocular), resetRequested_(false), finishRequested_(false), finished_(true), map_(map),
-		abortBA_(false), stopped_(false), stopRequested_(false), notStop_(false), acceptKeyFrames_(true)
+		abortBA_(false), stopped_(false), stopRequested_(false), notStop_(false), acceptKeyFrames_(true), thDepth_(thDepth)
 	{
 	}
 
@@ -718,7 +718,7 @@ private:
 
 				if (!monocular_)
 				{
-					if (keyframe->depth[i] > keyframe->thDepth || keyframe->depth[i] < 0)
+					if (keyframe->depth[i] > thDepth_ || keyframe->depth[i] < 0)
 						continue;
 				}
 
@@ -798,6 +798,8 @@ private:
 	bool notStop_;
 	bool acceptKeyFrames_;
 
+	float thDepth_;
+
 	mutable std::mutex mutexNewKFs_;
 	mutable std::mutex mutexReset_;
 	mutable std::mutex mutexFinish_;
@@ -805,9 +807,9 @@ private:
 	mutable std::mutex mutexAccept_;
 };
 
-std::shared_ptr<LocalMapping> LocalMapping::Create(Map* map, bool monocular)
+std::shared_ptr<LocalMapping> LocalMapping::Create(Map* map, bool monocular, float thDepth)
 {
-	return std::make_shared<LocalMappingImpl>(map, monocular);
+	return std::make_shared<LocalMappingImpl>(map, monocular, thDepth);
 }
 
 } //namespace ORB_SLAM
