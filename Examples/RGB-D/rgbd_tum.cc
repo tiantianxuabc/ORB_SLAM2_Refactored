@@ -19,144 +19,132 @@
 */
 
 
-#include<iostream>
-#include<algorithm>
-#include<fstream>
-#include<chrono>
-#include<thread>
+#include <iostream>
+#include <algorithm>
+#include <fstream>
+#include <chrono>
+#include <thread>
+#include <numeric>
 
-#include<opencv2/opencv.hpp>
+#include <opencv2/opencv.hpp>
 
-#include<System.h>
-
-using namespace std;
+#include "System.h"
 
 static inline void usleep(int64_t usec) { std::this_thread::sleep_for(std::chrono::microseconds(usec)); }
 
-void LoadImages(const string &strAssociationFilename, vector<string> &vstrImageFilenamesRGB,
-                vector<string> &vstrImageFilenamesD, vector<double> &vTimestamps);
+template <class... Args>
+static std::string FormatString(const char* fmt, Args... args)
+{
+	const int BUF_SIZE = 1024;
+	char buf[BUF_SIZE];
+	std::snprintf(buf, BUF_SIZE, fmt, args...);
+	return std::string(buf);
+}
+
+static int LoadImages(const char* path, std::vector<std::string>& images, std::vector<std::string>& depths,
+	std::vector<double>& timestamps)
+{
+	std::ifstream ifs(path);
+	CV_Assert(!ifs.fail());
+
+	int nframes = 0;
+	std::string line, filename1, filename2;
+	double stamp1, stamp2;
+	while (std::getline(ifs, line))
+	{
+		std::stringstream ss(line);
+		ss >> stamp1 >> filename1 >> stamp2 >> filename2;
+		images.push_back(filename1);
+		depths.push_back(filename2);
+		timestamps.push_back(stamp1);
+		nframes++;
+	}
+	return nframes;
+}
 
 int main(int argc, char **argv)
 {
-    if(argc != 5)
-    {
-        cerr << endl << "Usage: ./rgbd_tum path_to_vocabulary path_to_settings path_to_sequence path_to_association" << endl;
-        return 1;
-    }
+	if (argc < 5)
+	{
+		std::cerr << std::endl << "Usage: ./rgbd_tum path_to_vocabulary path_to_settings path_to_sequence path_to_association [use_viewer]" << std::endl;
+		return 1;
+	}
 
-    // Retrieve paths to images
-    vector<string> vstrImageFilenamesRGB;
-    vector<string> vstrImageFilenamesD;
-    vector<double> vTimestamps;
-    string strAssociationFilename = string(argv[4]);
-    LoadImages(strAssociationFilename, vstrImageFilenamesRGB, vstrImageFilenamesD, vTimestamps);
+	// Retrieve paths to images
+	std::vector<std::string> images;
+	std::vector<std::string> depths;
+	std::vector<double> timestamps;
+	const int nimages = LoadImages(argv[4], images, depths, timestamps);
 
-    // Check consistency in the number of images and depthmaps
-    int nImages = vstrImageFilenamesRGB.size();
-    if(vstrImageFilenamesRGB.empty())
-    {
-        cerr << endl << "No images found in provided path." << endl;
-        return 1;
-    }
-    else if(vstrImageFilenamesD.size()!=vstrImageFilenamesRGB.size())
-    {
-        cerr << endl << "Different number of images for rgb and depth." << endl;
-        return 1;
-    }
+	// Check consistency in the number of images and depthmaps
+	if (images.empty())
+	{
+		std::cerr << std::endl << "No images found in provided path." << std::endl;
+		return 1;
+	}
+	else if (depths.size() != images.size())
+	{
+		std::cerr << std::endl << "Different number of images for rgb and depth." << std::endl;
+		return 1;
+	}
 
-    // Create SLAM system. It initializes all system threads and gets ready to process frames.
-    auto SLAM = ORB_SLAM2::System::Create(argv[1],argv[2],ORB_SLAM2::System::RGBD,true);
+	// Create SLAM system. It initializes all system threads and gets ready to process frames.
+	auto SLAM = ORB_SLAM2::System::Create(argv[1], argv[2], ORB_SLAM2::System::RGBD, true);
 
-    // Vector for tracking time statistics
-    vector<float> vTimesTrack;
-    vTimesTrack.resize(nImages);
+	// Vector for tracking time statistics
+	std::vector<double> trackTimes;
+	trackTimes.resize(nimages);
 
-    cout << endl << "-------" << endl;
-    cout << "Start processing sequence ..." << endl;
-    cout << "Images in the sequence: " << nImages << endl << endl;
+	std::cout << std::endl << "-------" << std::endl;
+	std::cout << "Start processing sequence ..." << std::endl;
+	std::cout << "Images in the sequence: " << nimages << std::endl << std::endl;
 
-    // Main loop
-    cv::Mat imRGB, imD;
-    for(int ni=0; ni<nImages; ni++)
-    {
-        // Read image and depthmap from file
-        imRGB = cv::imread(string(argv[3])+"/"+vstrImageFilenamesRGB[ni],CV_LOAD_IMAGE_UNCHANGED);
-        imD = cv::imread(string(argv[3])+"/"+vstrImageFilenamesD[ni],CV_LOAD_IMAGE_UNCHANGED);
-        double tframe = vTimestamps[ni];
+	// Main loop
+	cv::Mat imRGB, imD;
+	for (int i = 0; i < nimages; i++)
+	{
+		// Read image and depthmap from file
+		const cv::Mat image = cv::imread(FormatString("%s/%s", argv[3], images[i].c_str()), cv::IMREAD_UNCHANGED);
+		const cv::Mat depth = cv::imread(FormatString("%s/%s", argv[3], depths[i].c_str()), cv::IMREAD_UNCHANGED);
+		const double timestamp = timestamps[i];
 
-        if(imRGB.empty())
-        {
-            cerr << endl << "Failed to load image at: "
-                 << string(argv[3]) << "/" << vstrImageFilenamesRGB[ni] << endl;
-            return 1;
-        }
+		if (image.empty())
+		{
+			std::cerr << std::endl << "Failed to load image at: " << std::string(argv[3]) << "/" << images[i] << std::endl;
+			return 1;
+		}
 
-		std::chrono::steady_clock::time_point t1 = std::chrono::steady_clock::now();
+		const auto t1 = std::chrono::steady_clock::now();
 
-        // Pass the image to the SLAM system
-        SLAM->TrackRGBD(imRGB,imD,tframe);
+		// Pass the image to the SLAM system
+		SLAM->TrackRGBD(image, depth, timestamp);
 
-		std::chrono::steady_clock::time_point t2 = std::chrono::steady_clock::now();
+		const auto t2 = std::chrono::steady_clock::now();
 
-        double ttrack= std::chrono::duration_cast<std::chrono::duration<double> >(t2 - t1).count();
+		const double T1 = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1).count();
+		const double T2 = i < nimages - 1 ? timestamps[i + 1] - timestamp : timestamp - timestamps[i - 1];
 
-        vTimesTrack[ni]=ttrack;
+		trackTimes[i] = T1;
 
-        // Wait to load the next frame
-        double T=0;
-        if(ni<nImages-1)
-            T = vTimestamps[ni+1]-tframe;
-        else if(ni>0)
-            T = tframe-vTimestamps[ni-1];
+		// Wait to load the next frame
+		if (T1 < T2)
+			usleep(static_cast<int64_t>(1e6 * (T2 - T1)));
+	}
 
-        if(ttrack<T)
-            usleep((T-ttrack)*1e6);
-    }
+	// Stop all threads
+	SLAM->Shutdown();
 
-    // Stop all threads
-    SLAM->Shutdown();
+	// Tracking time statistics
+	std::sort(std::begin(trackTimes), std::end(trackTimes));
+	const double totalTime = std::accumulate(std::begin(trackTimes), std::end(trackTimes), 0.);
 
-    // Tracking time statistics
-    sort(vTimesTrack.begin(),vTimesTrack.end());
-    float totaltime = 0;
-    for(int ni=0; ni<nImages; ni++)
-    {
-        totaltime+=vTimesTrack[ni];
-    }
-    cout << "-------" << endl << endl;
-    cout << "median tracking time: " << vTimesTrack[nImages/2] << endl;
-    cout << "mean tracking time: " << totaltime/nImages << endl;
+	std::cout << "-------" << std::endl << std::endl;
+	std::cout << "median tracking time: " << trackTimes[nimages / 2] << std::endl;
+	std::cout << "mean tracking time: " << totalTime / nimages << std::endl;
 
-    // Save camera trajectory
-    SLAM->SaveTrajectoryTUM("CameraTrajectory.txt");
-    SLAM->SaveKeyFrameTrajectoryTUM("KeyFrameTrajectory.txt");   
+	// Save camera trajectory
+	SLAM->SaveTrajectoryTUM("CameraTrajectory.txt");
+	SLAM->SaveKeyFrameTrajectoryTUM("KeyFrameTrajectory.txt");
 
-    return 0;
-}
-
-void LoadImages(const string &strAssociationFilename, vector<string> &vstrImageFilenamesRGB,
-                vector<string> &vstrImageFilenamesD, vector<double> &vTimestamps)
-{
-    ifstream fAssociation;
-    fAssociation.open(strAssociationFilename.c_str());
-    while(!fAssociation.eof())
-    {
-        string s;
-        getline(fAssociation,s);
-        if(!s.empty())
-        {
-            stringstream ss;
-            ss << s;
-            double t;
-            string sRGB, sD;
-            ss >> t;
-            vTimestamps.push_back(t);
-            ss >> sRGB;
-            vstrImageFilenamesRGB.push_back(sRGB);
-            ss >> t;
-            ss >> sD;
-            vstrImageFilenamesD.push_back(sD);
-
-        }
-    }
+	return 0;
 }
