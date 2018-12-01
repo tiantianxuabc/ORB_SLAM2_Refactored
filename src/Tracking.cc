@@ -41,6 +41,7 @@
 #include "Usleep.h"
 #include "CameraParameters.h"
 #include "Optimizer.h"
+#include "CameraProjection.h"
 
 namespace ORB_SLAM2
 {
@@ -364,35 +365,26 @@ private:
 
 // Check if a MapPoint is in the frustum of the camera
 // and fill variables of the MapPoint to be used by the tracking
-static bool IsInFrustum(const Frame& frame, MapPoint* mappoint, float minViewingCos)
+static bool IsInFrustum(const Frame& frame, const CameraProjection& proj, MapPoint* mappoint, float minViewingCos)
 {
 	mappoint->trackInView = false;
 
-	const CameraParams& camera = frame.camera;
-	const CameraPose& pose = frame.pose;
-	const auto Ow = frame.GetCameraCenter();
+	const Point3D Ow = frame.GetCameraCenter();
 
 	// 3D in absolute coordinates
 	const Point3D Xw = mappoint->GetWorldPos();
 
 	// 3D in camera coordinates
-	const auto Rcw = pose.R();
-	const auto tcw = pose.t();
-	const Point3D Xc = Rcw * Xw + tcw;
-	const float PcX = Xc(0);
-	const float PcY = Xc(1);
-	const float PcZ = Xc(2);
+	const Point3D Xc = proj.WorldToCamera(Xw);
 
 	// Check positive depth
-	if (PcZ < 0.f)
+	if (Xc(2) < 0.f)
 		return false;
 
 	// Project in image and check it is not outside
-	const float invZ = 1.f / PcZ;
-	const float u = camera.fx * PcX * invZ + camera.cx;
-	const float v = camera.fy * PcY * invZ + camera.cy;
+	const Point2D pt = proj.CameraToImage(Xc);
 
-	if (!frame.imageBounds.Contains(u, v))
+	if (!frame.imageBounds.Contains(pt.x, pt.y))
 		return false;
 
 	// Check distance is in the scale invariance region of the MapPoint
@@ -413,13 +405,13 @@ static bool IsInFrustum(const Frame& frame, MapPoint* mappoint, float minViewing
 		return false;
 
 	// Predict scale in the image
-	const int scale = mappoint->PredictScale(dist, (Frame*)&frame);
+	const int scale = mappoint->PredictScale(dist, &frame);
 
 	// Data used by the tracking
 	mappoint->trackInView = true;
-	mappoint->trackProjX = u;
-	mappoint->trackProjXR = u - camera.bf * invZ;
-	mappoint->trackProjY = v;
+	mappoint->trackProjX = pt.x;
+	mappoint->trackProjXR = pt.x - proj.DepthToDisparity(Xc(2));
+	mappoint->trackProjY = pt.y;
 	mappoint->trackScaleLevel = scale;
 	mappoint->trackViewCos = viewCos;
 
@@ -449,13 +441,14 @@ static void SearchLocalPoints(const LocalMap& localMap, Frame& currFrame, float 
 	int nToMatch = 0;
 
 	// Project points in frame and check its visibility
+	const CameraProjection proj(currFrame.pose, currFrame.camera);
 	for (MapPoint* mappoint : localMap.mappoints)
 	{
 		if (mappoint->lastFrameSeen == currFrame.id || mappoint->isBad())
 			continue;
 
 		// Project (this fills MapPoint variables for matching)
-		if (IsInFrustum(currFrame, mappoint, 0.5f))
+		if (IsInFrustum(currFrame, proj, mappoint, 0.5f))
 		{
 			mappoint->IncreaseVisible();
 			nToMatch++;
@@ -508,6 +501,7 @@ void CreateMapPoints(Frame& currFrame, KeyFrame* keyframe, Map* map, float thDep
 	// We sort points by the measured depth by the stereo/RGBD sensor.
 	// We create all those MapPoints whose depth < param_.thDepth.
 	// If there are less than 100 close points we create the 100 closest.
+	const CameraUnProjection unproj(currFrame.pose, currFrame.camera);
 	std::vector<std::pair<float, int> > depthIndices;
 	depthIndices.reserve(currFrame.N);
 	for (int i = 0; i < currFrame.N; i++)
@@ -543,7 +537,7 @@ void CreateMapPoints(Frame& currFrame, KeyFrame* keyframe, Map* map, float thDep
 
 		if (create)
 		{
-			const Point3D Xw = currFrame.UnprojectStereo(i);
+			const Point3D Xw = unproj.uvZToWorld(currFrame.keypointsUn[i].pt, Z);
 
 			MapPoint* newpoint = new MapPoint(Xw, keyframe, map);
 			newpoint->AddObservation(keyframe, i);
@@ -978,13 +972,14 @@ public:
 		map_->AddKeyFrame(keyframe);
 
 		// Create MapPoints and asscoiate to KeyFrame
+		const CameraUnProjection unproj(currFrame.pose, currFrame.camera);
 		for (int i = 0; i < currFrame.N; i++)
 		{
 			const float Z = currFrame.depth[i];
 			if (Z <= 0.f)
 				continue;
 
-			const Point3D Xw = currFrame.UnprojectStereo(i);
+			const Point3D Xw = unproj.uvZToWorld(currFrame.keypointsUn[i].pt, Z);
 			MapPoint* mappoint = new MapPoint(Xw, keyframe, map_);
 			mappoint->AddObservation(keyframe, i);
 			mappoint->ComputeDistinctiveDescriptors();
