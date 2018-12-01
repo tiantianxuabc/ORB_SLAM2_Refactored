@@ -34,7 +34,6 @@ namespace ORB_SLAM2
 {
 
 MapPoint::mappointid_t MapPoint::nextId = 0;
-//std::mutex MapPoint::globalMutex_;
 
 MapPoint::MapPoint(const Point3D& Xw, KeyFrame* referenceKF, Map* map) :
 	firstKFid(referenceKF->id), firstFrame(referenceKF->frameId), nobservations_(0), trackReferenceForFrame(0),
