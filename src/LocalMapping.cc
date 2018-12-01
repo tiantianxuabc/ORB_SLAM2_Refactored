@@ -396,8 +396,8 @@ private:
 		ORBmatcher matcher(0.6f, false);
 
 		const CameraPose pose1 = keyframe1->GetPose();
-		CameraProjection proj1(pose1, keyframe1->camera);
-		CameraUnProjection unproj1(pose1, keyframe1->camera);
+		const CameraProjection proj1(pose1, keyframe1->camera);
+		const CameraUnProjection unproj1(pose1, keyframe1->camera);
 		const Point3D Ow1 = keyframe1->GetCameraCenter();
 		const cv::Mat Tcw1 = pose1.Mat();
 
@@ -437,8 +437,8 @@ private:
 			matcher.SearchForTriangulation(keyframe1, keyframe2, F12, matchIndices, false);
 
 			const CameraPose pose2 = keyframe2->GetPose();
-			CameraProjection proj2(pose2, keyframe2->camera);
-			CameraUnProjection unproj2(pose2, keyframe2->camera);
+			const CameraProjection proj2(pose2, keyframe2->camera);
+			const CameraUnProjection unproj2(pose2, keyframe2->camera);
 			const cv::Mat Tcw2 = pose2.Mat();
 
 			// Triangulate each match
