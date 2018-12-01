@@ -350,7 +350,7 @@ int Optimizer::PoseOptimization(Frame* frame)
 	std::vector<g2o::HyperGraph::Edge*> edges;
 
 	{
-		unique_lock<mutex> lock(MapPoint::globalMutex_);
+		std::unique_lock<std::mutex> lock(MapPoint::GetGlobalMutex());
 
 		for (int i = 0; i < nkeypoints; i++)
 		{

@@ -28,13 +28,13 @@
 #define LOCK_MUTEX_POINT_CREATION() std::unique_lock<std::mutex> lock1(map_->mutexPointCreation);
 #define LOCK_MUTEX_POSITION()       std::unique_lock<std::mutex> lock2(mutexPos_);
 #define LOCK_MUTEX_FEATURES()       std::unique_lock<std::mutex> lock3(mutexFeatures_);
-#define LOCK_MUTEX_GLOBAL()         std::unique_lock<std::mutex> lock4(globalMutex_);
+#define LOCK_MUTEX_GLOBAL()         std::unique_lock<std::mutex> lock4(GetGlobalMutex());
 
 namespace ORB_SLAM2
 {
 
 MapPoint::mappointid_t MapPoint::nextId = 0;
-std::mutex MapPoint::globalMutex_;
+//std::mutex MapPoint::globalMutex_;
 
 MapPoint::MapPoint(const Point3D& Xw, KeyFrame* referenceKF, Map* map) :
 	firstKFid(referenceKF->id), firstFrame(referenceKF->frameId), nobservations_(0), trackReferenceForFrame(0),
@@ -407,6 +407,12 @@ int MapPoint::PredictScale(float dist, const Frame* frame) const
 	}
 	const int scale = static_cast<int>(ceil(log(ratio) / frame->pyramid.logScaleFactor));
 	return std::max(0, std::min(scale, frame->pyramid.nlevels - 1));
+}
+
+std::mutex& MapPoint::GetGlobalMutex()
+{
+	static std::mutex globalMutex;
+	return globalMutex;
 }
 
 } //namespace ORB_SLAM

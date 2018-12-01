@@ -109,7 +109,7 @@ public:
 	Point3D posGBA;
 	frameid_t BAGlobalForKF;
 
-	static std::mutex globalMutex_;
+	static std::mutex& GetGlobalMutex();
 
 protected:
 
