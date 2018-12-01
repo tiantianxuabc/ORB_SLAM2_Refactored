@@ -376,14 +376,89 @@ private:
 	}
 
 	static inline float CosAngle(const Vec3D& v1, const Vec3D& v2)
-	{
+	{ 
 		return static_cast<float>(v1.dot(v2) / (cv::norm(v1) * cv::norm(v2)));
 	}
 
-	static inline float Parallax(float baseline, float Z)
+	static inline float Parallax(float baseline, float Z) { return 2.f * atan2f(0.5f * baseline, Z); }
+	static inline float NormSq(float x, float y) { return x * x + y * y; }
+	static inline float NormSq(float x, float y, float z) { return x * x + y * y + z * z; }
+
+	struct CameraProjection
 	{
-		return 2.f * atan2f(0.5f * baseline, Z);
-	}
+		CameraProjection(const CameraPose& pose, const CameraParams& camera)
+		{
+			Rcw = pose.R();
+			tcw = pose.t();
+			fu = camera.fx;
+			fv = camera.fy;
+			u0 = camera.cx;
+			v0 = camera.cy;
+			bf = camera.bf;
+		}
+
+		inline Point3D WorldToCamera(const Point3D& Xw) const
+		{
+			return Rcw * Xw + tcw;
+		}
+
+		inline Point2D CameraToImage(const Point3D& Xc) const
+		{
+			const float invZ = 1.f / Xc(2);
+			const float u = invZ * fu * Xc(0) + u0;
+			const float v = invZ * fv * Xc(1) + v0;
+			return Point2D(u, v);
+		}
+
+		inline Point2D WorldToImage(const Point3D& Xw) const
+		{
+			return CameraToImage(WorldToCamera(Xw));
+		}
+
+		inline float DepthToDisparity(float Z) const
+		{
+			return bf / Z;
+		}
+
+		cv::Matx33f Rcw;
+		cv::Matx31f tcw;
+		float fu, fv, u0, v0, bf;
+	};
+
+	struct CameraUnProjection
+	{
+		CameraUnProjection(const CameraPose& pose, const CameraParams& camera)
+		{
+			Rwc = pose.InvR();
+			twc = pose.Invt();
+			invfu = 1.f / camera.fx;
+			invfv = 1.f / camera.fy;
+			u0 = camera.cx;
+			v0 = camera.cy;
+			bf = camera.bf;
+		}
+
+		inline Point3D uvZToCamera(float u, float v, float Z) const
+		{
+			const float X = invfu * (u - u0) * Z;
+			const float Y = invfv * (v - v0) * Z;
+			return Point3D(X, Y, Z);
+		}
+
+		inline Point3D CameraToWorld(const Point3D& Xc) const
+		{
+			return Rwc * Xc + twc;
+		}
+
+		inline Point3D uvZToWorld(float u, float v, float Z) const
+		{
+			return CameraToWorld(uvZToCamera(u, v, Z));
+		}
+
+		cv::Matx33f Rwc;
+		cv::Matx31f twc;
+		float invfu, invfv, u0, v0, bf;
+	};
 
 	void CreateNewMapPoints(KeyFrame* currKeyFrame_)
 	{
@@ -395,18 +470,11 @@ private:
 
 		ORBmatcher matcher(0.6f, false);
 
-		const auto Rcw1 = keyframe1->GetPose().R();
-		const auto Rwc1 = Rcw1.t();
-		const auto tcw1 = keyframe1->GetPose().t();
-		const cv::Mat Tcw1 = CameraPose(Rcw1, tcw1).Mat();
+		const CameraPose pose1 = keyframe1->GetPose();
+		CameraProjection proj1(pose1, keyframe1->camera);
+		CameraUnProjection unproj1(pose1, keyframe1->camera);
 		const Point3D Ow1 = keyframe1->GetCameraCenter();
-
-		const float fx1 = keyframe1->camera.fx;
-		const float fy1 = keyframe1->camera.fy;
-		const float cx1 = keyframe1->camera.cx;
-		const float cy1 = keyframe1->camera.cy;
-		const float invfx1 = 1.f / fx1;
-		const float invfy1 = 1.f / fy1;
+		const cv::Mat Tcw1 = pose1.Mat();
 
 		const float ratioFactor = 1.5f * keyframe1->pyramid.scaleFactor;
 
@@ -443,39 +511,32 @@ private:
 			std::vector<std::pair<size_t, size_t> > matchIndices;
 			matcher.SearchForTriangulation(keyframe1, keyframe2, F12, matchIndices, false);
 
-			const auto Rcw2 = keyframe2->GetPose().R();
-			const auto Rwc2 = Rcw2.t();
-			const auto tcw2 = keyframe2->GetPose().t();
-			const cv::Mat Tcw2 = CameraPose(Rcw2, tcw2).Mat();
-
-			const float fx2 = keyframe2->camera.fx;
-			const float fy2 = keyframe2->camera.fy;
-			const float cx2 = keyframe2->camera.cx;
-			const float cy2 = keyframe2->camera.cy;
-			const float invfx2 = 1.f / fx2;
-			const float invfy2 = 1.f / fy2;
+			const CameraPose pose2 = keyframe2->GetPose();
+			CameraProjection proj2(pose2, keyframe2->camera);
+			CameraUnProjection unproj2(pose2, keyframe2->camera);
+			const cv::Mat Tcw2 = pose2.Mat();
 
 			// Triangulate each match
-			const int nmatches = static_cast<int>(matchIndices.size());
-			for (int ik = 0; ik < nmatches; ik++)
+			for (const auto& matchIdx : matchIndices)
 			{
-				const int idx1 = static_cast<int>(matchIndices[ik].first);
-				const int idx2 = static_cast<int>(matchIndices[ik].second);
+				const int idx1 = static_cast<int>(matchIdx.first);
+				const int idx2 = static_cast<int>(matchIdx.second);
 
 				const cv::KeyPoint& keypoint1 = keyframe1->keypointsUn[idx1];
-				const float ur1 = keyframe1->uright[idx1];
-				const bool stereo1 = ur1 >= 0;
-
 				const cv::KeyPoint& keypoint2 = keyframe2->keypointsUn[idx2];
+				const float ur1 = keyframe1->uright[idx1];
 				const float ur2 = keyframe2->uright[idx2];
+				const float Z1 = keyframe1->depth[idx1];
+				const float Z2 = keyframe2->depth[idx2];
+				const bool stereo1 = ur1 >= 0;
 				const bool stereo2 = ur2 >= 0;
 
 				// Check parallax between rays
-				Vec3D xn1((keypoint1.pt.x - cx1) * invfx1, (keypoint1.pt.y - cy1) * invfy1, 1.f);
-				Vec3D xn2((keypoint2.pt.x - cx2) * invfx2, (keypoint2.pt.y - cy2) * invfy2, 1.f);
+				const Vec3D xn1 = unproj1.uvZToCamera(keypoint1.pt.x, keypoint1.pt.y, 1.f);
+				const Vec3D xn2 = unproj2.uvZToCamera(keypoint2.pt.x, keypoint2.pt.y, 1.f);
 
-				const Vec3D ray1 = Rwc1 * xn1;
-				const Vec3D ray2 = Rwc2 * xn2;
+				const Vec3D ray1 = unproj1.Rwc * xn1;
+				const Vec3D ray2 = unproj2.Rwc * xn2;
 				const float cosParallaxRays = CosAngle(ray1, ray2);
 
 				float cosParallaxStereo = cosParallaxRays + 1;
@@ -483,13 +544,13 @@ private:
 				float cosParallaxStereo2 = cosParallaxStereo;
 
 				if (stereo1)
-					cosParallaxStereo1 = cosf(Parallax(keyframe1->camera.baseline, keyframe1->depth[idx1]));
+					cosParallaxStereo1 = cosf(Parallax(keyframe1->camera.baseline, Z1));
 				else if (stereo2)
-					cosParallaxStereo2 = cosf(Parallax(keyframe2->camera.baseline, keyframe2->depth[idx2]));
+					cosParallaxStereo2 = cosf(Parallax(keyframe2->camera.baseline, Z2));
 
 				cosParallaxStereo = std::min(cosParallaxStereo1, cosParallaxStereo2);
 
-				Point3D x3D;
+				Point3D Xw;
 				if (cosParallaxRays < cosParallaxStereo && cosParallaxRays>0 && (stereo1 || stereo2 || cosParallaxRays < 0.9998))
 				{
 					// Linear Triangulation Method
@@ -509,89 +570,65 @@ private:
 
 					// Euclidean coordinates
 					const double denom = 1. / v(3);
-					x3D = denom * Point3D(v(0), v(1), v(2));
+					Xw = denom * Point3D(v(0), v(1), v(2));
 
 				}
 				else if (stereo1 && cosParallaxStereo1 < cosParallaxStereo2)
 				{
-					x3D = keyframe1->UnprojectStereo(idx1);
+					Xw = unproj1.uvZToWorld(keypoint1.pt.x, keypoint1.pt.y, Z1);
 				}
 				else if (stereo2 && cosParallaxStereo2 < cosParallaxStereo1)
 				{
-					x3D = keyframe2->UnprojectStereo(idx2);
+					Xw = unproj2.uvZToWorld(keypoint2.pt.x, keypoint2.pt.y, Z2);
 				}
 				else
 					continue; //No stereo and very low parallax
 
-				const auto x3Dt = x3D.t();
-
-				//Check triangulation in front of cameras
-				const float z1 = Rcw1.row(2).dot(x3Dt) + tcw1(2);
-				if (z1 <= 0)
+				// Check triangulation in front of cameras
+				const Point3D Xc1 = proj1.WorldToCamera(Xw);
+				const Point3D Xc2 = proj2.WorldToCamera(Xw);
+				if (Xc1(2) <= 0 || Xc2(2) <= 0)
 					continue;
 
-				const float z2 = Rcw2.row(2).dot(x3Dt) + tcw2(2);
-				if (z2 <= 0)
-					continue;
-
-				//Check reprojection error in first keyframe
+				// Check reprojection error in first keyframe
 				const float sigmaSq1 = keyframe1->pyramid.sigmaSq[keypoint1.octave];
-				const float x1 = Rcw1.row(0).dot(x3Dt) + tcw1(0);
-				const float y1 = Rcw1.row(1).dot(x3Dt) + tcw1(1);
-				const float invz1 = 1.f / z1;
-
+				const Point2D pt1 = proj1.CameraToImage(Xc1);
+				const Point2D diff1 = pt1 - keypoint1.pt;
 				if (!stereo1)
 				{
-					const float u1 = fx1*x1*invz1 + cx1;
-					const float v1 = fy1*y1*invz1 + cy1;
-					const float errX1 = u1 - keypoint1.pt.x;
-					const float errY1 = v1 - keypoint1.pt.y;
-					if ((errX1*errX1 + errY1*errY1) > 5.991*sigmaSq1)
+					if (NormSq(diff1.x, diff1.y) > 5.991 * sigmaSq1)
 						continue;
 				}
 				else
 				{
-					const float u1 = fx1*x1*invz1 + cx1;
-					const float u1_r = u1 - keyframe1->camera.bf*invz1;
-					const float v1 = fy1*y1*invz1 + cy1;
-					const float errX1 = u1 - keypoint1.pt.x;
-					const float errY1 = v1 - keypoint1.pt.y;
-					const float errX1_r = u1_r - ur1;
-					if ((errX1*errX1 + errY1*errY1 + errX1_r*errX1_r) > 7.8*sigmaSq1)
+					const float d1 = proj1.DepthToDisparity(Xc1(2));
+					const float diff1z = (pt1.x - d1) - ur1;
+					if (NormSq(diff1.x, diff1.y, diff1z) > 7.8 * sigmaSq1)
 						continue;
 				}
 
-				//Check reprojection error in second keyframe
+				// Check reprojection error in second keyframe
 				const float sigmaSq2 = keyframe2->pyramid.sigmaSq[keypoint2.octave];
-				const float x2 = Rcw2.row(0).dot(x3Dt) + tcw2(0);
-				const float y2 = Rcw2.row(1).dot(x3Dt) + tcw2(1);
-				const float invz2 = 1.f / z2;
+				const Point2D pt2 = proj2.CameraToImage(Xc2);
+				const Point2D diff2 = pt2 - keypoint2.pt;
 				if (!stereo2)
 				{
-					const float u2 = fx2*x2*invz2 + cx2;
-					const float v2 = fy2*y2*invz2 + cy2;
-					const float errX2 = u2 - keypoint2.pt.x;
-					const float errY2 = v2 - keypoint2.pt.y;
-					if ((errX2*errX2 + errY2*errY2) > 5.991*sigmaSq2)
+					if (NormSq(diff2.x, diff2.y) > 5.991 * sigmaSq2)
 						continue;
 				}
 				else
 				{
-					const float u2 = fx2*x2*invz2 + cx2;
-					const float u2_r = u2 - keyframe1->camera.bf*invz2;
-					const float v2 = fy2*y2*invz2 + cy2;
-					const float errX2 = u2 - keypoint2.pt.x;
-					const float errY2 = v2 - keypoint2.pt.y;
-					const float errX2_r = u2_r - ur2;
-					if ((errX2*errX2 + errY2*errY2 + errX2_r*errX2_r) > 7.8*sigmaSq2)
+					const float d2 = proj2.DepthToDisparity(Xc2(2));
+					const float diff2z = (pt2.x - d2) - ur2;
+					if (NormSq(diff2.x, diff2.y, diff2z) > 7.8 * sigmaSq2)
 						continue;
 				}
 
 				//Check scale consistency
-				const Vec3D normal1 = x3D - Ow1;
+				const Vec3D normal1 = Xw - Ow1;
 				const float dist1 = static_cast<float>(cv::norm(normal1));
 
-				const Vec3D normal2 = x3D - Ow2;
+				const Vec3D normal2 = Xw - Ow2;
 				const float dist2 = static_cast<float>(cv::norm(normal2));
 
 				if (dist1 == 0 || dist2 == 0)
@@ -606,7 +643,7 @@ private:
 					continue;
 
 				// Triangulation is succesfull
-				MapPoint* mappoint = new MapPoint(x3D, keyframe1, map_);
+				MapPoint* mappoint = new MapPoint(Xw, keyframe1, map_);
 
 				mappoint->AddObservation(keyframe1, idx1);
 				mappoint->AddObservation(keyframe2, idx2);
@@ -615,7 +652,6 @@ private:
 				keyframe2->AddMapPoint(mappoint, idx2);
 
 				mappoint->ComputeDistinctiveDescriptors();
-
 				mappoint->UpdateNormalAndDepth();
 
 				map_->AddMapPoint(mappoint);
