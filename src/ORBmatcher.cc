@@ -457,12 +457,6 @@ int ORBmatcher::SearchByBoW(KeyFrame* keyframe, Frame& frame, std::vector<MapPoi
 
 	int nmatches = 0;
 
-	// TODO remove
-	std::vector<int> rotHist[HISTO_LENGTH];
-	for (int i = 0; i < HISTO_LENGTH; i++)
-		rotHist[i].reserve(500);
-	const float factor = 1.0f / HISTO_LENGTH;
-
 	std::vector<MatchIdx> matchIds;
 	matchIds.reserve(keyframe->N);
 
@@ -1448,13 +1442,6 @@ int ORBmatcher::SearchByProjection(Frame& frame, KeyFrame* keyframe, const std::
 	const float fy = frame.camera.fy;
 	const float cx = frame.camera.cx;
 	const float cy = frame.camera.cy;
-
-	// Rotation Histogram (to check rotation consistency)
-	// TODO remove
-	std::vector<int> rotHist[HISTO_LENGTH];
-	for (int i = 0; i < HISTO_LENGTH; i++)
-		rotHist[i].reserve(500);
-	const float factor = 1.0f / HISTO_LENGTH;
 
 	const std::vector<MapPoint*> mappoints = keyframe->GetMapPointMatches();
 
