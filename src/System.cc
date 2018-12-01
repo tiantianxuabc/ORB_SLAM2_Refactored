@@ -367,8 +367,7 @@ public:
 
 		// Load depth threshold
 		const float thDepth = camera_.baseline * static_cast<float>(settings["ThDepth"]);
-		thDepth_ = thDepth;
-
+		
 		// Load depth factor
 		depthFactor_ = sensor == System::RGBD ? ReadDepthFactor(settings) : 1.f;
 
@@ -949,8 +948,6 @@ private:
 
 	// Color order (true RGB, false BGR, ignored if grayscale)
 	bool RGB_;
-
-	float thDepth_;
 };
 
 System::Pointer System::Create(const Path& vocabularyFile, const Path& settingsFile, Sensor sensor, bool useViewer)
