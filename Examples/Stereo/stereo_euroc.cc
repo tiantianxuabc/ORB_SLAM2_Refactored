@@ -19,193 +19,199 @@
 */
 
 
-#include<iostream>
-#include<algorithm>
-#include<fstream>
-#include<iomanip>
-#include<chrono>
-#include<thread>
+#include <iostream>
+#include <algorithm>
+#include <fstream>
+#include <iomanip>
+#include <chrono>
+#include <thread>
+#include <numeric>
 
-#include<opencv2/opencv.hpp>
+#include <opencv2/opencv.hpp>
 
-#include<System.h>
-
-using namespace std;
+#include <System.h>
 
 static inline void usleep(int64_t usec) { std::this_thread::sleep_for(std::chrono::microseconds(usec)); }
 
-void LoadImages(const string &strPathLeft, const string &strPathRight, const string &strPathTimes,
-                vector<string> &vstrImageLeft, vector<string> &vstrImageRight, vector<double> &vTimeStamps);
-
-int main(int argc, char **argv)
+template <class... Args>
+static std::string FormatString(const char* fmt, Args... args)
 {
-    if(argc != 6)
-    {
-        cerr << endl << "Usage: ./stereo_euroc path_to_vocabulary path_to_settings path_to_left_folder path_to_right_folder path_to_times_file" << endl;
-        return 1;
-    }
-
-    // Retrieve paths to images
-    vector<string> vstrImageLeft;
-    vector<string> vstrImageRight;
-    vector<double> vTimeStamp;
-    LoadImages(string(argv[3]), string(argv[4]), string(argv[5]), vstrImageLeft, vstrImageRight, vTimeStamp);
-
-    if(vstrImageLeft.empty() || vstrImageRight.empty())
-    {
-        cerr << "ERROR: No images in provided path." << endl;
-        return 1;
-    }
-
-    if(vstrImageLeft.size()!=vstrImageRight.size())
-    {
-        cerr << "ERROR: Different number of left and right images." << endl;
-        return 1;
-    }
-
-    // Read rectification parameters
-    cv::FileStorage fsSettings(argv[2], cv::FileStorage::READ);
-    if(!fsSettings.isOpened())
-    {
-        cerr << "ERROR: Wrong path to settings" << endl;
-        return -1;
-    }
-
-    cv::Mat K_l, K_r, P_l, P_r, R_l, R_r, D_l, D_r;
-    fsSettings["LEFT.K"] >> K_l;
-    fsSettings["RIGHT.K"] >> K_r;
-
-    fsSettings["LEFT.P"] >> P_l;
-    fsSettings["RIGHT.P"] >> P_r;
-
-    fsSettings["LEFT.R"] >> R_l;
-    fsSettings["RIGHT.R"] >> R_r;
-
-    fsSettings["LEFT.D"] >> D_l;
-    fsSettings["RIGHT.D"] >> D_r;
-
-    int rows_l = fsSettings["LEFT.height"];
-    int cols_l = fsSettings["LEFT.width"];
-    int rows_r = fsSettings["RIGHT.height"];
-    int cols_r = fsSettings["RIGHT.width"];
-
-    if(K_l.empty() || K_r.empty() || P_l.empty() || P_r.empty() || R_l.empty() || R_r.empty() || D_l.empty() || D_r.empty() ||
-            rows_l==0 || rows_r==0 || cols_l==0 || cols_r==0)
-    {
-        cerr << "ERROR: Calibration parameters to rectify stereo are missing!" << endl;
-        return -1;
-    }
-
-    cv::Mat M1l,M2l,M1r,M2r;
-    cv::initUndistortRectifyMap(K_l,D_l,R_l,P_l.rowRange(0,3).colRange(0,3),cv::Size(cols_l,rows_l),CV_32F,M1l,M2l);
-    cv::initUndistortRectifyMap(K_r,D_r,R_r,P_r.rowRange(0,3).colRange(0,3),cv::Size(cols_r,rows_r),CV_32F,M1r,M2r);
-
-
-    const int nImages = vstrImageLeft.size();
-
-    // Create SLAM system. It initializes all system threads and gets ready to process frames.
-    auto SLAM = ORB_SLAM2::System::Create(argv[1],argv[2],ORB_SLAM2::System::STEREO,true);
-
-    // Vector for tracking time statistics
-    vector<float> vTimesTrack;
-    vTimesTrack.resize(nImages);
-
-    cout << endl << "-------" << endl;
-    cout << "Start processing sequence ..." << endl;
-    cout << "Images in the sequence: " << nImages << endl << endl;
-
-    // Main loop
-    cv::Mat imLeft, imRight, imLeftRect, imRightRect;
-    for(int ni=0; ni<nImages; ni++)
-    {
-        // Read left and right images from file
-        imLeft = cv::imread(vstrImageLeft[ni],CV_LOAD_IMAGE_UNCHANGED);
-        imRight = cv::imread(vstrImageRight[ni],CV_LOAD_IMAGE_UNCHANGED);
-
-        if(imLeft.empty())
-        {
-            cerr << endl << "Failed to load image at: "
-                 << string(vstrImageLeft[ni]) << endl;
-            return 1;
-        }
-
-        if(imRight.empty())
-        {
-            cerr << endl << "Failed to load image at: "
-                 << string(vstrImageRight[ni]) << endl;
-            return 1;
-        }
-
-        cv::remap(imLeft,imLeftRect,M1l,M2l,cv::INTER_LINEAR);
-        cv::remap(imRight,imRightRect,M1r,M2r,cv::INTER_LINEAR);
-
-        double tframe = vTimeStamp[ni];
-
-
-		std::chrono::steady_clock::time_point t1 = std::chrono::steady_clock::now();
-
-        // Pass the images to the SLAM system
-        SLAM->TrackStereo(imLeftRect,imRightRect,tframe);
-
-		std::chrono::steady_clock::time_point t2 = std::chrono::steady_clock::now();
-
-        double ttrack= std::chrono::duration_cast<std::chrono::duration<double> >(t2 - t1).count();
-
-        vTimesTrack[ni]=ttrack;
-
-        // Wait to load the next frame
-        double T=0;
-        if(ni<nImages-1)
-            T = vTimeStamp[ni+1]-tframe;
-        else if(ni>0)
-            T = tframe-vTimeStamp[ni-1];
-
-        if(ttrack<T)
-            usleep((T-ttrack)*1e6);
-    }
-
-    // Stop all threads
-    SLAM->Shutdown();
-
-    // Tracking time statistics
-    sort(vTimesTrack.begin(),vTimesTrack.end());
-    float totaltime = 0;
-    for(int ni=0; ni<nImages; ni++)
-    {
-        totaltime+=vTimesTrack[ni];
-    }
-    cout << "-------" << endl << endl;
-    cout << "median tracking time: " << vTimesTrack[nImages/2] << endl;
-    cout << "mean tracking time: " << totaltime/nImages << endl;
-
-    // Save camera trajectory
-    SLAM->SaveTrajectoryTUM("CameraTrajectory.txt");
-
-    return 0;
+	const int BUF_SIZE = 1024;
+	char buf[BUF_SIZE];
+	std::snprintf(buf, BUF_SIZE, fmt, args...);
+	return std::string(buf);
 }
 
-void LoadImages(const string &strPathLeft, const string &strPathRight, const string &strPathTimes,
-                vector<string> &vstrImageLeft, vector<string> &vstrImageRight, vector<double> &vTimeStamps)
+static int LoadImages(const char* I0Path, const char* I1Path, const char* timePath,
+	std::vector<std::string>& I0s, std::vector<std::string>& I1s, std::vector<double>& stamps)
 {
-    ifstream fTimes;
-    fTimes.open(strPathTimes.c_str());
-    vTimeStamps.reserve(5000);
-    vstrImageLeft.reserve(5000);
-    vstrImageRight.reserve(5000);
-    while(!fTimes.eof())
-    {
-        string s;
-        getline(fTimes,s);
-        if(!s.empty())
-        {
-            stringstream ss;
-            ss << s;
-            vstrImageLeft.push_back(strPathLeft + "/" + ss.str() + ".png");
-            vstrImageRight.push_back(strPathRight + "/" + ss.str() + ".png");
-            double t;
-            ss >> t;
-            vTimeStamps.push_back(t/1e9);
+	std::ifstream ifs(timePath);
+	CV_Assert(!ifs.fail());
 
-        }
-    }
+	int nframes = 0;
+	std::string line;
+	while (std::getline(ifs, line))
+	{
+		I0s.push_back(FormatString("%s/%s.png", I0Path, line.c_str()));
+		I1s.push_back(FormatString("%s/%s.png", I1Path, line.c_str()));
+		stamps.push_back(1e-9 * std::stoull(line));
+		nframes++;
+	}
+	return nframes;
+}
+
+class Rectify
+{
+
+public:
+
+	enum class View { LEFT, RIGHT };
+
+	Rectify(const cv::FileStorage& settings, View view) : fail_(true)
+	{
+		cv::Mat K, D, R, P;
+		int h, w;
+		if (view == View::LEFT)
+		{
+			settings["LEFT.K"] >> K;
+			settings["LEFT.P"] >> P;
+			settings["LEFT.R"] >> R;
+			settings["LEFT.D"] >> D;
+			h = settings["LEFT.height"];
+			w = settings["LEFT.width"];
+		}
+		else if (view == View::RIGHT)
+		{
+			settings["RIGHT.K"] >> K;
+			settings["RIGHT.P"] >> P;
+			settings["RIGHT.R"] >> R;
+			settings["RIGHT.D"] >> D;
+			h = settings["RIGHT.height"];
+			w = settings["RIGHT.width"];
+		}
+
+		if (K.empty() || D.empty() || R.empty() || P.empty() || h == 0 || w == 0)
+			return;
+
+		cv::initUndistortRectifyMap(K, D, R, P(cv::Rect(0, 0, 3, 3)), cv::Size(w, h), CV_32F, M1, M2);
+
+		fail_ = false;
+	}
+
+	void operator()(const cv::Mat& src, cv::Mat& dst) const
+	{
+		cv::remap(src, dst, M1, M2, cv::INTER_LINEAR);
+	}
+
+	bool fail() const { return fail_; }
+
+private:
+	cv::Mat M1, M2;
+	bool fail_;
+};
+
+int main(int argc, char* argv[])
+{
+	if (argc < 6)
+	{
+		std::cerr << "Usage: ./stereo_euroc path_to_vocabulary path_to_settings path_to_left_folder path_to_right_folder path_to_times_file" << std::endl;
+		return 1;
+	}
+
+	const bool syncWithStamp = false;
+
+	// Load sequence
+	std::vector<std::string> ILs, IRs;
+	std::vector<double> timestamps;
+	const int nimages = LoadImages(argv[3], argv[4], argv[5], ILs, IRs, timestamps);
+
+	if (ILs.empty() || IRs.empty())
+	{
+		std::cerr << "ERROR: No images in provided path." << std::endl;
+		return 1;
+	}
+
+	if (ILs.size() != IRs.size())
+	{
+		std::cerr << "ERROR: Different number of left and right images." << std::endl;
+		return 1;
+	}
+
+	// Read rectification parameters
+	cv::FileStorage settings(argv[2], cv::FileStorage::READ);
+	if (!settings.isOpened())
+	{
+		std::cerr << "ERROR: Wrong path to settings" << std::endl;
+		return 1;
+	}
+
+	Rectify rectifyL(settings, Rectify::View::LEFT);
+	Rectify rectifyR(settings, Rectify::View::RIGHT);
+	if (rectifyL.fail() || rectifyR.fail())
+	{
+		std::cerr << "ERROR: Calibration parameters to rectify stereo are missing!" << std::endl;
+		return 1;
+	}
+
+	// Create SLAM system. It initializes all system threads and gets ready to process frames.
+	auto SLAM = ORB_SLAM2::System::Create(argv[1], argv[2], ORB_SLAM2::System::STEREO, true);
+
+	// Vector for tracking time statistics
+	std::vector<float> trackTimes;
+	trackTimes.resize(nimages);
+
+	std::cout << std::endl << "-------" << std::endl;
+	std::cout << "Start processing sequence ..." << std::endl;
+	std::cout << "Images in the sequence: " << nimages << std::endl << std::endl;
+
+	// Main loop
+	cv::Mat IL, IR;
+	for (int i = 0; i < nimages; i++)
+	{
+		const cv::Mat _IL = cv::imread(ILs[i], cv::IMREAD_UNCHANGED);
+		const cv::Mat _IR = cv::imread(IRs[i], cv::IMREAD_UNCHANGED);
+		if (_IL.empty() || _IR.empty())
+		{
+			std::cout << "imread failed." << std::endl;
+			break;
+		}
+
+		rectifyL(_IL, IL);
+		rectifyR(_IR, IR);
+
+		const double timestamp = timestamps[i];
+
+		const auto t1 = std::chrono::steady_clock::now();
+
+		// Pass the images to the SLAM system
+		SLAM->TrackStereo(IL, IR, timestamp);
+
+		const auto t2 = std::chrono::steady_clock::now();
+
+		// Wait to load the next frame
+		const double T1 = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1).count();
+		const double T2 = i < nimages - 1 ? timestamps[i + 1] - timestamp : timestamp - timestamps[i - 1];
+
+		trackTimes[i] = T1;
+
+		// Wait to load the next frame
+		if (T1 < T2)
+			usleep(static_cast<int64_t>(1e6 * (T2 - T1)));
+	}
+
+	// Stop all threads
+	SLAM->Shutdown();
+
+	// Tracking time statistics
+	std::sort(std::begin(trackTimes), std::end(trackTimes));
+	const double totalTime = std::accumulate(std::begin(trackTimes), std::end(trackTimes), 0.);
+
+	std::cout << "-------" << std::endl << std::endl;
+	std::cout << "median tracking time: " << trackTimes[nimages / 2] << std::endl;
+	std::cout << "mean tracking time: " << totalTime / nimages << std::endl;
+
+	// Save camera trajectory
+	SLAM->SaveTrajectoryTUM("CameraTrajectory.txt");
+
+	return 0;
 }
