@@ -216,7 +216,7 @@ public:
 		if (stopRequested_ && !notStop_)
 		{
 			stopped_ = true;
-			cout << "Local Mapping STOP" << endl;
+			std::cout << "Local Mapping STOP" << std::endl;
 			return true;
 		}
 
@@ -237,7 +237,7 @@ public:
 			delete *lit;
 		newKeyFrames_.clear();
 
-		cout << "Local Mapping RELEASE" << endl;
+		std::cout << "Local Mapping RELEASE" << std::endl;
 	}
 
 	bool isStopped() const override

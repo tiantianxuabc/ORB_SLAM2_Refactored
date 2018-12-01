@@ -996,7 +996,7 @@ public:
 			currFrame.mappoints[i] = mappoint;
 		}
 
-		cout << "New map created with " << map_->MapPointsInMap() << " points" << endl;
+		std::cout << "New map created with " << map_->MapPointsInMap() << " points" << std::endl;
 
 		localMapper_->InsertKeyFrame(keyframe);
 
@@ -1136,7 +1136,7 @@ public:
 		pKFcur->UpdateConnections();
 
 		// Bundle Adjustment
-		cout << "New Map created with " << map_->MapPointsInMap() << " points" << endl;
+		std::cout << "New Map created with " << map_->MapPointsInMap() << " points" << std::endl;
 
 		Optimizer::GlobalBundleAdjustemnt(map_, 20);
 
@@ -1146,7 +1146,7 @@ public:
 
 		if (medianDepth < 0 || pKFcur->TrackedMapPoints(1) < 100)
 		{
-			cout << "Wrong initialization, reseting..." << endl;
+			std::cout << "Wrong initialization, reseting..." << std::endl;
 			system_->RequestReset();
 			return;
 		}
@@ -1325,7 +1325,7 @@ public:
 		{
 			if (map_->KeyFramesInMap() <= 5)
 			{
-				cout << "Track lost soon after initialisation, reseting..." << endl;
+				std::cout << "Track lost soon after initialisation, reseting..." << std::endl;
 				system_->RequestReset();
 				return cv::Mat();
 			}
