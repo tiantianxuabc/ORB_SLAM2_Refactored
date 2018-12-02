@@ -63,6 +63,17 @@ public:
 		return T1;
 	}
 
+	// CameraPose => cv::Mat1f
+	operator cv::Mat1f() const
+	{
+		cv::Mat1f m = cv::Mat1f::eye(4, 4);
+		for (int i = 0; i < 3; i++) for (int j = 0; j < 3; j++) m(i, j) = s_ * R_(i, j);
+		for (int i = 0; i < 3; i++) m(i, 3) = t_(i);
+		return m;
+	}
+
+	cv::Mat1f Mat() const { return cv::Mat1f(*this); }
+
 private:
 	float s_;
 };
