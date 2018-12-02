@@ -480,7 +480,7 @@ public:
 		if (localMapper_->isStopped() || localMapper_->stopRequested())
 			return false;
 
-		const size_t nkeyframes = map_->KeyFramesInMap();
+		const int nkeyframes = static_cast<int>(map_->KeyFramesInMap());
 
 		// Do not insert keyframes if not enough frames have passed from last relocalisation
 		const int lastRelocFrameId = relocalizer_.GetLastRelocFrameId();
@@ -828,7 +828,7 @@ public:
 		return success;
 	}
 
-	bool EstimateLocalization(Frame& currFrame, Frame& lastFrame, const cv::Mat& velocity, int lastKeyFrameId)
+	bool EstimateLocalization(Frame& currFrame, Frame& lastFrame, const cv::Mat& velocity, frameid_t lastKeyFrameId)
 	{
 		// Localization Mode: Local Mapping is deactivated
 
