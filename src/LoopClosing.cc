@@ -699,7 +699,7 @@ public:
 
 	LoopClosingImpl(Map *map, KeyFrameDatabase* keyframeDB, ORBVocabulary *voc, bool fixScale)
 		: resetRequested_(false), finishRequested_(false), finished_(true), lastLoopKFId_(0),
-		keyframeDB_(keyframeDB), detector_(keyframeDB, voc, fixScale), GBA_(map), corrector_(map, &GBA_, fixScale)
+		keyframeDB_(keyframeDB), detector_(keyframeDB, voc, fixScale), corrector_(map, &GBA_, fixScale), GBA_(map)
 	{
 	}
 
@@ -848,6 +848,7 @@ private:
 	bool resetRequested_;
 	bool finishRequested_;
 	bool finished_;
+	frameid_t lastLoopKFId_;
 
 	std::shared_ptr<Tracking> tracker_;
 	std::shared_ptr<LocalMapping> localMapper_;
@@ -857,8 +858,6 @@ private:
 	// Loop detector variables
 	KeyFrameDatabase* keyframeDB_;
 	LoopDetector detector_;
-
-	frameid_t lastLoopKFId_;
 
 	// Variables related to Global Bundle Adjustment
 	LoopCorrector corrector_;
