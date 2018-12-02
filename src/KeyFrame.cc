@@ -21,10 +21,9 @@
 #include "KeyFrame.h"
 
 #include "Map.h"
-#include "Converter.h"
-#include "ORBmatcher.h"
-#include "ORBVocabulary.h"
+#include "MapPoint.h"
 #include "KeyFrameDatabase.h"
+#include "Converter.h"
 
 #define LOCK_MUTEX_POSE()        std::unique_lock<std::mutex> lock1(mutexPose_);
 #define LOCK_MUTEX_CONNECTIONS() std::unique_lock<std::mutex> lock2(mutexConnections_);

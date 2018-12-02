@@ -23,14 +23,7 @@
 
 #include <mutex>
 
-#include <Thirdparty/DBoW2/DBoW2/BowVector.h>
-#include <Thirdparty/DBoW2/DBoW2/FeatureVector.h>
-
-#include "FrameId.h"
 #include "Frame.h"
-#include "ORBVocabulary.h"
-#include "CameraParameters.h"
-#include "CameraPose.h"
 
 namespace ORB_SLAM2
 {
