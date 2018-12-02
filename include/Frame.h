@@ -23,9 +23,7 @@
 
 #include <vector>
 
-#include <opencv2/opencv.hpp>
-#include <Thirdparty/DBoW2/DBoW2/BowVector.h>
-#include <Thirdparty/DBoW2/DBoW2/FeatureVector.h>
+#include <opencv2/core.hpp>
 
 #include "FrameId.h"
 #include "ORBVocabulary.h"
@@ -38,7 +36,6 @@ namespace ORB_SLAM2
 
 class MapPoint;
 class KeyFrame;
-class ORBextractor;
 
 struct ImageBounds
 {
