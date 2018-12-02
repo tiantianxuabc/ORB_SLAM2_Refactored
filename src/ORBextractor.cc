@@ -746,7 +746,6 @@ void ORBextractor::Init()
 void ORBextractor::Extract(const cv::Mat& image, KeyPoints& keypoints, cv::Mat& descriptors)
 {
 	const int nfeatures = param_.nfeatures;
-	const float scaleFactor = param_.scaleFactor;
 	const int nlevels = param_.nlevels;
 
 	keypoints_.resize(nlevels);

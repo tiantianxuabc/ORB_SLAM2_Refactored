@@ -358,7 +358,7 @@ public:
 	}
 
 	// This function will run in a separate thread
-	void _Run(int loopKFId)
+	void _Run(frameid_t loopKFId)
 	{
 		std::cout << "Starting Global Bundle Adjustment" << std::endl;
 
@@ -457,7 +457,7 @@ public:
 		}
 	}
 
-	void Run(int loopKFId)
+	void Run(frameid_t loopKFId)
 	{
 		running_ = true;
 		finished_ = false;

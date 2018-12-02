@@ -33,6 +33,12 @@
 namespace ORB_SLAM2
 {
 
+static inline Vec3D Normalized(const Vec3D& v)
+{
+	const double invn = 1. / cv::norm(v);
+	return invn * v;
+}
+
 MapPoint::mappointid_t MapPoint::nextId = 0;
 
 MapPoint::MapPoint(const Point3D& Xw, KeyFrame* referenceKF, Map* map) :
