@@ -73,7 +73,7 @@ private:
 
 	std::vector<cv::Mat> images_;
 	std::vector<cv::Mat> blurImages_;
-	std::vector<std::vector<cv::KeyPoint>> keypoints_;
+	std::vector<KeyPoints> keypoints_;
 	std::vector<cv::Point> pattern_;
 
 	Parameters param_;

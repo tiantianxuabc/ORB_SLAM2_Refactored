@@ -43,9 +43,9 @@ FrameDrawer::FrameDrawer(Map* map) : map_(map)
 cv::Mat FrameDrawer::DrawFrame()
 {
 	cv::Mat image;
-	std::vector<cv::KeyPoint> initKeyPoints; // Initialization: KeyPoints in reference frame
+	KeyPoints initKeyPoints; // Initialization: KeyPoints in reference frame
 	std::vector<int> matches; // Initialization: correspondeces with reference keypoints
-	std::vector<cv::KeyPoint> currKeyPoints; // KeyPoints in current frame
+	KeyPoints currKeyPoints; // KeyPoints in current frame
 	std::vector<int> status; // Tracked MapPoints in current frame
 	int state; // Tracking state
 

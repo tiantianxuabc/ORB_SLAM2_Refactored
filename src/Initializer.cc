@@ -747,7 +747,7 @@ void Initializer::Triangulate(const cv::KeyPoint &kp1, const cv::KeyPoint &kp2, 
     x3D = x3D.rowRange(0,3)/x3D.at<float>(3);
 }
 
-void Initializer::Normalize(const std::vector<cv::KeyPoint> &vKeys, std::vector<cv::Point2f> &vNormalizedPoints, cv::Mat &T)
+void Initializer::Normalize(const KeyPoints &vKeys, std::vector<cv::Point2f> &vNormalizedPoints, cv::Mat &T)
 {
     float meanX = 0;
     float meanY = 0;
@@ -796,7 +796,7 @@ void Initializer::Normalize(const std::vector<cv::KeyPoint> &vKeys, std::vector<
 }
 
 
-int Initializer::CheckRT(const cv::Mat &R, const cv::Mat &t, const std::vector<cv::KeyPoint> &vKeys1, const std::vector<cv::KeyPoint> &vKeys2,
+int Initializer::CheckRT(const cv::Mat &R, const cv::Mat &t, const KeyPoints &vKeys1, const KeyPoints &vKeys2,
                        const std::vector<Match> &vMatches12, std::vector<bool> &vbMatchesInliers,
                        const cv::Mat &K, std::vector<cv::Point3f> &vP3D, float th2, std::vector<bool> &vbGood, float &parallax)
 {

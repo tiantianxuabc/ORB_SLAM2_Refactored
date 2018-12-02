@@ -63,9 +63,9 @@ private:
 
     void Triangulate(const cv::KeyPoint &kp1, const cv::KeyPoint &kp2, const cv::Mat &P1, const cv::Mat &P2, cv::Mat &x3D);
 
-    void Normalize(const std::vector<cv::KeyPoint> &vKeys, std::vector<cv::Point2f> &vNormalizedPoints, cv::Mat &T);
+    void Normalize(const KeyPoints &vKeys, std::vector<cv::Point2f> &vNormalizedPoints, cv::Mat &T);
 
-    int CheckRT(const cv::Mat &R, const cv::Mat &t, const std::vector<cv::KeyPoint> &vKeys1, const std::vector<cv::KeyPoint> &vKeys2,
+    int CheckRT(const cv::Mat &R, const cv::Mat &t, const KeyPoints &vKeys1, const KeyPoints &vKeys2,
                        const std::vector<Match> &vMatches12, std::vector<bool> &vbInliers,
                        const cv::Mat &K, std::vector<cv::Point3f> &vP3D, float th2, std::vector<bool> &vbGood, float &parallax);
 
@@ -73,10 +73,10 @@ private:
 
 
     // Keypoints from Reference Frame (Frame 1)
-    std::vector<cv::KeyPoint> mvKeys1;
+    KeyPoints mvKeys1;
 
     // Keypoints from Current Frame (Frame 2)
-    std::vector<cv::KeyPoint> mvKeys2;
+    KeyPoints mvKeys2;
 
     // Current Matches from Reference to Current
     std::vector<Match> mvMatches12;

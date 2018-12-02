@@ -49,11 +49,11 @@ private:
 
 	// Info of the frame to be drawn
 	cv::Mat image_;
-	std::vector<cv::KeyPoint> currKeyPoints_;
+	KeyPoints currKeyPoints_;
 	std::vector<int> status_;
 	bool localizationMode_;
 	int ntracked_, ntrackedVO_;
-	std::vector<cv::KeyPoint> initKeyPoints_;
+	KeyPoints initKeyPoints_;
 	std::vector<int> initMatches_;
 	int state_;
 

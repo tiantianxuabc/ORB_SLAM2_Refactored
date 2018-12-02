@@ -64,8 +64,8 @@ class FeaturesGrid
 public:
 
 	FeaturesGrid();
-	FeaturesGrid(const std::vector<cv::KeyPoint>& keypoints, const ImageBounds& imageBounds, int nlevels);
-	void AssignFeatures(const std::vector<cv::KeyPoint>& keypoints, const ImageBounds& imageBounds, int nlevels);
+	FeaturesGrid(const KeyPoints& keypoints, const ImageBounds& imageBounds, int nlevels);
+	void AssignFeatures(const KeyPoints& keypoints, const ImageBounds& imageBounds, int nlevels);
 	std::vector<size_t> GetFeaturesInArea(float x, float y, float r, int minLevel = -1, int maxLevel = -1) const;
 
 private:
@@ -73,7 +73,7 @@ private:
 	static const int COLS = 64;
 	float invW_;
 	float invH_;
-	std::vector<cv::KeyPoint> keypoints_;
+	KeyPoints keypoints_;
 	ImageBounds imageBounds_;
 	int nlevels_;
 	std::vector<std::size_t> grid_[COLS][ROWS];
@@ -89,13 +89,13 @@ public:
 	Frame(const Frame& frame);
 
 	// Constructor for stereo and RGB-D cameras.
-	Frame(ORBVocabulary* voc, double timestamp, const CameraParams& camera, const std::vector<cv::KeyPoint>& keypoints,
-		const std::vector<cv::KeyPoint>& keypointsUn, const std::vector<float>& uright, const std::vector<float>& depth,
+	Frame(ORBVocabulary* voc, double timestamp, const CameraParams& camera, const KeyPoints& keypoints,
+		const KeyPoints& keypointsUn, const std::vector<float>& uright, const std::vector<float>& depth,
 		const cv::Mat& descriptors, const ScalePyramidInfo& pyramid, const ImageBounds& imageBounds);
 
 	// Constructor for Monocular cameras.
-	Frame(ORBVocabulary* voc, double timestamp, const CameraParams& camera, const std::vector<cv::KeyPoint>& keypoints,
-		const std::vector<cv::KeyPoint>& keypointsUn, const cv::Mat& descriptors, const ScalePyramidInfo& pyramid, const ImageBounds& imageBounds);
+	Frame(ORBVocabulary* voc, double timestamp, const CameraParams& camera, const KeyPoints& keypoints,
+		const KeyPoints& keypointsUn, const cv::Mat& descriptors, const ScalePyramidInfo& pyramid, const ImageBounds& imageBounds);
 
 	// Compute Bag of Words representation.
 	void ComputeBoW();
@@ -129,8 +129,8 @@ public:
 	// Vector of keypoints (original for visualization) and undistorted (actually used by the system).
 	// In the stereo case, mvKeysUn is redundant as images must be rectified.
 	// In the RGB-D case, RGB images can be distorted.
-	std::vector<cv::KeyPoint> keypoints;
-	std::vector<cv::KeyPoint> keypointsUn;
+	KeyPoints keypoints;
+	KeyPoints keypointsUn;
 
 	// Corresponding stereo coordinate and depth for each keypoint.
 	// "Monocular" keypoints have a negative value.

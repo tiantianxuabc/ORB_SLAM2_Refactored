@@ -247,8 +247,8 @@ void ComputeStereoMatches(
 }
 
 template <typename T>
-static int CheckOrientation(const std::vector<cv::KeyPoint>& keypoints1, const std::vector<cv::KeyPoint>& keypoints2,
-	const std::vector<MatchIdx>& matchIds, std::vector<T>& matchStatus)
+static int CheckOrientation(const KeyPoints& keypoints1, const KeyPoints& keypoints2, const std::vector<MatchIdx>& matchIds,
+	std::vector<T>& matchStatus)
 {
 	CV_Assert(matchStatus.size() == keypoints2.size());
 
@@ -695,8 +695,8 @@ int ORBmatcher::SearchForInitialization(Frame& frame1, Frame& frame2, std::vecto
 
 int ORBmatcher::SearchByBoW(KeyFrame* keyframe1, KeyFrame* keyframe2, std::vector<MapPoint*>& matches12)
 {
-	const std::vector<cv::KeyPoint>& keypoints1 = keyframe1->keypointsUn;
-	const std::vector<cv::KeyPoint>& keypoints2 = keyframe2->keypointsUn;
+	const KeyPoints& keypoints1 = keyframe1->keypointsUn;
+	const KeyPoints& keypoints2 = keyframe2->keypointsUn;
 	const std::vector<MapPoint*> mappoints1 = keyframe1->GetMapPointMatches();
 	const std::vector<MapPoint*> mappoints2 = keyframe2->GetMapPointMatches();
 	const cv::Mat& descriptors1 = keyframe1->descriptorsL;
