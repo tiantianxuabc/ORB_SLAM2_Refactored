@@ -281,25 +281,209 @@ static bool TrackReferenceKeyFrame(Frame& currFrame, KeyFrame* referenceKF, Fram
 	return ninliers >= minInliers;
 }
 
-class NewKeyFrameCondition
+class Relocalizer
+{
+public:
+
+	Relocalizer(KeyFrameDatabase* keyFrameDB) : keyFrameDB_(keyFrameDB), lastRelocFrameId_(0) {}
+
+	bool Relocalize(Frame& currFrame)
+	{
+		// Compute Bag of Words Vector
+		currFrame.ComputeBoW();
+
+		// Relocalization is performed when tracking is lost
+		// Track Lost: Query KeyFrame Database for keyframe candidates for relocalisation
+		std::vector<KeyFrame*> candidateKFs = keyFrameDB_->DetectRelocalizationCandidates(&currFrame);
+
+		if (candidateKFs.empty())
+			return false;
+
+		const int nkeyframes = static_cast<int>(candidateKFs.size());
+
+		// We perform first an ORB matching with each candidate
+		// If enough matches are found we setup a PnP solver
+		ORBmatcher matcher(0.75f, true);
+
+		std::vector<PnPsolver*> PnPsolvers;
+		PnPsolvers.resize(nkeyframes);
+
+		std::vector<std::vector<MapPoint*>> vmatches;
+		vmatches.resize(nkeyframes);
+
+		std::vector<bool> discarded;
+		discarded.resize(nkeyframes);
+
+		int ncandidates = 0;
+
+		for (int i = 0; i < nkeyframes; i++)
+		{
+			KeyFrame* keyframe = candidateKFs[i];
+			if (keyframe->isBad())
+			{
+				discarded[i] = true;
+			}
+			else
+			{
+				const int nmatches = matcher.SearchByBoW(keyframe, currFrame, vmatches[i]);
+				if (nmatches < 15)
+				{
+					discarded[i] = true;
+					continue;
+				}
+				else
+				{
+					PnPsolver* solver = new PnPsolver(currFrame, vmatches[i]);
+					solver->SetRansacParameters(0.99, 10, 300, 4, 0.5f, 5.991f);
+					PnPsolvers[i] = solver;
+					ncandidates++;
+				}
+			}
+		}
+
+		// Alternatively perform some iterations of P4P RANSAC
+		// Until we found a camera pose supported by enough inliers
+		bool found = false;
+		ORBmatcher matcher2(0.9f, true);
+
+		while (ncandidates > 0 && !found)
+		{
+			for (int i = 0; i < nkeyframes; i++)
+			{
+				if (discarded[i])
+					continue;
+
+				// Perform 5 Ransac Iterations
+				std::vector<bool> isInlier;
+				int nInliers;
+				bool terminate;
+
+				PnPsolver* solver = PnPsolvers[i];
+				const cv::Mat Tcw = solver->iterate(5, terminate, isInlier, nInliers);
+
+				// If Ransac reachs max. iterations discard keyframe
+				if (terminate)
+				{
+					discarded[i] = true;
+					ncandidates--;
+				}
+
+				// If a Camera Pose is computed, optimize
+				if (!Tcw.empty())
+				{
+					currFrame.SetPose(CameraPose(Tcw));
+
+					std::set<MapPoint*> foundPoints;
+
+					const int np = static_cast<int>(isInlier.size());
+
+					for (int j = 0; j < np; j++)
+					{
+						if (isInlier[j])
+						{
+							currFrame.mappoints[j] = vmatches[i][j];
+							foundPoints.insert(vmatches[i][j]);
+						}
+						else
+							currFrame.mappoints[j] = nullptr;
+					}
+
+					int ngood = Optimizer::PoseOptimization(&currFrame);
+
+					if (ngood < 10)
+						continue;
+
+					for (int io = 0; io < currFrame.N; io++)
+						if (currFrame.outlier[io])
+							currFrame.mappoints[io] = nullptr;
+
+					// If few inliers, search by projection in a coarse window and optimize again
+					if (ngood < 50)
+					{
+						int nadditional = matcher2.SearchByProjection(currFrame, candidateKFs[i], foundPoints, 10, 100);
+
+						if (nadditional + ngood >= 50)
+						{
+							ngood = Optimizer::PoseOptimization(&currFrame);
+
+							// If many inliers but still not enough, search by projection again in a narrower window
+							// the camera has been already optimized with many points
+							if (ngood > 30 && ngood < 50)
+							{
+								foundPoints.clear();
+								for (int ip = 0; ip < currFrame.N; ip++)
+									if (currFrame.mappoints[ip])
+										foundPoints.insert(currFrame.mappoints[ip]);
+								nadditional = matcher2.SearchByProjection(currFrame, candidateKFs[i], foundPoints, 3, 64);
+
+								// Final optimization
+								if (ngood + nadditional >= 50)
+								{
+									ngood = Optimizer::PoseOptimization(&currFrame);
+
+									for (int io = 0; io < currFrame.N; io++)
+										if (currFrame.outlier[io])
+											currFrame.mappoints[io] = nullptr;
+								}
+							}
+						}
+					}
+
+
+					// If the pose is supported by enough inliers stop ransacs and continue
+					if (ngood >= 50)
+					{
+						found = true;
+						break;
+					}
+				}
+			}
+		}
+
+		if (!found)
+		{
+			return false;
+		}
+		else
+		{
+			lastRelocFrameId_ = currFrame.id;
+			return true;
+		}
+	}
+
+	frameid_t GetLastRelocFrameId() const
+	{
+		return lastRelocFrameId_;
+	}
+
+private:
+
+	KeyFrameDatabase* keyFrameDB_;
+	frameid_t lastRelocFrameId_;
+};
+
+class NeedNewKeyFrame
 {
 public:
 
 	using Parameters = Tracking::Parameters;
 
-	NewKeyFrameCondition(Map* map, const LocalMap& LocalMap, const Parameters& param, int sensor)
-		: map_(map), localMap_(LocalMap), param_(param), sensor_(sensor) {}
+	NeedNewKeyFrame(const Map* map, const LocalMap& LocalMap, const Relocalizer& relocalizer,
+		const Parameters& param, int sensor)
+		: map_(map), localMap_(LocalMap), relocalizer_(relocalizer), param_(param), sensor_(sensor) {}
 
-	bool Satisfy(const Frame& currFrame, LocalMapping* localMapper, int matchesInliers,
-		int lastRelocFrameId, int lastKeyFrameId) const
+	void SetLocalMapper(LocalMapping* localMapper) { localMapper_ = localMapper; }
+
+	bool operator()(const Frame& currFrame, const KeyFrame* lastKeyFrame, int matchInliers) const
 	{
 		// If Local Mapping is freezed by a Loop Closure do not insert keyframes
-		if (localMapper->isStopped() || localMapper->stopRequested())
+		if (localMapper_->isStopped() || localMapper_->stopRequested())
 			return false;
 
 		const size_t nkeyframes = map_->KeyFramesInMap();
 
 		// Do not insert keyframes if not enough frames have passed from last relocalisation
+		const int lastRelocFrameId = relocalizer_.GetLastRelocFrameId();
 		if (currFrame.PassedFrom(lastRelocFrameId) < param_.maxFrames && nkeyframes > param_.maxFrames)
 			return false;
 
@@ -308,7 +492,7 @@ public:
 		const int refMatches = localMap_.referenceKF->TrackedMapPoints(minObservations);
 
 		// Local Mapping accept keyframes?
-		const bool acceptKeyFrames = localMapper->AcceptKeyFrames();
+		const bool acceptKeyFrames = localMapper_->AcceptKeyFrames();
 
 		// Check how many "close" points are being tracked and how many could be potentially created.
 		enum { TRACKED = 0, NON_TRACKED = 1 };
@@ -332,13 +516,13 @@ public:
 		const float refRatio = sensor_ == System::MONOCULAR ? 0.9f : (nkeyframes < 2 ? 0.4f : 0.75f);
 
 		// Condition 1a: More than "MaxFrames" have passed from last keyframe insertion
-		const bool c1a = currFrame.PassedFrom(lastKeyFrameId) >= param_.maxFrames;
+		const bool c1a = currFrame.PassedFrom(lastKeyFrame->frameId) >= param_.maxFrames;
 		// Condition 1b: More than "MinFrames" have passed and Local Mapping is idle
-		const bool c1b = currFrame.PassedFrom(lastKeyFrameId) >= param_.minFrames && acceptKeyFrames;
+		const bool c1b = currFrame.PassedFrom(lastKeyFrame->frameId) >= param_.minFrames && acceptKeyFrames;
 		//Condition 1c: tracking is weak
-		const bool c1c = sensor_ != System::MONOCULAR && (matchesInliers < refMatches * 0.25 || needToInsertClose);
+		const bool c1c = sensor_ != System::MONOCULAR && (matchInliers < refMatches * 0.25 || needToInsertClose);
 		// Condition 2: Few tracked points compared to reference keyframe. Lots of visual odometry compared to map matches.
-		const bool c2 = ((matchesInliers < refMatches * refRatio || needToInsertClose) && matchesInliers > 15);
+		const bool c2 = ((matchInliers < refMatches * refRatio || needToInsertClose) && matchInliers > 15);
 
 		if ((c1a || c1b || c1c) && c2)
 		{
@@ -347,18 +531,20 @@ public:
 			if (acceptKeyFrames)
 				return true;
 
-			localMapper->InterruptBA();
+			localMapper_->InterruptBA();
 
 			if (sensor_ != System::MONOCULAR)
-				return localMapper->KeyframesInQueue() < 3;
+				return localMapper_->KeyframesInQueue() < 3;
 		}
 
 		return false;
 	}
 
 private:
-	Map* map_;
+	const Map* map_;
 	const LocalMap& localMap_;
+	const Relocalizer& relocalizer_;
+	LocalMapping* localMapper_;
 	Parameters param_;
 	int sensor_;
 };
@@ -599,187 +785,6 @@ static void CreateMapPointsVO(Frame& lastFrame, std::list<MapPoint*>& tempPoints
 	}
 }
 
-class Relocalizer
-{
-public:
-
-	Relocalizer(KeyFrameDatabase* keyFrameDB) : keyFrameDB_(keyFrameDB), lastRelocFrameId_(0) {}
-
-	bool Relocalize(Frame& currFrame)
-	{
-		// Compute Bag of Words Vector
-		currFrame.ComputeBoW();
-
-		// Relocalization is performed when tracking is lost
-		// Track Lost: Query KeyFrame Database for keyframe candidates for relocalisation
-		std::vector<KeyFrame*> candidateKFs = keyFrameDB_->DetectRelocalizationCandidates(&currFrame);
-
-		if (candidateKFs.empty())
-			return false;
-
-		const int nkeyframes = static_cast<int>(candidateKFs.size());
-
-		// We perform first an ORB matching with each candidate
-		// If enough matches are found we setup a PnP solver
-		ORBmatcher matcher(0.75f, true);
-
-		std::vector<PnPsolver*> PnPsolvers;
-		PnPsolvers.resize(nkeyframes);
-
-		std::vector<std::vector<MapPoint*>> vmatches;
-		vmatches.resize(nkeyframes);
-
-		std::vector<bool> discarded;
-		discarded.resize(nkeyframes);
-
-		int ncandidates = 0;
-
-		for (int i = 0; i < nkeyframes; i++)
-		{
-			KeyFrame* keyframe = candidateKFs[i];
-			if (keyframe->isBad())
-			{
-				discarded[i] = true;
-			}
-			else
-			{
-				const int nmatches = matcher.SearchByBoW(keyframe, currFrame, vmatches[i]);
-				if (nmatches < 15)
-				{
-					discarded[i] = true;
-					continue;
-				}
-				else
-				{
-					PnPsolver* solver = new PnPsolver(currFrame, vmatches[i]);
-					solver->SetRansacParameters(0.99, 10, 300, 4, 0.5f, 5.991f);
-					PnPsolvers[i] = solver;
-					ncandidates++;
-				}
-			}
-		}
-
-		// Alternatively perform some iterations of P4P RANSAC
-		// Until we found a camera pose supported by enough inliers
-		bool found = false;
-		ORBmatcher matcher2(0.9f, true);
-
-		while (ncandidates > 0 && !found)
-		{
-			for (int i = 0; i < nkeyframes; i++)
-			{
-				if (discarded[i])
-					continue;
-
-				// Perform 5 Ransac Iterations
-				std::vector<bool> isInlier;
-				int nInliers;
-				bool terminate;
-
-				PnPsolver* solver = PnPsolvers[i];
-				const cv::Mat Tcw = solver->iterate(5, terminate, isInlier, nInliers);
-
-				// If Ransac reachs max. iterations discard keyframe
-				if (terminate)
-				{
-					discarded[i] = true;
-					ncandidates--;
-				}
-
-				// If a Camera Pose is computed, optimize
-				if (!Tcw.empty())
-				{
-					currFrame.SetPose(CameraPose(Tcw));
-
-					std::set<MapPoint*> foundPoints;
-
-					const int np = static_cast<int>(isInlier.size());
-
-					for (int j = 0; j < np; j++)
-					{
-						if (isInlier[j])
-						{
-							currFrame.mappoints[j] = vmatches[i][j];
-							foundPoints.insert(vmatches[i][j]);
-						}
-						else
-							currFrame.mappoints[j] = nullptr;
-					}
-
-					int ngood = Optimizer::PoseOptimization(&currFrame);
-
-					if (ngood < 10)
-						continue;
-
-					for (int io = 0; io < currFrame.N; io++)
-						if (currFrame.outlier[io])
-							currFrame.mappoints[io] = nullptr;
-
-					// If few inliers, search by projection in a coarse window and optimize again
-					if (ngood < 50)
-					{
-						int nadditional = matcher2.SearchByProjection(currFrame, candidateKFs[i], foundPoints, 10, 100);
-
-						if (nadditional + ngood >= 50)
-						{
-							ngood = Optimizer::PoseOptimization(&currFrame);
-
-							// If many inliers but still not enough, search by projection again in a narrower window
-							// the camera has been already optimized with many points
-							if (ngood > 30 && ngood < 50)
-							{
-								foundPoints.clear();
-								for (int ip = 0; ip < currFrame.N; ip++)
-									if (currFrame.mappoints[ip])
-										foundPoints.insert(currFrame.mappoints[ip]);
-								nadditional = matcher2.SearchByProjection(currFrame, candidateKFs[i], foundPoints, 3, 64);
-
-								// Final optimization
-								if (ngood + nadditional >= 50)
-								{
-									ngood = Optimizer::PoseOptimization(&currFrame);
-
-									for (int io = 0; io < currFrame.N; io++)
-										if (currFrame.outlier[io])
-											currFrame.mappoints[io] = nullptr;
-								}
-							}
-						}
-					}
-
-
-					// If the pose is supported by enough inliers stop ransacs and continue
-					if (ngood >= 50)
-					{
-						found = true;
-						break;
-					}
-				}
-			}
-		}
-
-		if (!found)
-		{
-			return false;
-		}
-		else
-		{
-			lastRelocFrameId_ = currFrame.id;
-			return true;
-		}
-	}
-
-	frameid_t GetLastRelocFrameId() const
-	{
-		return lastRelocFrameId_;
-	}
-
-private:
-
-	KeyFrameDatabase* keyFrameDB_;
-	frameid_t lastRelocFrameId_;
-};
-
 class InitialPoseEstimator
 {
 
@@ -952,7 +957,7 @@ public:
 		: state_(STATE_NO_IMAGES), sensor_(sensor), localization_(false), voc_(voc), keyFrameDB_(keyFrameDB),
 		initializer_(nullptr), localMap_(map), system_(system), map_(map), param_(param), relocalizer_(keyFrameDB),
 		initPose_(map, localMap_, relocalizer_, trajectory_, sensor, param.thDepth),
-		newKeyFrameCondition_(map, localMap_, param, sensor)
+		needNewKeyFrame_(map, localMap_, relocalizer_, param, sensor)
 	{
 	}
 
@@ -1284,8 +1289,7 @@ public:
 			initPose_.DeleteTemporalMapPoints();
 
 			// Check if we need to insert a new keyframe
-			if (!localization_ && newKeyFrameCondition_.Satisfy(currFrame, localMapper_.get(), matchesInliers_,
-				relocalizer_.GetLastRelocFrameId(), lastKeyFrame_->frameId))
+			if (!localization_ && needNewKeyFrame_(currFrame, lastKeyFrame_, matchesInliers_))
 			{
 				if (localMapper_->SetNotStop(true))
 				{
@@ -1349,6 +1353,7 @@ public:
 	void SetLocalMapper(const std::shared_ptr<LocalMapping>& localMapper) override
 	{
 		localMapper_ = localMapper;
+		needNewKeyFrame_.SetLocalMapper(localMapper.get());
 	}
 
 	void SetLoopClosing(const std::shared_ptr<LoopClosing>& loopClosing) override
@@ -1468,7 +1473,7 @@ private:
 
 	InitialPoseEstimator initPose_;
 
-	NewKeyFrameCondition newKeyFrameCondition_;
+	NeedNewKeyFrame needNewKeyFrame_;
 
 	// Number of observations associated to Map Points (for visualization)
 	std::vector<int> nobservations_;
