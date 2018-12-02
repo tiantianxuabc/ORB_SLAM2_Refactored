@@ -54,8 +54,8 @@ static inline float RadiusByViewingCos(float viewCos) { return viewCos > 0.998 ?
 static inline float NormSq(float x, float y) { return x * x + y * y; }
 static inline float NormSq(float x, float y, float z) { return x * x + y * y + z * z; }
 template <typename T> static inline T InvalidMatch() { return 0; }
-template <> static inline MapPoint* InvalidMatch<MapPoint*>() { return nullptr; }
-template <> static inline int InvalidMatch<int>() { return -1; }
+template <> inline MapPoint* InvalidMatch<MapPoint*>() { return nullptr; }
+template <> inline int InvalidMatch<int>() { return -1; }
 
 static int PatchDistance(const cv::Mat1b& patchL, const cv::Mat1b& patchR)
 {

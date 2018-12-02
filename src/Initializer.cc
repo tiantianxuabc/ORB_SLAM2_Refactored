@@ -839,7 +839,7 @@ int Initializer::CheckRT(const cv::Mat &R, const cv::Mat &t, const std::vector<c
 
         Triangulate(kp1,kp2,P1,P2,p3dC1);
 
-        if(!isfinite(p3dC1.at<float>(0)) || !isfinite(p3dC1.at<float>(1)) || !isfinite(p3dC1.at<float>(2)))
+        if(!std::isfinite(p3dC1.at<float>(0)) || !std::isfinite(p3dC1.at<float>(1)) || !std::isfinite(p3dC1.at<float>(2)))
         {
             vbGood[vMatches12[i].first]=false;
             continue;

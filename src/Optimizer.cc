@@ -130,19 +130,27 @@ static void SetXw(EDGE* e, const Point3D& Xw)
 	e->Xw[2] = Xw(2);
 }
 
+template <class T> struct get_elem_type {};
+template <> struct get_elem_type<Eigen::Matrix3d> { using type = double; };
+template <> struct get_elem_type<CameraPose::Mat33> { using type = float; };
+template <> struct get_elem_type<Eigen::Vector3d> { using type = double; };
+template <> struct get_elem_type<CameraPose::Mat31> { using type = float; };
+
 template <class R2, class R1>
 static R2 ConvertRotation(const R1& src)
 {
+	using dst_elem_type = typename get_elem_type<R2>::type;
 	R2 dst;
-	for (int i = 0; i < 3; i++) for (int j = 0; j < 3; j++) dst(i, j) = static_cast<typename R2::value_type>(src(i, j));
+	for (int i = 0; i < 3; i++) for (int j = 0; j < 3; j++) dst(i, j) = static_cast<dst_elem_type>(src(i, j));
 	return dst;
 }
 
 template <class T2, class T1>
 static T2 ConvertTranslation(const T1& src)
 {
+	using dst_elem_type = typename get_elem_type<T2>::type;
 	T2 dst;
-	for (int i = 0; i < 3; i++) dst(i) = static_cast<typename T2::value_type>(src(i));
+	for (int i = 0; i < 3; i++) dst(i) = static_cast<dst_elem_type>(src(i));
 	return dst;
 }
 

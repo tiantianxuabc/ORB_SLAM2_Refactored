@@ -82,7 +82,7 @@ class LocalMappingImpl : public LocalMapping
 {
 public:
 
-	LocalMappingImpl::LocalMappingImpl(Map* map, bool monocular, float thDepth) :
+	LocalMappingImpl(Map* map, bool monocular, float thDepth) :
 		monocular_(monocular), resetRequested_(false), finishRequested_(false), finished_(true), map_(map),
 		abortBA_(false), stopped_(false), stopRequested_(false), notStop_(false), acceptKeyFrames_(true), thDepth_(thDepth)
 	{
