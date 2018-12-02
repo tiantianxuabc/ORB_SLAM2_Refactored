@@ -136,15 +136,15 @@ static void ConvertToGray(const cv::Mat& src, cv::Mat& dst, bool RGB)
 	cv::cvtColor(src, dst, codes[idx]);
 }
 
-static void GetScalePyramidInfo(const ORBextractor* extractor, ScalePyramidInfo& pyramid)
+static void GetScalePyramidInfo(const ORBextractor& extractor, ScalePyramidInfo& pyramid)
 {
-	pyramid.nlevels = extractor->GetLevels();
-	pyramid.scaleFactor = extractor->GetScaleFactor();
+	pyramid.nlevels = extractor.GetLevels();
+	pyramid.scaleFactor = extractor.GetScaleFactor();
 	pyramid.logScaleFactor = log(pyramid.scaleFactor);
-	pyramid.scaleFactors = extractor->GetScaleFactors();
-	pyramid.invScaleFactors = extractor->GetInverseScaleFactors();
-	pyramid.sigmaSq = extractor->GetScaleSigmaSquares();
-	pyramid.invSigmaSq = extractor->GetInverseScaleSigmaSquares();
+	pyramid.scaleFactors = extractor.GetScaleFactors();
+	pyramid.invScaleFactors = extractor.GetInverseScaleFactors();
+	pyramid.sigmaSq = extractor.GetScaleSigmaSquares();
+	pyramid.invSigmaSq = extractor.GetInverseScaleSigmaSquares();
 }
 
 // Undistort keypoints given OpenCV distortion parameters.
@@ -222,7 +222,7 @@ class ModeManager
 {
 public:
 
-	ModeManager(const std::shared_ptr<Tracking>& tracker, const std::shared_ptr<LocalMapping>& localMapper)
+	ModeManager(Tracking* tracker, LocalMapping* localMapper)
 		: tracker_(tracker), localMapper_(localMapper), activateLocalizationMode_(false), deactivateLocalizationMode_(false) {}
 
 	void Update()
@@ -262,8 +262,8 @@ public:
 	}
 
 private:
-	std::shared_ptr<Tracking> tracker_;
-	std::shared_ptr<LocalMapping> localMapper_;
+	Tracking* tracker_;
+	LocalMapping* localMapper_;
 	// Change mode flags
 	mutable std::mutex mutexMode_;
 	bool activateLocalizationMode_;
@@ -385,10 +385,10 @@ public:
 		}
 
 		// Scale Level Info
-		GetScalePyramidInfo(extractorL_.get(), pyramid_);
+		GetScalePyramidInfo(*extractorL_, pyramid_);
 		
 		//Create KeyFrame Database
-		keyFrameDB_ = std::make_shared<KeyFrameDatabase>(voc_);
+		keyFrameDB_ = std::make_unique<KeyFrameDatabase>(voc_);
 
 		//Initialize the Tracking thread
 		//(it will live in the main thread of execution, the one that called this constructor)
@@ -397,31 +397,31 @@ public:
 
 		//Initialize the Local Mapping thread and launch
 		localMapper_ = LocalMapping::Create(&map_, sensor_ == MONOCULAR, thDepth);
-		threads_[THREAD_LOCAL_MAPPING] = std::thread(&ORB_SLAM2::LocalMapping::Run, localMapper_);
+		threads_[THREAD_LOCAL_MAPPING] = std::thread(&ORB_SLAM2::LocalMapping::Run, localMapper_.get());
 
 		//Initialize the Loop Closing thread and launch
 		loopCloser_ = LoopClosing::Create(&map_, keyFrameDB_.get(), &voc_, sensor_ != MONOCULAR);
-		threads_[THREAD_LOOP_CLOSING] = std::thread(&ORB_SLAM2::LoopClosing::Run, loopCloser_);
+		threads_[THREAD_LOOP_CLOSING] = std::thread(&ORB_SLAM2::LoopClosing::Run, loopCloser_.get());
 
 		//Initialize the Viewer thread and launch
 		if (useViewer)
 		{
-			viewer_ = std::make_shared<Viewer>(this, &map_, settingsFile);
-			threads_[THREAD_VIEWER] = std::thread(&Viewer::Run, viewer_);
+			viewer_ = std::make_unique<Viewer>(this, &map_, settingsFile);
+			threads_[THREAD_VIEWER] = std::thread(&Viewer::Run, viewer_.get());
 		}
 
 		//Set pointers between threads
-		tracker_->SetLocalMapper(localMapper_);
-		tracker_->SetLoopClosing(loopCloser_);
+		tracker_->SetLocalMapper(localMapper_.get());
+		tracker_->SetLoopClosing(loopCloser_.get());
 
-		localMapper_->SetTracker(tracker_);
-		localMapper_->SetLoopCloser(loopCloser_);
+		localMapper_->SetTracker(tracker_.get());
+		localMapper_->SetLoopCloser(loopCloser_.get());
 
-		loopCloser_->SetTracker(tracker_);
-		loopCloser_->SetLocalMapper(localMapper_);
+		loopCloser_->SetTracker(tracker_.get());
+		loopCloser_->SetLocalMapper(localMapper_.get());
 
-		resetManager_ = std::make_shared<ResetManager>(this);
-		modeManager_ = std::make_shared<ModeManager>(tracker_, localMapper_);
+		resetManager_ = std::make_unique<ResetManager>(this);
+		modeManager_ = std::make_unique<ModeManager>(tracker_.get(), localMapper_.get());
 	}
 
 	// Proccess the given stereo frame. Images must be synchronized and rectified.
@@ -883,7 +883,7 @@ private:
 	ORBVocabulary voc_;
 
 	// KeyFrame database for place recognition (relocalization and loop detection).
-	std::shared_ptr<KeyFrameDatabase> keyFrameDB_;
+	std::unique_ptr<KeyFrameDatabase> keyFrameDB_;
 
 	// Map structure that stores the pointers to all KeyFrames and MapPoints.
 	Map map_;
@@ -891,17 +891,17 @@ private:
 	// Tracker. It receives a frame and computes the associated camera pose.
 	// It also decides when to insert a new keyframe, create some new MapPoints and
 	// performs relocalization if tracking fails.
-	std::shared_ptr<Tracking> tracker_;
+	std::unique_ptr<Tracking> tracker_;
 
 	// Local Mapper. It manages the local map and performs local bundle adjustment.
-	std::shared_ptr<LocalMapping> localMapper_;
+	std::unique_ptr<LocalMapping> localMapper_;
 
 	// Loop Closer. It searches loops with every new keyframe. If there is a loop it performs
 	// a pose graph optimization and full bundle adjustment (in a new thread) afterwards.
-	std::shared_ptr<LoopClosing> loopCloser_;
+	std::unique_ptr<LoopClosing> loopCloser_;
 
 	// The viewer draws the map and the current camera pose. It uses Pangolin.
-	std::shared_ptr<Viewer> viewer_;
+	std::unique_ptr<Viewer> viewer_;
 
 	// System threads: Local Mapping, Loop Closing, Viewer.
 	// The Tracking thread "lives" in the main execution thread that creates the System object.
@@ -909,10 +909,10 @@ private:
 	std::thread threads_[NUM_THREADS];
 
 	// Reset flag
-	std::shared_ptr<ResetManager> resetManager_;
+	std::unique_ptr<ResetManager> resetManager_;
 
 	// Change mode flags
-	std::shared_ptr<ModeManager> modeManager_;
+	std::unique_ptr<ModeManager> modeManager_;
 
 	// Tracking state
 	int trackingState_;

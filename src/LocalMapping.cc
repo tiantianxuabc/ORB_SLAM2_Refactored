@@ -80,14 +80,14 @@ public:
 	{
 	}
 
-	void SetLoopCloser(const std::shared_ptr<LoopClosing>& loopCloser) override
-	{
-		loopCloser_ = loopCloser;
-	}
-
-	void SetTracker(const std::shared_ptr<Tracking>& tracker) override
+	void SetTracker(Tracking* tracker) override
 	{
 		tracker_ = tracker;
+	}
+
+	void SetLoopCloser(LoopClosing* loopCloser) override
+	{
+		loopCloser_ = loopCloser;
 	}
 
 	void Update()
@@ -732,8 +732,8 @@ private:
 
 	Map* map_;
 
-	std::shared_ptr<LoopClosing> loopCloser_;
-	std::shared_ptr<Tracking> tracker_;
+	LoopClosing* loopCloser_;
+	Tracking* tracker_;
 
 	std::list<KeyFrame*> newKeyFrames_;
 	std::list<MapPoint*> recentAddedMapPoints_;
@@ -753,9 +753,11 @@ private:
 	mutable std::mutex mutexAccept_;
 };
 
-std::shared_ptr<LocalMapping> LocalMapping::Create(Map* map, bool monocular, float thDepth)
+LocalMapping::Pointer LocalMapping::Create(Map* map, bool monocular, float thDepth)
 {
-	return std::make_shared<LocalMappingImpl>(map, monocular, thDepth);
+	return std::make_unique<LocalMappingImpl>(map, monocular, thDepth);
 }
+
+LocalMapping::~LocalMapping() {}
 
 } //namespace ORB_SLAM

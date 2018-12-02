@@ -39,11 +39,13 @@ class LoopClosing
 
 public:
 
-	static std::shared_ptr<LoopClosing> Create(Map* map, KeyFrameDatabase* keyframeDB, ORBVocabulary* voc, bool fixScale);
-	
-	virtual void SetTracker(const std::shared_ptr<Tracking>& tracker) = 0;
+	using Pointer = std::unique_ptr<LoopClosing>;
 
-	virtual void SetLocalMapper(const std::shared_ptr<LocalMapping>& localMapper) = 0;
+	static Pointer Create(Map* map, KeyFrameDatabase* keyframeDB, ORBVocabulary* voc, bool fixScale);
+	
+	virtual void SetTracker(Tracking* tracker) = 0;
+
+	virtual void SetLocalMapper(LocalMapping* localMapper) = 0;
 
 	// Main function
 	virtual void Run() = 0;
@@ -58,6 +60,8 @@ public:
 	virtual void RequestFinish() = 0;
 
 	virtual bool isFinished() const = 0;
+
+	virtual ~LoopClosing();
 };
 
 } // namespace ORB_SLAM

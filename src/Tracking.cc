@@ -1350,13 +1350,13 @@ public:
 		return currFrame.pose.Mat();
 	}
 
-	void SetLocalMapper(const std::shared_ptr<LocalMapping>& localMapper) override
+	void SetLocalMapper(LocalMapping* localMapper) override
 	{
 		localMapper_ = localMapper;
-		needNewKeyFrame_.SetLocalMapper(localMapper.get());
+		needNewKeyFrame_.SetLocalMapper(localMapper);
 	}
 
-	void SetLoopClosing(const std::shared_ptr<LoopClosing>& loopClosing) override
+	void SetLoopClosing(LoopClosing* loopClosing) override
 	{
 		loopClosing_ = loopClosing;
 	}
@@ -1438,8 +1438,8 @@ private:
 	bool localization_;
 
 	//Other Thread Pointers
-	std::shared_ptr<LocalMapping> localMapper_;
-	std::shared_ptr<LoopClosing> loopClosing_;
+	LocalMapping* localMapper_;
+	LoopClosing* loopClosing_;
 
 	//BoW
 	ORBVocabulary* voc_;
@@ -1482,10 +1482,12 @@ private:
 Tracking::Pointer Tracking::Create(System* system, ORBVocabulary* voc, Map* map, KeyFrameDatabase* keyframeDB,
 	int sensor, const Parameters& param)
 {
-	return std::make_shared<TrackingImpl>(system, voc, map, keyframeDB, sensor, param);
+	return std::make_unique<TrackingImpl>(system, voc, map, keyframeDB, sensor, param);
 }
 
 Tracking::Parameters::Parameters(int minFrames, int maxFrames, float thDepth)
 	: minFrames(minFrames), maxFrames(maxFrames), thDepth(thDepth) {}
+
+Tracking::~Tracking() {}
 
 } //namespace ORB_SLAM

@@ -35,12 +35,14 @@ class LocalMapping
 {
 public:
 
-	static std::shared_ptr<LocalMapping> Create(Map* map, bool monocular, float thDepth);
+	using Pointer = std::unique_ptr<LocalMapping>;
 
-	virtual void SetLoopCloser(const std::shared_ptr<LoopClosing>& loopCloser) = 0;
+	static Pointer Create(Map* map, bool monocular, float thDepth);
 
-	virtual void SetTracker(const std::shared_ptr<Tracking>& tracker) = 0;
-
+	virtual void SetTracker(Tracking* tracker) = 0;
+	
+	virtual void SetLoopCloser(LoopClosing* loopCloser) = 0;
+	
 	// Main function
 	virtual void Run() = 0;
 
@@ -63,6 +65,8 @@ public:
 	virtual bool isFinished() const = 0;
 
 	virtual int KeyframesInQueue() const = 0;
+
+	virtual ~LocalMapping();
 };
 
 } //namespace ORB_SLAM

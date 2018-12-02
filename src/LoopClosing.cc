@@ -703,16 +703,16 @@ public:
 	{
 	}
 
-	void SetTracker(const std::shared_ptr<Tracking>& tracker) override
+	void SetTracker(Tracking* tracker) override
 	{
 		tracker_ = tracker;
 	}
 
-	void SetLocalMapper(const std::shared_ptr<LocalMapping>& localMapper) override
+	void SetLocalMapper(LocalMapping* localMapper) override
 	{
 		localMapper_ = localMapper;
-		GBA_.SetLocalMapper(localMapper.get());
-		corrector_.SetLocalMapper(localMapper.get());
+		GBA_.SetLocalMapper(localMapper);
+		corrector_.SetLocalMapper(localMapper);
 	}
 
 	// Main function
@@ -850,8 +850,8 @@ private:
 	bool finished_;
 	frameid_t lastLoopKFId_;
 
-	std::shared_ptr<Tracking> tracker_;
-	std::shared_ptr<LocalMapping> localMapper_;
+	Tracking* tracker_;
+	LocalMapping* localMapper_;
 
 	std::list<KeyFrame*> keyFrameQueue_;
 
@@ -868,9 +868,11 @@ private:
 	mutable std::mutex mutexLoopQueue_;
 };
 
-std::shared_ptr<LoopClosing> LoopClosing::Create(Map* map, KeyFrameDatabase* keyframeDB, ORBVocabulary* voc, bool fixScale)
+LoopClosing::Pointer LoopClosing::Create(Map* map, KeyFrameDatabase* keyframeDB, ORBVocabulary* voc, bool fixScale)
 {
-	return std::make_shared<LoopClosingImpl>(map, keyframeDB, voc, fixScale);
+	return std::make_unique<LoopClosingImpl>(map, keyframeDB, voc, fixScale);
 }
+
+LoopClosing::~LoopClosing() {}
 
 } //namespace ORB_SLAM

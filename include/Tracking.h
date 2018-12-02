@@ -56,7 +56,7 @@ class Tracking
 
 public:
 
-	using Pointer = std::shared_ptr<Tracking>;
+	using Pointer = std::unique_ptr<Tracking>;
 
 	// Tracking states
 	enum State
@@ -86,8 +86,8 @@ public:
 		int sensor, const Parameters& param);
 
 	virtual cv::Mat Update(Frame& currFrame) = 0;
-	virtual void SetLocalMapper(const std::shared_ptr<LocalMapping>& localMapper) = 0;
-	virtual void SetLoopClosing(const std::shared_ptr<LoopClosing>& loopClosing) = 0;
+	virtual void SetLocalMapper(LocalMapping* localMapper) = 0;
+	virtual void SetLoopClosing(LoopClosing* loopClosing) = 0;
 
 	// Use this function if you have deactivated local mapping and you only want to localize the camera.
 	virtual void InformOnlyTracking(bool flag) = 0;
@@ -107,6 +107,8 @@ public:
 
 	// True if local mapping is deactivated and we are performing only localization
 	virtual bool OnlyTracking() const = 0;
+
+	virtual ~Tracking();
 };
 
 } //namespace ORB_SLAM
