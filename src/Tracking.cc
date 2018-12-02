@@ -1241,16 +1241,15 @@ public:
 		// the camera we will use the local map again.
 		if (success && (!localization_ || (localization_ && !initPose_.FewMatches())))
 		{
-			const int lastRelocFrameId = relocalizer_.GetLastRelocFrameId();
 			// If the camera has been relocalised recently, perform a coarser search
-			const bool relocalizedRecently = currFrame.PassedFrom(lastRelocFrameId) < 2;
-			const float th = relocalizedRecently ? 5.f : (sensor_ == System::RGBD ? 3.f : 1.f);
+			const int passedFromLastReloc = currFrame.PassedFrom(relocalizer_.GetLastRelocFrameId());
+			const float th = passedFromLastReloc < 2 ? 5.f : (sensor_ == System::RGBD ? 3.f : 1.f);
 
 			matchesInliers_ = TrackLocalMap(localMap_, currFrame, th, localization_, sensor_ == System::STEREO);
 
 			// Decide if the tracking was succesful
 			// More restrictive if there was a relocalization recently
-			const int minInliers = currFrame.PassedFrom(lastRelocFrameId) < param_.maxFrames ? 50 : 30;
+			const int minInliers = passedFromLastReloc < param_.maxFrames ? 50 : 30;
 			success = matchesInliers_ >= minInliers;
 		}
 
