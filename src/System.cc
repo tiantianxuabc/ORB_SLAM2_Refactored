@@ -25,8 +25,8 @@
 
 #include "Frame.h"
 #include "KeyFrame.h"
-#include "Tracking.h"
 #include "Map.h"
+#include "Tracking.h"
 #include "LocalMapping.h"
 #include "LoopClosing.h"
 #include "KeyFrameDatabase.h"
