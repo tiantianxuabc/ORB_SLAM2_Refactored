@@ -29,6 +29,7 @@ namespace ORB_SLAM2
 using Point2D = cv::Point2f;
 using Point3D = cv::Matx31f;
 using Vec3D = cv::Matx31f;
+using KeyPoints = std::vector<cv::KeyPoint>;
 
 } // namespace ORB_SLAM2
 

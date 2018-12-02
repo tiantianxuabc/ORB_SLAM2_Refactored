@@ -31,11 +31,11 @@
 #include "KeyFrame.h"
 #include "Frame.h"
 #include "Sim3.h"
+#include "Point.h"
 
 namespace ORB_SLAM2
 {
 
-using KeyPoints = std::vector<cv::KeyPoint>;
 using Pyramid = std::vector<cv::Mat>;
 
 void ComputeStereoMatches(

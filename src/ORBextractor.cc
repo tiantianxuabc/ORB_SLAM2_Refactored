@@ -64,9 +64,6 @@
 namespace ORB_SLAM2
 {
 
-using KeyPoints = std::vector<cv::KeyPoint>;
-using Pyramid = std::vector<cv::Mat>;
-
 const int PATCH_SIZE = 31;
 const int HALF_PATCH_SIZE = 15;
 const int EDGE_THRESHOLD = 19;
