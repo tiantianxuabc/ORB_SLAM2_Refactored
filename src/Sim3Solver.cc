@@ -32,6 +32,8 @@
 #include "MapPoint.h"
 #include "CameraPose.h"
 
+#define COMPUTE_ROTATION_SVD
+
 namespace ORB_SLAM2
 {
 
@@ -45,6 +47,22 @@ static void ComputeCentroid(const cv::Mat& P, cv::Mat& Pr, cv::Mat& C)
 		Pr.col(i) = P.col(i) - C;
 	}
 }
+
+#ifdef COMPUTE_ROTATION_SVD
+
+static void ComputeRotation(cv::Mat1f& M, cv::Matx33f& R)
+{
+	cv::Mat1f w, U, Vh;
+	cv::SVD::compute(M.t(), w, U, Vh, cv::SVD::MODIFY_A | cv::SVD::FULL_UV);
+	cv::Mat1f S = cv::Mat1f::eye(3, 3);
+	if (cv::determinant(U) * cv::determinant(Vh) < 0)
+		S(2, 2) = -1.f;
+
+	cv::Mat1f _R = U * S * Vh;
+	R = cv::Matx33f(_R);
+}
+
+#else
 
 static void ComputeRotation(const cv::Mat1f& M, cv::Mat& R)
 {
@@ -88,17 +106,7 @@ static void ComputeRotation(const cv::Mat1f& M, cv::Mat& R)
 	cv::Rodrigues(vec, R); // computes the rotation matrix from angle-axis
 }
 
-static void ComputeRotationSVD(cv::Mat1f& M, cv::Matx33f& R)
-{
-	cv::Mat1f w, U, Vh;
-	cv::SVD::compute(M.t(), w, U, Vh, cv::SVD::MODIFY_A | cv::SVD::FULL_UV);
-	cv::Mat1f S = cv::Mat1f::eye(3, 3);
-	if (cv::determinant(U) * cv::determinant(Vh) < 0)
-		S(2, 2) = -1.f;
-
-	cv::Mat1f _R = U * S * Vh;
-	R = cv::Matx33f(_R);
-}
+#endif // COMPUTE_ROTATION_SVD
 
 static void ComputeSim3(const cv::Mat& P1, const cv::Mat& P2, Sim3& S12, Sim3& S21, bool fixScale)
 {
@@ -124,7 +132,7 @@ static void ComputeSim3(const cv::Mat& P1, const cv::Mat& P2, Sim3& S12, Sim3& S
 
 	// Step 3 ~ Step 4: Compute Rotation matrix
 	cv::Matx33f R12;
-	ComputeRotationSVD(M, R12);
+	ComputeRotation(M, R12);
 
 	// Step 5: Rotate set 2
 

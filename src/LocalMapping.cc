@@ -40,14 +40,6 @@
 namespace ORB_SLAM2
 {
 
-static cv::Mat SkewSymmetricMatrix(const cv::Mat1f& v)
-{
-	return (cv::Mat1f(3, 3) << 
-		    0, -v(2),  v(1),
-		 v(2),     0, -v(0),
-		-v(1),  v(0),    0);
-}
-
 static inline cv::Matx33f SkewSymmetricMatrix(const Vec3D& v)
 {
 	const float x = v(0);

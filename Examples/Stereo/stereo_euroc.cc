@@ -118,8 +118,6 @@ int main(int argc, char* argv[])
 		return 1;
 	}
 
-	const bool syncWithStamp = false;
-
 	// Load sequence
 	std::vector<std::string> ILs, IRs;
 	std::vector<double> timestamps;

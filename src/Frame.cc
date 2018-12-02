@@ -157,8 +157,8 @@ Frame::Frame(const Frame& frame)
 	: voc(frame.voc), timestamp(frame.timestamp), camera(frame.camera), N(frame.N),
 	keypoints(frame.keypoints), keypointsUn(frame.keypointsUn), uright(frame.uright), depth(frame.depth),
 	bowVector(frame.bowVector), featureVector(frame.featureVector), descriptors(frame.descriptors.clone()),
-	mappoints(frame.mappoints), outlier(frame.outlier), id(frame.id), referenceKF(frame.referenceKF),
-	pyramid(frame.pyramid), grid(frame.grid), imageBounds(frame.imageBounds)
+	mappoints(frame.mappoints), outlier(frame.outlier), grid(frame.grid), id(frame.id), referenceKF(frame.referenceKF),
+	pyramid(frame.pyramid), imageBounds(frame.imageBounds)
 {
 	if (!frame.pose.Empty())
 		SetPose(frame.pose);
@@ -168,7 +168,7 @@ Frame::Frame(ORBVocabulary* voc, double timestamp, const CameraParams& camera, c
 	const std::vector<cv::KeyPoint>& keypointsUn, const std::vector<float>& uright, const std::vector<float>& depth,
 	const cv::Mat& descriptors, const ScalePyramidInfo& pyramid, const ImageBounds& imageBounds)
 	: voc(voc), timestamp(timestamp), camera(camera), keypoints(keypoints), keypointsUn(keypointsUn), uright(uright),
-	depth(depth), descriptors(descriptors.clone()), pyramid(pyramid), imageBounds(imageBounds), referenceKF(nullptr)
+	depth(depth), descriptors(descriptors.clone()), referenceKF(nullptr), pyramid(pyramid), imageBounds(imageBounds)
 {
 	// Frame ID
 	id = nextId++;
@@ -184,7 +184,7 @@ Frame::Frame(ORBVocabulary* voc, double timestamp, const CameraParams& camera, c
 Frame::Frame(ORBVocabulary* voc, double timestamp, const CameraParams& camera, const std::vector<cv::KeyPoint>& keypoints,
 	const std::vector<cv::KeyPoint>& keypointsUn, const cv::Mat& descriptors, const ScalePyramidInfo& pyramid, const ImageBounds& imageBounds)
 	: voc(voc), timestamp(timestamp), camera(camera), keypoints(keypoints), keypointsUn(keypointsUn),
-	descriptors(descriptors.clone()), pyramid(pyramid), imageBounds(imageBounds), referenceKF(nullptr)
+	descriptors(descriptors.clone()), referenceKF(nullptr), pyramid(pyramid), imageBounds(imageBounds)
 {
 	// Frame ID
 	id = nextId++;
