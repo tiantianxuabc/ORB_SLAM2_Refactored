@@ -42,9 +42,9 @@ static inline Vec3D Normalized(const Vec3D& v)
 MapPoint::mappointid_t MapPoint::nextId = 0;
 
 MapPoint::MapPoint(const Point3D& Xw, KeyFrame* referenceKF, Map* map) :
-	firstKFid(referenceKF->id), firstFrame(referenceKF->frameId), nobservations_(0), trackReferenceForFrame(0),
-	lastFrameSeen(0), BALocalForKF(0), fuseCandidateForKF(0), loopPointForKF(0), correctedByKF(0),
-	correctedReference(0), BAGlobalForKF(0), referenceKF_(referenceKF), nvisible_(1), nfound_(1), bad_(false),
+	firstKFid(referenceKF->id), firstFrame(referenceKF->frameId), trackReferenceForFrame(0), lastFrameSeen(0),
+	BALocalForKF(0), fuseCandidateForKF(0), loopPointForKF(0), correctedByKF(0),
+	correctedReference(0), BAGlobalForKF(0), nobservations_(0), referenceKF_(referenceKF), nvisible_(1), nfound_(1), bad_(false),
 	replaced_(nullptr), minDistance_(0), maxDistance_(0), map_(map)
 {
 	Xw_ = Xw;
@@ -56,9 +56,9 @@ MapPoint::MapPoint(const Point3D& Xw, KeyFrame* referenceKF, Map* map) :
 }
 
 MapPoint::MapPoint(const Point3D& Xw, Map* map, Frame* frame, int idx) :
-	firstKFid(-1), firstFrame(frame->id), nobservations_(0), trackReferenceForFrame(0), lastFrameSeen(0),
+	firstKFid(-1), firstFrame(frame->id), trackReferenceForFrame(0), lastFrameSeen(0),
 	BALocalForKF(0), fuseCandidateForKF(0), loopPointForKF(0), correctedByKF(0),
-	correctedReference(0), BAGlobalForKF(0), referenceKF_(nullptr), nvisible_(1),
+	correctedReference(0), BAGlobalForKF(0), nobservations_(0), referenceKF_(nullptr), nvisible_(1),
 	nfound_(1), bad_(false), replaced_(nullptr), map_(map)
 {
 
