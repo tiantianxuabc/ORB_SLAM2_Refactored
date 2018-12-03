@@ -223,13 +223,14 @@ void MapDrawer::GetCurrentOpenGLCameraMatrix(pangolin::OpenGlMatrix& M) const
 {
 	if (!cameraPose_.empty())
 	{
-		cv::Mat1f Rwc(3, 3);
-		cv::Mat1f twc(3, 1);
+		CameraPose Tcw;
 		{
 			std::unique_lock<std::mutex> lock(mutexCamera_);
-			Rwc = GetR(cameraPose_).t();
-			twc = -Rwc * Gett(cameraPose_);
+			Tcw = CameraPose(cameraPose_);
 		}
+
+		const auto Rwc = Tcw.InvR();
+		const auto twc = Tcw.Invt();
 
 		M.m[0] = Rwc(0, 0);
 		M.m[1] = Rwc(1, 0);

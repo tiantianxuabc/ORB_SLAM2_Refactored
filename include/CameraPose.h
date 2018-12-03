@@ -26,9 +26,6 @@
 namespace ORB_SLAM2
 {
 
-static inline cv::Mat GetR(const cv::Mat& T) { return T(cv::Range(0, 3), cv::Range(0, 3)); }
-static inline cv::Mat Gett(const cv::Mat& T) { return T(cv::Range(0, 3), cv::Range(3, 4)); }
-
 class CameraPose
 {
 public:
