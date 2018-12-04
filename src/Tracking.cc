@@ -1030,10 +1030,7 @@ public:
 				for (size_t i = 0; i < currFrame.keypointsUn.size(); i++)
 					prevMatched_[i] = currFrame.keypointsUn[i].pt;
 
-				if (initializer_)
-					delete initializer_;
-
-				initializer_ = new Initializer(currFrame, 1.0, 200);
+				initializer_.reset(new Initializer(currFrame, 1.0, 200));
 
 				fill(initMatches_.begin(), initMatches_.end(), -1);
 
@@ -1045,8 +1042,7 @@ public:
 			// Try to initialize
 			if ((int)currFrame.keypoints.size() <= 100)
 			{
-				delete initializer_;
-				initializer_ = static_cast<Initializer*>(NULL);
+				initializer_.reset(nullptr);
 				fill(initMatches_.begin(), initMatches_.end(), -1);
 				return;
 			}
@@ -1058,8 +1054,7 @@ public:
 			// Check if there are enough correspondences
 			if (nmatches < 100)
 			{
-				delete initializer_;
-				initializer_ = static_cast<Initializer*>(NULL);
+				initializer_.reset(nullptr);
 				return;
 			}
 
@@ -1369,13 +1364,7 @@ public:
 	void Reset() override
 	{
 		state_ = STATE_NO_IMAGES;
-
-		if (initializer_)
-		{
-			delete initializer_;
-			initializer_ = nullptr;
-		}
-
+		initializer_.reset(nullptr);
 		trajectory_.clear();
 	}
 
@@ -1446,7 +1435,7 @@ private:
 	KeyFrameDatabase* keyFrameDB_;
 
 	// Initalization (only for monocular)
-	Initializer* initializer_;
+	std::unique_ptr<Initializer> initializer_;
 
 	//Local Map
 	LocalMap localMap_;
