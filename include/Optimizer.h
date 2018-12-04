@@ -44,7 +44,7 @@ void BundleAdjustment(const std::vector<KeyFrame*>& keyframes, const std::vector
 void GlobalBundleAdjustemnt(Map* map, int niterations, bool* stopFlag = nullptr, frameid_t loopKFId = 0,
 	bool robust = true);
 
-void LocalBundleAdjustment(KeyFrame* pKF, bool *pbStopFlag, Map *pMap);
+void LocalBundleAdjustment(KeyFrame* currKeyFrame, bool* stopFlag, Map* map);
 
 int PoseOptimization(Frame* pFrame);
 

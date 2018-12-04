@@ -400,7 +400,7 @@ public:
 						if (child->BAGlobalForKF != loopKFId)
 						{
 							CameraPose Tchildc = child->GetPose() * Twc;
-							child->TcwGBA = Tchildc * keyframe->TcwGBA;//*Tcorc*pKF->mTcwGBA;
+							child->TcwGBA = Tchildc * keyframe->TcwGBA;
 							child->BAGlobalForKF = loopKFId;
 
 						}

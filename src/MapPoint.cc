@@ -332,10 +332,10 @@ int MapPoint::GetIndexInKeyFrame(const KeyFrame* keyframe) const
 	return observations_.count(_keyframe) ? static_cast<int>(observations_.at(_keyframe)) : -1;
 }
 
-bool MapPoint::IsInKeyFrame(KeyFrame *pKF) const
+bool MapPoint::IsInKeyFrame(KeyFrame* keyframe) const
 {
 	LOCK_MUTEX_FEATURES();
-	return observations_.count(pKF) > 0;
+	return observations_.count(keyframe) > 0;
 }
 
 void MapPoint::UpdateNormalAndDepth()
