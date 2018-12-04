@@ -305,7 +305,7 @@ public:
 		// If enough matches are found we setup a PnP solver
 		ORBmatcher matcher(0.75f, true);
 
-		std::vector<PnPsolver*> PnPsolvers;
+		std::vector<std::unique_ptr<PnPsolver>> PnPsolvers;
 		PnPsolvers.resize(nkeyframes);
 
 		std::vector<std::vector<MapPoint*>> vmatches;
@@ -333,9 +333,9 @@ public:
 				}
 				else
 				{
-					PnPsolver* solver = new PnPsolver(currFrame, vmatches[i]);
+					auto solver = std::make_unique<PnPsolver>(currFrame, vmatches[i]);
 					solver->SetRansacParameters(0.99, 10, 300, 4, 0.5f, 5.991f);
-					PnPsolvers[i] = solver;
+					PnPsolvers[i] = std::move(solver);
 					ncandidates++;
 				}
 			}
@@ -358,7 +358,7 @@ public:
 				int nInliers;
 				bool terminate;
 
-				PnPsolver* solver = PnPsolvers[i];
+				auto& solver = PnPsolvers[i];
 				const cv::Mat Tcw = solver->iterate(5, terminate, isInlier, nInliers);
 
 				// If Ransac reachs max. iterations discard keyframe
