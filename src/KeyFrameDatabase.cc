@@ -100,7 +100,6 @@ std::vector<KeyFrame*> KeyFrameDatabase::DetectLoopCandidates(KeyFrame* keyframe
 
 	// Only compare against those keyframes that share enough words
 	int maxCommonWords = 0;
-	//for (list<KeyFrame*>::iterator lit = sharingKFs.begin(), lend = sharingKFs.end(); lit != lend; lit++)
 	for (KeyFrame* sharingKF : wordSharingKFs)
 		maxCommonWords = std::max(maxCommonWords, sharingKF->loopWords);
 

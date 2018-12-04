@@ -271,7 +271,6 @@ void MapPoint::ComputeDistinctiveDescriptors()
 	std::vector<cv::Mat> descriptors;
 	descriptors.reserve(observations.size());
 
-	//for (std::map<KeyFrame*, size_t>::iterator mit = observations.begin(), mend = observations.end(); mit != mend; mit++)
 	for (const auto& observation : observations)
 	{
 		KeyFrame* keyframe = observation.first;

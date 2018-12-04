@@ -270,7 +270,6 @@ void KeyFrame::UpdateConnections()
 	std::vector<WeightAndKeyFrame> pairs;
 	pairs.reserve(KFcounter.size());
 
-	//for (map<KeyFrame*, int>::iterator mit = KFcounter.begin(), mend = KFcounter.end(); mit != mend; mit++)
 	for (const auto& v : KFcounter)
 	{
 		KeyFrame* keyframe = v.first;
