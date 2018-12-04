@@ -1169,7 +1169,6 @@ int ORBmatcher::SearchBySim3(KeyFrame* keyframe1, KeyFrame* keyframe2, std::vect
 
 		int bestDist = std::numeric_limits<int>::max();
 		int bestIdx = -1;
-		//for (vector<size_t>::const_iterator vit = indices.begin(), vend = indices.end(); vit != vend; vit++)
 		for (size_t idx : indices)
 		{
 			const cv::KeyPoint& keypoint2 = keyframe2->keypointsUn[idx];

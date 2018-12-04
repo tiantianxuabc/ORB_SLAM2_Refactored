@@ -1032,7 +1032,7 @@ public:
 
 				initializer_.reset(new Initializer(currFrame, 1.0, 200));
 
-				fill(initMatches_.begin(), initMatches_.end(), -1);
+				std::fill(std::begin(initMatches_), std::end(initMatches_), -1);
 
 				return;
 			}
@@ -1043,7 +1043,7 @@ public:
 			if ((int)currFrame.keypoints.size() <= 100)
 			{
 				initializer_.reset(nullptr);
-				fill(initMatches_.begin(), initMatches_.end(), -1);
+				std::fill(std::begin(initMatches_), std::end(initMatches_), -1);
 				return;
 			}
 

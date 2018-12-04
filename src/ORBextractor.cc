@@ -566,7 +566,7 @@ static void QuadTreeSuppression(const KeyPoints& src, cv::Rect roi, KeyPoints& d
 		pnodes[nodeid]->keypoints.push_back(keypoint);
 	}
 
-	for (auto it = nodes.begin(); it != nodes.end();)
+	for (auto it = std::begin(nodes); it != std::end(nodes);)
 	{
 		if (it->keypoints.empty())
 		{
@@ -590,7 +590,7 @@ static void QuadTreeSuppression(const KeyPoints& src, cv::Rect roi, KeyPoints& d
 		size_t prevSize = nodes.size();
 		divisibles.clear();
 
-		for (auto it = nodes.begin(); it != nodes.end();)
+		for (auto it = std::begin(nodes); it != std::end(nodes);)
 		{
 			if (!it->divisible)
 			{
@@ -613,7 +613,7 @@ static void QuadTreeSuppression(const KeyPoints& src, cv::Rect roi, KeyPoints& d
 				if (child.keypoints.size() > 1)
 				{
 					QTreeNode& front = nodes.front();
-					front.it = nodes.begin();
+					front.it = std::begin(nodes);
 					divisibles.push_back({ child.keypoints.size(), &front });
 				}
 			}
@@ -657,7 +657,7 @@ static void QuadTreeSuppression(const KeyPoints& src, cv::Rect roi, KeyPoints& d
 						if (child.keypoints.size() > 1)
 						{
 							QTreeNode& front = nodes.front();
-							front.it = nodes.begin();
+							front.it = std::begin(nodes);
 							divisibles.push_back({ child.keypoints.size(), &front });
 						}
 					}
