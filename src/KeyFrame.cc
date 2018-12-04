@@ -264,7 +264,7 @@ void KeyFrame::UpdateConnections()
 	//If the counter is greater than threshold add connection
 	//In case no keyframe counter is over threshold add the one with maximum counter
 	int maxCount = 0;
-	KeyFrame* maxKF = NULL;
+	KeyFrame* maxKF = nullptr;
 	const int threshold = 15;
 
 	std::vector<WeightAndKeyFrame> pairs;
