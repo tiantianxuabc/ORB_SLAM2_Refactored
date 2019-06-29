@@ -641,10 +641,7 @@ void Optimizer::LocalBundleAdjustment(KeyFrame* currKeyFrame, bool* stopFlag, Ma
 	if (stopFlag && *stopFlag)
 		doMore = false;
 
-	auto AsMonocular = [](g2o::HyperGraph::Edge* e) { return static_cast<g2o::EdgeSE3ProjectXYZ*>(e); };
-	auto AsStereo = [](g2o::HyperGraph::Edge* e) { return static_cast<g2o::EdgeStereoSE3ProjectXYZ*>(e); };
 	const double maxChi2[2] = { CHI2_MONO, CHI2_STEREO };
-
 	if (doMore)
 	{
 		// Check inlier observations
@@ -654,19 +651,22 @@ void Optimizer::LocalBundleAdjustment(KeyFrame* currKeyFrame, bool* stopFlag, Ma
 				continue;
 
 			g2o::HyperGraph::Edge* e = edges[i];
-
 			const int type = edgeTypes[i];
-			const bool monocular = type == EDGE_MONO;
 
-			const double chi2 = monocular ? AsMonocular(e)->chi2() : AsStereo(e)->chi2();
-			const bool isDepthPositive = monocular ? AsMonocular(e)->isDepthPositive() : AsStereo(e)->isDepthPositive();
-
-			if (chi2 > maxChi2[type] || !isDepthPositive)
+			if (type == EDGE_MONO)
 			{
-				monocular ? AsMonocular(e)->setLevel(1) : AsStereo(e)->setLevel(1);
+				auto _e = static_cast<g2o::EdgeSE3ProjectXYZ*>(e);
+				if (_e->chi2() > maxChi2[type] || !_e->isDepthPositive())
+					_e->setLevel(1);
+				_e->setRobustKernel(0);
 			}
-
-			monocular ? AsMonocular(e)->setRobustKernel(0) : AsStereo(e)->setRobustKernel(0);
+			else
+			{
+				auto _e = static_cast<g2o::EdgeStereoSE3ProjectXYZ*>(e);
+				if (_e->chi2() > maxChi2[type] || !_e->isDepthPositive())
+					_e->setLevel(1);
+				_e->setRobustKernel(0);
+			}
 		}
 
 		// Optimize again without the outliers
@@ -685,17 +685,19 @@ void Optimizer::LocalBundleAdjustment(KeyFrame* currKeyFrame, bool* stopFlag, Ma
 			continue;
 
 		g2o::HyperGraph::Edge* e = edges[i];
-
 		const int type = edgeTypes[i];
-		const bool monocular = type == EDGE_MONO;
 
-		const double chi2 = monocular ? AsMonocular(e)->chi2() : AsStereo(e)->chi2();
-		const bool isDepthPositive = monocular ? AsMonocular(e)->isDepthPositive() : AsStereo(e)->isDepthPositive();
-
-		if (chi2 > maxChi2[type] || !isDepthPositive)
+		if (type == EDGE_MONO)
 		{
-			KeyFrame* keyframe = keyframes[i];
-			toErase.push_back(std::make_pair(keyframe, mappoint));
+			auto _e = static_cast<g2o::EdgeSE3ProjectXYZ*>(e);
+			if (_e->chi2() > maxChi2[type] || !_e->isDepthPositive())
+				toErase.push_back(std::make_pair(keyframes[i], mappoint));
+		}
+		else
+		{
+			auto _e = static_cast<g2o::EdgeStereoSE3ProjectXYZ*>(e);
+			if (_e->chi2() > maxChi2[type] || !_e->isDepthPositive())
+				toErase.push_back(std::make_pair(keyframes[i], mappoint));
 		}
 	}
 
