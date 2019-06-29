@@ -594,7 +594,7 @@ void Optimizer::LocalBundleAdjustment(KeyFrame* currKeyFrame, bool* stopFlag, Ma
 			// Monocular observation
 			if (ur < 0)
 			{
-				g2o::EdgeSE3ProjectXYZ* e = new g2o::EdgeSE3ProjectXYZ();
+				auto e = new g2o::EdgeSE3ProjectXYZ();
 
 				e->setVertex(0, optimizer.vertex(id));
 				e->setVertex(1, optimizer.vertex(keyframe->id));
@@ -610,7 +610,7 @@ void Optimizer::LocalBundleAdjustment(KeyFrame* currKeyFrame, bool* stopFlag, Ma
 			}
 			else // Stereo observation
 			{
-				g2o::EdgeStereoSE3ProjectXYZ* e = new g2o::EdgeStereoSE3ProjectXYZ();
+				auto e = new g2o::EdgeStereoSE3ProjectXYZ();
 
 				e->setVertex(0, optimizer.vertex(id));
 				e->setVertex(1, optimizer.vertex(keyframe->id));
