@@ -377,7 +377,7 @@ int Optimizer::PoseOptimization(Frame* frame)
 			// Monocular observation
 			if (ur < 0)
 			{
-				g2o::EdgeSE3ProjectXYZOnlyPose* e = new g2o::EdgeSE3ProjectXYZOnlyPose();
+				auto e = new g2o::EdgeSE3ProjectXYZOnlyPose();
 
 				e->setVertex(0, vertex);
 				SetMeasurement(e, keypoint.pt);
@@ -392,7 +392,7 @@ int Optimizer::PoseOptimization(Frame* frame)
 			}
 			else  // Stereo observation
 			{
-				g2o::EdgeStereoSE3ProjectXYZOnlyPose* e = new g2o::EdgeStereoSE3ProjectXYZOnlyPose();
+				auto e = new g2o::EdgeStereoSE3ProjectXYZOnlyPose();
 
 				e->setVertex(0, vertex);
 				SetMeasurement(e, keypoint.pt, ur);
@@ -419,9 +419,6 @@ int Optimizer::PoseOptimization(Frame* frame)
 	const int iterations = 10;
 	const double maxChi2[2] = { CHI2_MONO, CHI2_STEREO };
 
-	auto AsMonocular = [](g2o::HyperGraph::Edge* e) { return static_cast<g2o::EdgeSE3ProjectXYZOnlyPose*>(e); };
-	auto AsStereo = [](g2o::HyperGraph::Edge* e) { return static_cast<g2o::EdgeStereoSE3ProjectXYZOnlyPose*>(e); };
-
 	int noutliers = 0;
 	for (int k = 0; k < 4; k++)
 	{
@@ -435,23 +432,51 @@ int Optimizer::PoseOptimization(Frame* frame)
 			g2o::HyperGraph::Edge* e = edges[i];
 			const int idx = indices[i];
 			const int type = edgeTypes[i];
-			const bool monocular = type == EDGE_MONO;
+			
+			if (type == EDGE_MONO)
+			{
+				auto _e = static_cast<g2o::EdgeSE3ProjectXYZOnlyPose*>(e);
 
-			if (frame->outlier[idx])
-				monocular ? AsMonocular(e)->computeError() : AsStereo(e)->computeError();
+				if (frame->outlier[idx])
+					_e->computeError();
 
-			const double chi2 = monocular ? AsMonocular(e)->chi2() : AsStereo(e)->chi2();
-			const bool outlier = chi2 > maxChi2[type];
-			const int level = outlier ? 1 : 0;
+				if (_e->chi2() > maxChi2[type])
+				{
+					frame->outlier[idx] = true;
+					_e->setLevel(1);
+					noutliers++;
+				}
+				else
+				{
+					frame->outlier[idx] = false;
+					_e->setLevel(0);
+				}
 
-			monocular ? AsMonocular(e)->setLevel(level) : AsStereo(e)->setLevel(level);
+				if (k == 2)
+					_e->setRobustKernel(0);
+			}
+			else
+			{
+				auto _e = static_cast<g2o::EdgeStereoSE3ProjectXYZOnlyPose*>(e);
 
-			frame->outlier[idx] = outlier;
-			if (outlier)
-				noutliers++;
+				if (frame->outlier[idx])
+					_e->computeError();
 
-			if (k == 2)
-				monocular ? AsMonocular(e)->setRobustKernel(0) : AsStereo(e)->setRobustKernel(0);
+				if (_e->chi2() > maxChi2[type])
+				{
+					frame->outlier[idx] = true;
+					_e->setLevel(1);
+					noutliers++;
+				}
+				else
+				{
+					frame->outlier[idx] = false;
+					_e->setLevel(0);
+				}
+
+				if (k == 2)
+					_e->setRobustKernel(0);
+			}
 		}
 		if (optimizer.edges().size() < 10)
 			break;
