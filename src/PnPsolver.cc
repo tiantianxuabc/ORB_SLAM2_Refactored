@@ -673,10 +673,6 @@ void PnPsolver::find_betas_approx_1(const cv::Mat& L_6x10, const cv::Mat& Rho,
 	cv::Mat B4 = cv::Mat(4, 1, CV_64F, b4);
 
 	for (int i = 0; i < 6; i++) {
-		//cvmSet(&L_6x4, i, 0, cvmGet(L_6x10, i, 0));
-		//cvmSet(&L_6x4, i, 1, cvmGet(L_6x10, i, 1));
-		//cvmSet(&L_6x4, i, 2, cvmGet(L_6x10, i, 3));
-		//cvmSet(&L_6x4, i, 3, cvmGet(L_6x10, i, 6));
 		L_6x4.at<double>(i, 0) = L_6x10.at<double>(i, 0);
 		L_6x4.at<double>(i, 1) = L_6x10.at<double>(i, 1);
 		L_6x4.at<double>(i, 2) = L_6x10.at<double>(i, 3);
@@ -710,9 +706,6 @@ void PnPsolver::find_betas_approx_2(const cv::Mat& L_6x10, const cv::Mat& Rho,
 	cv::Mat B3 = cv::Mat(3, 1, CV_64F, b3);
 
 	for (int i = 0; i < 6; i++) {
-		//cvmSet(&L_6x3, i, 0, cvmGet(L_6x10, i, 0));
-		//cvmSet(&L_6x3, i, 1, cvmGet(L_6x10, i, 1));
-		//cvmSet(&L_6x3, i, 2, cvmGet(L_6x10, i, 2));
 		L_6x3.at<double>(i, 0) = L_6x10.at<double>(i, 0);
 		L_6x3.at<double>(i, 1) = L_6x10.at<double>(i, 1);
 		L_6x3.at<double>(i, 2) = L_6x10.at<double>(i, 2);
@@ -746,11 +739,6 @@ void PnPsolver::find_betas_approx_3(const cv::Mat& L_6x10, const cv::Mat& Rho,
 	cv::Mat B5 = cv::Mat(5, 1, CV_64F, b5);
 
 	for (int i = 0; i < 6; i++) {
-		//cvmSet(&L_6x5, i, 0, cvmGet(L_6x10, i, 0));
-		//cvmSet(&L_6x5, i, 1, cvmGet(L_6x10, i, 1));
-		//cvmSet(&L_6x5, i, 2, cvmGet(L_6x10, i, 2));
-		//cvmSet(&L_6x5, i, 3, cvmGet(L_6x10, i, 3));
-		//cvmSet(&L_6x5, i, 4, cvmGet(L_6x10, i, 4));
 		L_6x5.at<double>(i, 0) = L_6x10.at<double>(i, 0);
 		L_6x5.at<double>(i, 1) = L_6x10.at<double>(i, 1);
 		L_6x5.at<double>(i, 2) = L_6x10.at<double>(i, 2);
@@ -837,7 +825,6 @@ void PnPsolver::compute_A_and_b_gauss_newton(const double * l_6x10, const double
 		rowA[2] = rowL[3] * betas[0] + rowL[4] * betas[1] + 2 * rowL[5] * betas[2] + rowL[8] * betas[3];
 		rowA[3] = rowL[6] * betas[0] + rowL[7] * betas[1] + rowL[8] * betas[2] + 2 * rowL[9] * betas[3];
 
-		//cvmSet(b, i, 0, rho[i] -
 		b.at<double>(i, 0) = rho[i] -
 			(
 				rowL[0] * betas[0] * betas[0] +
