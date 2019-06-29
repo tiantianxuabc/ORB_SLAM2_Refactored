@@ -76,7 +76,7 @@ cv::Mat FrameDrawer::DrawFrame()
 	} // destroy scoped mutex -> release mutex
 
 	if (image.channels() < 3) //this should be always true
-		cv::cvtColor(image, image, CV_GRAY2BGR);
+		cv::cvtColor(image, image, cv::COLOR_GRAY2BGR);
 
 	//Draw
 	if (state == Tracking::STATE_NOT_INITIALIZED) //INITIALIZING
